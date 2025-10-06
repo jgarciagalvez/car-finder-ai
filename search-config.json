@@ -1,0 +1,32 @@
+{
+  "searchUrls": {
+    "otomoto": [
+      {
+        "name": "BMW 3 Series E90/E91/E92/E93",
+        "url": "https://www.otomoto.pl/osobowe/bmw/seria-3?search%5Bfilter_enum_generation%5D%5B0%5D=e90-e91-e92-e93-2005-2013&search%5Bfilter_float_price%3Afrom%5D=15000&search%5Bfilter_float_price%3Ato%5D=35000&search%5Bfilter_float_year%3Afrom%5D=2008&search%5Bfilter_float_year%3Ato%5D=2013&search%5Bfilter_float_mileage%3Ato%5D=200000&search%5Bfilter_enum_fuel_type%5D%5B0%5D=diesel&search%5Border%5D=created_at%3Adesc",
+        "description": "BMW 3 Series E90-E93 generation, diesel, 2008-2013, up to 200k km, 15-35k PLN"
+      }
+    ],
+    "olx": [
+      {
+        "name": "BMW 3 Series General Search",
+        "url": "https://www.olx.pl/motoryzacja/samochody/bmw/seria-3/?search%5Bfilter_float_price%3Afrom%5D=15000&search%5Bfilter_float_price%3Ato%5D=35000&search%5Border%5D=created_at%3Adesc",
+        "description": "BMW 3 Series on OLX, 15-35k PLN price range"
+      }
+    ]
+  },
+  "ingestionSettings": {
+    "maxPagesPerSearch": 5,
+    "delayBetweenRequests": {
+      "min": 2000,
+      "max": 5000
+    },
+    "retryAttempts": 3,
+    "batchSize": 10,
+    "enableDeduplication": true
+  },
+  "currencyConversion": {
+    "plnToEurRate": 0.23,
+    "lastUpdated": "2025-10-06"
+  }
+}

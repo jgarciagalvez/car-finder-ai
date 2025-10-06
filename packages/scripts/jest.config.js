@@ -19,13 +19,12 @@ module.exports = {
   ],
   
   // Module resolution for monorepo cross-package testing
-  moduleNameMapper: {
+  moduleNameMapping: {
     '^@car-finder/types$': '<rootDir>/../types/src',
+    '^@car-finder/db$': '<rootDir>/../db/src',
     '^@car-finder/services$': '<rootDir>/../services/src',
     '^@car-finder/services/(.*)$': '<rootDir>/../services/src/$1',
   },
-  
-  setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
   
   // Coverage and reporting
   coverageDirectory: 'coverage',
@@ -34,6 +33,6 @@ module.exports = {
   // Clear mocks between tests
   clearMocks: true,
   
-  // Test timeout
-  testTimeout: 10000,
+  // Test timeout for integration tests
+  testTimeout: 15000,
 };

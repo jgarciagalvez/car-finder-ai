@@ -1,0 +1,30 @@
+{
+  "name": "@car-finder/services",
+  "version": "1.0.0",
+  "description": "Service abstraction layer and dependency injection for Car Finder AI",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@car-finder/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.11.0",
+    "jest": "^29.7.0",
+    "rimraf": "^5.0.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.5.0"
+  },
+  "peerDependencies": {
+    "puppeteer": "^22.0.0",
+    "cheerio": "^1.0.0",
+    "kysely": "^0.27.0"
+  }
+}

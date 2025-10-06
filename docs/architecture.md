@@ -340,45 +340,152 @@ Workflows are defined for **Data Ingestion**, **Data Analysis**, and **AI Chat I
 
 A `vehicles` table will be created in SQLite using SQL DDL, with indexes for performance and a trigger to auto-update timestamps.
 
-### Frontend Architecture
+### Global Project Structure
 
-The architecture is based on Next.js App Router, with a clear folder structure for components, context, hooks, and libraries. It uses React Context for state and a dedicated API client for data fetching.
+```
+car-finder-ai/
+├── apps/
+│   ├── api/                 # Express.js API server
+│   └── web/                 # Next.js frontend application
+├── packages/
+│   ├── types/              # Shared TypeScript types
+│   ├── db/                 # Database layer & repositories
+│   ├── scripts/            # Background processing scripts (ingest, analyze)
+│   ├── services/           # Service abstraction layer (Story 2.0)
+│   └── ai/                 # AI provider abstraction (Epic 2)
+├── docs/                   # Project documentation
+│   ├── architecture.md     # This file
+│   ├── prd.md             # Product requirements
+│   ├── project-brief.md   # Project overview
+│   └── stories/           # User stories
+├── .env                    # Environment configuration (gitignored)
+├── .env.example           # Environment template
+├── .gitignore             # Git ignore rules
+├── package.json           # Root workspace configuration
+├── pnpm-workspace.yaml    # pnpm workspace config
+├── turbo.json             # Turborepo build pipeline
+├── tsconfig.json          # Root TypeScript config
+├── parser-schema.json     # HTML parsing configuration
+└── search-config.json     # Search URL configuration
+```
 
 ### Backend Architecture
 
 The backend follows a **dual-purpose Node.js architecture** with clear separation between API serving and background processing:
 
-#### **API Server (`apps/api`)**
-- **Framework**: Express.js server for HTTP API endpoints
-- **Purpose**: Serves data to the frontend via REST API
-- **Structure**: 
-  ```
-  apps/api/src/
-  ├── routes/              (HTTP endpoint handlers)
-  │   ├── vehicles.ts      (Vehicle CRUD endpoints)
-  │   ├── ai.ts           (AI chat endpoints)
-  │   └── index.ts        (Route registration)
-  ├── services/           (Business logic services)
-  │   ├── ScraperService.ts
-  │   ├── ParserService.ts
-  │   └── MarketValueService.ts
-  ├── middleware/         (Cross-cutting concerns)
-  │   ├── cors.ts
-  │   ├── errorHandler.ts
-  │   └── validation.ts
-  └── index.ts           (Express server entry point)
-  ```
+- **API Server (`apps/api`)**: Express.js server for HTTP endpoints serving the frontend
+- **Background Scripts (`packages/scripts`)**: Independent Node.js processes for data ingestion and AI analysis
+- **Shared Services**: Reusable business logic in `apps/api/src/services/` consumed by both API and scripts
+- **Service Contracts**: Cross-package dependencies use `packages/services` interface contracts for testing
 
-#### **Background Processing Scripts (`packages/scripts`)**
-- **Scripts**: `ingest.ts` and `analyze.ts` for data processing
-- **Purpose**: Automated data collection and AI analysis
-- **Runtime**: Independent Node.js processes, not part of API server
-- **Integration**: Uses same services and database as API server
+### Frontend Architecture
 
-#### **Shared Services Architecture**
-- **Business Logic**: Reusable services in `apps/api/src/services/`
-- **Database Access**: All data operations through `packages/db` repository pattern
-- **Service Contracts**: Cross-package dependencies use `packages/services` interface contracts
+The architecture is based on Next.js App Router, with a clear folder structure for components, context, hooks, and libraries. It uses React Context for state and a dedicated API client for data fetching.
+
+### Package Architecture
+
+- **`packages/types`**: Shared TypeScript interfaces and types used across all apps and packages
+- **`packages/db`**: Database layer with SQLite, Kysely query builder, and repository pattern
+- **`packages/scripts`**: Background processing scripts for data ingestion and AI analysis
+- **`packages/services`**: Service abstraction layer with interfaces, adapters, and mocks for testing
+- **`packages/ai`**: AI provider abstraction layer with Gemini API integration and future provider support
+
+### Application Architecture
+
+#### API Server Structure (`apps/api`)
+
+```
+apps/api/
+├── src/
+│   ├── routes/                 # HTTP endpoint handlers
+│   │   ├── vehicles.ts         # GET/PATCH /api/vehicles
+│   │   ├── ai.ts              # POST /api/ai/chat
+│   │   └── index.ts           # Route registration & middleware setup
+│   ├── services/              # Business logic (reusable)
+│   │   ├── ScraperService.ts  # Puppeteer scraping
+│   │   ├── ParserService.ts   # HTML parsing
+│   │   ├── AIService.ts       # LLM interactions (Epic 2)
+│   │   └── MarketValueService.ts # Price analysis (Epic 2)
+│   ├── middleware/            # Cross-cutting concerns
+│   │   ├── cors.ts           # CORS configuration
+│   │   ├── errorHandler.ts   # Global error handling
+│   │   └── validation.ts     # Request validation
+│   ├── types/                # API-specific types
+│   │   ├── requests.ts       # Request DTOs
+│   │   └── responses.ts      # Response DTOs
+│   └── index.ts              # Express server entry point
+├── __tests__/                # Integration tests
+├── package.json
+└── tsconfig.json
+```
+
+#### Frontend Application Structure (`apps/web`)
+
+```
+apps/web/
+├── src/
+│   ├── app/                   # Next.js App Router
+│   │   ├── dashboard/         # Main vehicle dashboard
+│   │   │   └── page.tsx
+│   │   ├── vehicle/           # Vehicle detail pages
+│   │   │   └── [id]/
+│   │   │       └── page.tsx
+│   │   ├── globals.css        # Global styles
+│   │   ├── layout.tsx         # Root layout
+│   │   └── page.tsx          # Home page (redirect to dashboard)
+│   ├── components/            # Reusable UI components
+│   │   ├── ui/               # Shadcn UI primitives
+│   │   ├── VehicleCard.tsx   # Vehicle card component
+│   │   ├── VehicleDashboard.tsx
+│   │   ├── VehicleDetail.tsx
+│   │   └── CommunicationAssistant.tsx
+│   ├── lib/                  # Utilities and configurations
+│   │   ├── api.ts           # API client (fetch wrapper)
+│   │   ├── utils.ts         # General utilities
+│   │   └── types.ts         # Frontend-specific types
+│   ├── context/             # React Context providers
+│   │   ├── VehicleContext.tsx # Vehicle state management
+│   │   └── UIContext.tsx     # UI state (filters, sorting)
+│   └── hooks/               # Custom React hooks
+│       ├── useVehicles.ts   # Vehicle data fetching
+│       └── useAPI.ts        # Generic API hook
+├── public/                  # Static assets
+├── __tests__/              # Component tests
+├── package.json
+├── tsconfig.json
+└── next.config.js          # Next.js configuration
+```
+
+#### Environment Configuration
+
+**Single Root Configuration**:
+```bash
+# Root .env file (gitignored)
+GEMINI_API_KEY=your_key_here
+DATABASE_PATH=./data/vehicles.db
+NODE_ENV=development
+API_PORT=3000
+WEB_PORT=3001
+API_BASE_URL=http://localhost:3000
+```
+
+**Access Patterns**:
+- **`apps/api`**: Direct access via `process.env.GEMINI_API_KEY`
+- **`apps/web`**: Next.js automatically loads root `.env` files
+- **`packages/scripts`**: Direct access for ingestion/analysis scripts
+
+**Security**: Root `.env` in `.gitignore`, provide `.env.example` template.
+
+#### Build Outputs
+
+```
+# Build artifacts (gitignored)
+apps/api/dist/       # Compiled TypeScript for API server
+apps/web/.next/      # Next.js build output
+packages/*/dist/     # Compiled package builds
+data/               # SQLite database files
+node_modules/       # Dependencies
+```
 
 ### Unified Project Structure
 
@@ -394,6 +501,73 @@ Development is managed via `pnpm` scripts with concurrent execution:
 
 **Local Development**: Both frontend and API run concurrently on different ports (typically localhost:3001 for web, localhost:3000 for API).
 
+### Development Standards
+
+#### Naming Conventions
+
+**Files & Directories**:
+- React components: `PascalCase` - `VehicleCard.tsx`, `DashboardLayout.tsx`
+- Utilities/services: `camelCase` - `api.ts`, `scraperService.ts`, `marketValueService.ts`
+- Next.js routes: Follow App Router conventions - `dashboard/page.tsx`, `vehicle/[id]/page.tsx`
+- Type files: `camelCase` - `vehicleTypes.ts`, `apiTypes.ts`
+- Test files: Match source file - `VehicleCard.test.tsx`, `api.test.ts`
+- Directories: `kebab-case` - `vehicle-detail/`, `ai-analysis/`
+
+**Variables & Functions**:
+- Variables: `camelCase` - `vehicleData`, `isLoading`
+- Functions: `camelCase` - `fetchVehicles()`, `calculateScore()`
+- Constants: `SCREAMING_SNAKE_CASE` - `MAX_RETRY_ATTEMPTS`, `API_ENDPOINTS`
+- Private methods: `_camelCase` - `_validateInput()`
+
+**Types & Interfaces**:
+- Interfaces: `PascalCase` with `I` prefix - `IVehicleService`, `IScraperConfig`
+- Types: `PascalCase` - `VehicleStatus`, `ApiResponse`
+- Enums: `PascalCase` - `VehicleSource`, `AnalysisType`
+- Generic types: `T`, `K`, `V` - `ApiResponse<T>`
+
+**React Specific**:
+- Components: `PascalCase` - `VehicleCard`, `DashboardLayout`
+- Props interfaces: `ComponentNameProps` - `VehicleCardProps`
+- Hooks: `use` prefix - `useVehicles`, `useAPI`
+- Context: `ComponentContext` - `VehicleContext`, `UIContext`
+
+**Database & API**:
+- Database fields: `snake_case` - `source_url`, `created_at`
+- API endpoints: `kebab-case` - `/api/vehicles`, `/api/ai-analysis`
+- Query parameters: `camelCase` - `?sortBy=price&filterStatus=new`
+
+#### Code Organization Standards
+
+**Import Order**:
+1. React/Next.js imports
+2. Third-party libraries
+3. Internal packages (`@car-finder/*`)
+4. Relative imports (`./`, `../`)
+
+**Function Organization**:
+- Public methods first
+- Private methods last
+- Async functions clearly marked
+- Error handling explicit
+
+**Type Safety**:
+- Explicit return types for functions
+- Strict null checks enabled
+- No `any` types (use `unknown` if needed)
+- Proper error type definitions
+
+#### Testing Patterns
+
+**Test Organization**:
+- Co-located tests: `Component.test.tsx`
+- Integration tests: `__tests__/integration/`
+- Service mocks: Use `packages/services` abstractions
+
+**State Management Approach**:
+- React Context for global state
+- Custom hooks for data fetching
+- Local state for UI interactions
+
 ### Key Developer Standards
 
   * **Frontend**: Pure Next.js application in `apps/web` (no API routes)
@@ -401,10 +575,11 @@ Development is managed via `pnpm` scripts with concurrent execution:
   * **Types**: Use shared types from `packages/types`
   * **Database**: All DB access through the `packages/db` repository
   * **API Client**: All frontend API calls through `lib/api.ts`
-  * **Environment**: API keys must be loaded from a `.env` file
+  * **Environment**: Single root `.env` file for all configuration
   * **Services**: Cross-package service dependencies must use `packages/services` interface contracts
   * **Testing**: All integration tests must use service mocks and abstractions from `packages/services`
   * **AI**: AI operations must use the provider abstraction layer from `packages/ai`
+  * **Naming**: Follow established naming conventions for consistency across the monorepo
 
 ### Checklist Results Report
 

@@ -19,9 +19,20 @@ describe('DatabaseService', () => {
       await dbService.close();
     }
     
-    // Remove test database file
+    // Remove test database file with retry for Windows file locking
     if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
+      try {
+        fs.unlinkSync(testDbPath);
+      } catch (error) {
+        // Retry after a short delay for Windows file locking issues
+        await new Promise(resolve => setTimeout(resolve, 100));
+        try {
+          fs.unlinkSync(testDbPath);
+        } catch (retryError) {
+          // If still fails, just warn - don't fail the test
+          console.warn(`Warning: Could not delete test database file: ${testDbPath}`);
+        }
+      }
     }
   });
 

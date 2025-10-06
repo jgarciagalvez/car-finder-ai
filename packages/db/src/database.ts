@@ -1,17 +1,35 @@
-import Database from 'better-sqlite3';
-import { Kysely, SqliteDialect, sql } from 'kysely';
+import { createClient, type Client } from '@libsql/client';
+import { Kysely, sql } from 'kysely';
+import { LibsqlDialect } from 'kysely-libsql';
 import { Database as DatabaseSchema, SCHEMA_STATEMENTS } from './schema';
 import path from 'path';
 import fs from 'fs';
 
 export class DatabaseService {
   private db: Kysely<DatabaseSchema> | null = null;
-  private sqliteDb: Database.Database | null = null;
+  private sqliteDb: Client | null = null;
   private dbPath: string;
 
   constructor(dbPath?: string) {
-    // Default to a local database file in the project root
-    this.dbPath = dbPath || path.join(process.cwd(), 'car-finder.db');
+    // Use DATABASE_PATH environment variable or fallback to architecture-specified path
+    // Find project root by looking for package.json with workspaces
+    const findProjectRoot = (): string => {
+      let currentDir = process.cwd();
+      while (currentDir !== path.dirname(currentDir)) {
+        const packageJsonPath = path.join(currentDir, 'package.json');
+        if (fs.existsSync(packageJsonPath)) {
+          const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+          if (packageJson.workspaces) {
+            return currentDir; // Found the monorepo root
+          }
+        }
+        currentDir = path.dirname(currentDir);
+      }
+      return process.cwd(); // Fallback to current directory
+    };
+    
+    const projectRoot = findProjectRoot();
+    this.dbPath = dbPath || process.env.DATABASE_PATH || path.join(projectRoot, 'data', 'vehicles.db');
   }
 
   /**
@@ -25,13 +43,15 @@ export class DatabaseService {
         fs.mkdirSync(dbDir, { recursive: true });
       }
 
-      // Create SQLite database connection
-      this.sqliteDb = new Database(this.dbPath);
+      // Create LibSQL database connection
+      this.sqliteDb = createClient({
+        url: `file:${this.dbPath}`
+      });
       
-      // Create Kysely instance with SQLite dialect
+      // Create Kysely instance with official LibSQL dialect
       this.db = new Kysely<DatabaseSchema>({
-        dialect: new SqliteDialect({
-          database: this.sqliteDb,
+        dialect: new LibsqlDialect({
+          client: this.sqliteDb,
         }),
       });
 
@@ -85,7 +105,12 @@ export class DatabaseService {
       }
       
       if (this.sqliteDb) {
-        this.sqliteDb.close();
+        try {
+          await this.sqliteDb.close();
+        } catch (error) {
+          // Ignore close errors - database might already be closed
+          console.warn('Warning: Error closing database connection:', error);
+        }
         this.sqliteDb = null;
       }
       

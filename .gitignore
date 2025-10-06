@@ -85,3 +85,10 @@ jspm_packages/
 # temporary folders
 tmp/
 temp/
+
+# Database files (production data only - test databases are committed)
+data/vehicles.db
+
+# Test databases in test directories (temporary files)
+**/__tests__/*.db
+**/test-*.db

@@ -53,7 +53,7 @@ graph TD
 | **BE Runtime** | Node.js | `~20.11.0` | Executes backend scripts/API | Current Long-Term Support (LTS) version. |
 | **API Framework** | Express.js | `~4.18.0` | API server and routing | Lightweight and flexible web framework for Node.js. |
 | **Web Scraping**| Puppeteer | `~22.0.0` | Headless browser for scraping | Robust control over a headless Chrome instance. |
-| **Database** | SQLite | `~5.1.0` | Local database storage | Simple, file-based SQL database for a zero-cost app. |
+| **Database** | LibSQL | `@libsql/client` | Local database storage | SQLite-compatible database with pure JavaScript implementation for zero-cost, cross-platform operation. |
 | **AI SDK** | `@google/generative-ai` | `~0.11.0` | Gemini API client library | The official Google SDK. |
 | **Testing** | Jest & RTL | `~29.7.0` | Unit and integration testing | The standard testing suite for Next.js/React. |
 
@@ -358,6 +358,9 @@ car-finder-ai/
 │   ├── prd.md             # Product requirements
 │   ├── project-brief.md   # Project overview
 │   └── stories/           # User stories
+├── data/                   # Runtime data directory
+│   ├── vehicles.db         # Main SQLite database (gitignored)
+│   └── vehicles.test.db    # Test database (example, committed)
 ├── .env                    # Environment configuration (gitignored)
 ├── .env.example           # Environment template
 ├── .gitignore             # Git ignore rules
@@ -463,18 +466,25 @@ apps/web/
 # Root .env file (gitignored)
 GEMINI_API_KEY=your_key_here
 DATABASE_PATH=./data/vehicles.db
+TEST_DATABASE_PATH=./data/vehicles.test.db
 NODE_ENV=development
 API_PORT=3000
 WEB_PORT=3001
 API_BASE_URL=http://localhost:3000
 ```
 
-**Access Patterns**:
-- **`apps/api`**: Direct access via `process.env.GEMINI_API_KEY`
-- **`apps/web`**: Next.js automatically loads root `.env` files
-- **`packages/scripts`**: Direct access for ingestion/analysis scripts
+**Database Configuration**:
+- **Production Database**: `./data/vehicles.db` (gitignored - contains real user data)
+- **Test Database**: `./data/vehicles.test.db` (committed as example with sample data)
+- **Database Directory**: `./data/` created automatically if it doesn't exist
 
-**Security**: Root `.env` in `.gitignore`, provide `.env.example` template.
+**Access Patterns**:
+- **`apps/api`**: Direct access via `process.env.DATABASE_PATH`
+- **`apps/web`**: Next.js automatically loads root `.env` files for `NEXT_PUBLIC_*` variables
+- **`packages/scripts`**: Direct access for ingestion/analysis scripts
+- **`packages/db`**: Uses `DATABASE_PATH` for production, `TEST_DATABASE_PATH` for testing
+
+**Security**: Root `.env` in `.gitignore`, provide `.env.example` template with sample values.
 
 #### Build Outputs
 
@@ -483,8 +493,12 @@ API_BASE_URL=http://localhost:3000
 apps/api/dist/       # Compiled TypeScript for API server
 apps/web/.next/      # Next.js build output
 packages/*/dist/     # Compiled package builds
-data/               # SQLite database files
-node_modules/       # Dependencies
+node_modules/        # Dependencies
+
+# Data directory (mixed gitignore strategy)
+data/
+├── vehicles.db      # Production database (gitignored)
+└── vehicles.test.db # Test database with sample data (committed)
 ```
 
 ### Unified Project Structure

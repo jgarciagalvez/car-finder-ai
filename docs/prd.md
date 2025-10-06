@@ -86,7 +86,7 @@ The testing strategy will focus on Unit Tests for complex functions and Integrat
 #### Additional Technical Assumptions and Requests
 * The backend will be built with **Node.js**, **Express.js**, and **Puppeteer**.
 * The frontend will be built with **React/Next.js** and **Tailwind CSS**.
-* The database will be **SQLite**.
+* The database will be **LibSQL** (SQLite-compatible).
 * Data parsing will be driven by an external **`parser-schema.json`** file.
 * **AI Provider Abstraction:** The application will use an abstraction layer for AI interactions. For the MVP, only the **Google Gemini API** will be implemented.
 
@@ -113,7 +113,7 @@ The testing strategy will focus on Unit Tests for complex functions and Integrat
 #### **Story 1.2: Local Database Initialization**
 **As a** user, **I want** a local SQLite database and a simple data access layer set up, **so that** scraped data can be stored persistently on my machine.
 **Acceptance Criteria:**
-1. The project includes `sqlite3` and a query builder like `Kysely`.
+1. The project includes `@libsql/client` and a query builder like `Kysely`.
 2. A database schema is defined for a `vehicles` table with columns for all required data.
 3. A database service is created that can initialize the database file and schema.
 4. The service exposes basic functions like `insertVehicle` and `findVehicleByUrl`.

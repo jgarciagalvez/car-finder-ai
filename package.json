@@ -10,7 +10,9 @@
   "packageManager": "pnpm@10.18.0",
   "scripts": {
     "build": "turbo build",
-    "dev": "turbo dev",
+    "dev": "pnpm --filter @car-finder/web dev",
+    "dev:api": "pnpm --filter @car-finder/api dev",
+    "dev:all": "turbo dev",
     "lint": "turbo lint",
     "type-check": "turbo type-check",
     "test": "turbo test",

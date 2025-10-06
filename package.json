@@ -1,0 +1,33 @@
+{
+  "name": "car-finder-ai",
+  "version": "1.0.0",
+  "description": "Personal Car Finder AI - Automated vehicle search and analysis tool",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "packageManager": "pnpm@10.18.0",
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "type-check": "turbo type-check",
+    "test": "turbo test",
+    "ingest": "pnpm --filter @car-finder/scripts ingest",
+    "analyze": "pnpm --filter @car-finder/scripts analyze"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.5.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.0.0",
+    "prettier": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=20.11.0",
+    "pnpm": ">=8.0.0"
+  }
+}

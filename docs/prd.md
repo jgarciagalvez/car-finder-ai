@@ -84,7 +84,7 @@ The primary architecture for the MVP will be a **Local-First Execution Model**. 
 The testing strategy will focus on Unit Tests for complex functions and Integration Tests for the core scraping/parsing logic.
 
 #### Additional Technical Assumptions and Requests
-* The backend will be built with **Node.js** and **Puppeteer**.
+* The backend will be built with **Node.js**, **Express.js**, and **Puppeteer**.
 * The frontend will be built with **React/Next.js** and **Tailwind CSS**.
 * The database will be **SQLite**.
 * Data parsing will be driven by an external **`parser-schema.json`** file.

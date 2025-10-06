@@ -46,11 +46,12 @@ graph TD
 | :--- | :--- | :--- | :--- | :--- |
 | **Monorepo** | Turborepo | `~2.0.0` | Manages the monorepo workspace | Lightweight and fast. |
 | **Language** | TypeScript | `~5.5.0` | Primary language for all code | Type safety improves code quality. |
-| **FE Framework** | Next.js | `~14.2.0` | Frontend application and simple API | Robust React framework for UI and simple API routes. |
+| **FE Framework** | Next.js | `~14.2.0` | Frontend application | Robust React framework for UI with App Router. |
 | **Styling** | Tailwind CSS | `~3.4.0` | Utility-first CSS framework | Allows for rapid UI development. |
 | **UI Components**| Shadcn UI | `CLI` | Component library primitives | Accessible and unstyled components for easy customization. |
 | **State Mgmt** | React Context/Hooks| `N/A` | Manages global UI state | Built-in to React, avoiding extra dependencies. |
 | **BE Runtime** | Node.js | `~20.11.0` | Executes backend scripts/API | Current Long-Term Support (LTS) version. |
+| **API Framework** | Express.js | `~4.18.0` | API server and routing | Lightweight and flexible web framework for Node.js. |
 | **Web Scraping**| Puppeteer | `~22.0.0` | Headless browser for scraping | Robust control over a headless Chrome instance. |
 | **Database** | SQLite | `~5.1.0` | Local database storage | Simple, file-based SQL database for a zero-cost app. |
 | **AI SDK** | `@google/generative-ai` | `~0.11.0` | Gemini API client library | The official Google SDK. |
@@ -345,7 +346,39 @@ The architecture is based on Next.js App Router, with a clear folder structure f
 
 ### Backend Architecture
 
-The backend is a script-based model using `ingest.ts` and `analyze.ts` for background processing, and Next.js API routes for serving data to the UI.
+The backend follows a **dual-purpose Node.js architecture** with clear separation between API serving and background processing:
+
+#### **API Server (`apps/api`)**
+- **Framework**: Express.js server for HTTP API endpoints
+- **Purpose**: Serves data to the frontend via REST API
+- **Structure**: 
+  ```
+  apps/api/src/
+  ├── routes/              (HTTP endpoint handlers)
+  │   ├── vehicles.ts      (Vehicle CRUD endpoints)
+  │   ├── ai.ts           (AI chat endpoints)
+  │   └── index.ts        (Route registration)
+  ├── services/           (Business logic services)
+  │   ├── ScraperService.ts
+  │   ├── ParserService.ts
+  │   └── MarketValueService.ts
+  ├── middleware/         (Cross-cutting concerns)
+  │   ├── cors.ts
+  │   ├── errorHandler.ts
+  │   └── validation.ts
+  └── index.ts           (Express server entry point)
+  ```
+
+#### **Background Processing Scripts (`packages/scripts`)**
+- **Scripts**: `ingest.ts` and `analyze.ts` for data processing
+- **Purpose**: Automated data collection and AI analysis
+- **Runtime**: Independent Node.js processes, not part of API server
+- **Integration**: Uses same services and database as API server
+
+#### **Shared Services Architecture**
+- **Business Logic**: Reusable services in `apps/api/src/services/`
+- **Database Access**: All data operations through `packages/db` repository pattern
+- **Service Contracts**: Cross-package dependencies use `packages/services` interface contracts
 
 ### Unified Project Structure
 
@@ -353,17 +386,25 @@ A Turborepo monorepo will be used with `apps/web`, `apps/api`, and `packages/db`
 
 ### Development Workflow
 
-Development is managed via `pnpm` scripts: `pnpm dev` (starts the UI), `pnpm ingest` (runs the scraper), and `pnpm analyze` (runs AI processing).
+Development is managed via `pnpm` scripts with concurrent execution:
+- `pnpm dev` - Starts the Next.js frontend (`apps/web`)
+- `pnpm dev:api` - Starts the Express.js API server (`apps/api`) 
+- `pnpm ingest` - Runs the data ingestion script (`packages/scripts`)
+- `pnpm analyze` - Runs the AI analysis script (`packages/scripts`)
+
+**Local Development**: Both frontend and API run concurrently on different ports (typically localhost:3001 for web, localhost:3000 for API).
 
 ### Key Developer Standards
 
-  * Use shared types from `packages/types`.
-  * All DB access through the `packages/db` repository.
-  * All frontend API calls through `lib/api.ts`.
-  * API keys must be loaded from a `.env` file.
-  * Cross-package service dependencies must use `packages/services` interface contracts.
-  * All integration tests must use service mocks and abstractions from `packages/services`.
-  * AI operations must use the provider abstraction layer from `packages/ai`.
+  * **Frontend**: Pure Next.js application in `apps/web` (no API routes)
+  * **API Endpoints**: All HTTP endpoints in `apps/api/src/routes/{domain}.ts` files using Express.js
+  * **Types**: Use shared types from `packages/types`
+  * **Database**: All DB access through the `packages/db` repository
+  * **API Client**: All frontend API calls through `lib/api.ts`
+  * **Environment**: API keys must be loaded from a `.env` file
+  * **Services**: Cross-package service dependencies must use `packages/services` interface contracts
+  * **Testing**: All integration tests must use service mocks and abstractions from `packages/services`
+  * **AI**: AI operations must use the provider abstraction layer from `packages/ai`
 
 ### Checklist Results Report
 

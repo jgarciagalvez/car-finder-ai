@@ -3,15 +3,19 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { ScraperService } from './services/ScraperService';
 import { ParserService } from './services/ParserService';
+import vehiclesRouter from './routes/vehicles';
 
-// Load environment variables
-dotenv.config();
+// Load environment variables from root
+dotenv.config({ path: '../../.env' });
 
 const app: Express = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.API_PORT || 3000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.WEB_PORT ? `http://localhost:${process.env.WEB_PORT}` : 'http://localhost:3001',
+  credentials: true
+}));
 app.use(express.json());
 
 // Health check endpoint
@@ -23,13 +27,8 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Placeholder API routes
-app.get('/api/vehicles', (req, res) => {
-  res.json({ 
-    message: 'Vehicles endpoint - to be implemented',
-    vehicles: []
-  });
-});
+// API Routes
+app.use('/api/vehicles', vehiclesRouter);
 
 // Parser service demonstration endpoint
 app.post('/api/parse', async (req, res) => {

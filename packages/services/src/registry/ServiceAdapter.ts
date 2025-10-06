@@ -14,12 +14,17 @@ export class ServiceAdapter {
   static registerProductionServices(): void {
     const registry = getGlobalRegistry();
 
-    // Register ScraperService (lazy loading to avoid circular dependencies)
-    registry.registerSingleton(SERVICE_KEYS.SCRAPER_SERVICE, () => {
+    // Register ScraperService with async browser initialization
+    registry.registerSingleton(SERVICE_KEYS.SCRAPER_SERVICE, async () => {
       // Dynamic import to avoid circular dependency
       const scraperPath = path.join(WorkspaceUtils.findWorkspaceRoot(), 'apps/api/src/services/ScraperService');
       const { ScraperService } = require(scraperPath);
-      return new ScraperService();
+      
+      // Initialize browser with proper async handling
+      const scraperService = new ScraperService();
+      await scraperService.initialize();
+      
+      return scraperService;
     });
 
     // Register ParserService

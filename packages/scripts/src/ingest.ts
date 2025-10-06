@@ -44,9 +44,9 @@ interface IngestionStats {
 }
 
 export class IngestionPipeline {
-  private scraperService: IScraperService;
-  private parserService: IParserService;
-  private vehicleRepository: IVehicleRepository;
+  private scraperService!: IScraperService;
+  private parserService!: IParserService;
+  private vehicleRepository!: IVehicleRepository;
   private config: IngestionConfig;
   private stats: IngestionStats;
   private processedUrls: Set<string> = new Set();
@@ -393,7 +393,7 @@ export class IngestionPipeline {
       console.log(`📅 Started at: ${this.stats.startTime.toISOString()}`);
 
       // Initialize services using ServiceRegistry
-      this.scraperService = ServiceRegistry.getScraperService();
+      this.scraperService = await ServiceRegistry.getScraperService();
       this.parserService = ServiceRegistry.getParserService();
       this.vehicleRepository = await ServiceRegistry.getVehicleRepository();
 

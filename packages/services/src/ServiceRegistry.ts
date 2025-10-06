@@ -22,10 +22,10 @@ export class ServiceRegistry {
   /**
    * Get scraper service instance
    */
-  static getScraperService(): IScraperService {
+  static async getScraperService(): Promise<IScraperService> {
     this.ensureInitialized();
     const registry = getGlobalRegistry();
-    return registry.resolve<IScraperService>(SERVICE_KEYS.SCRAPER_SERVICE);
+    return await registry.resolveAsync<IScraperService>(SERVICE_KEYS.SCRAPER_SERVICE);
   }
 
   /**

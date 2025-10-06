@@ -1,0 +1,63 @@
+{
+  "sites": {
+    "otomoto": {
+      "method": "json",
+      "scriptSelector": "script#__NEXT_DATA__",
+      "autoDetection": {
+        "searchPageIndicator": "props.pageProps.urqlState",
+        "detailPageIndicator": "props.pageProps.advert"
+      },
+      "pageTypes": {
+        "search": {
+          "basePath": "props.pageProps.urqlState",
+          "dataPath": "data",
+          "listPath": "advertSearch.edges",
+          "fields": {
+            "sourceId": "node.id",
+            "sourceUrl": "node.url", 
+            "sourceTitle": "node.title",
+            "sourceCreatedAt": "node.createdAt"
+          }
+        },
+        "detail": {
+          "basePath": "props.pageProps.advert",
+          "fields": {
+            "sourceId": "id",
+            "sourceTitle": "title",
+            "sourceUrl": "url",
+            "pricePln": "price.value",
+            "priceCurrency": "price.currency",
+            "sourceDescriptionHtml": "description",
+            "sourceCreatedAt": "createdAt",
+            "sellerName": "seller.name",
+            "sellerId": "seller.id",
+            "sellerType": "seller.type",
+            "sellerLocation": "seller.location.address",
+            "memberSince": "seller.featuresBadges[code=registration-date].label",
+            "sourceParameters": "details",
+            "sourceEquipment": "equipment",
+            "sourcePhotos": "images.photos"
+          }
+        }
+      }
+    },
+    "olx": {
+      "method": "css",
+      "pageTypes": {
+        "detail": {
+          "selectors": {
+            "title": "h1[data-cy='ad_title']",
+            "price": "[data-testid='ad-price-container']",
+            "description": "[data-cy='ad_description']",
+            "sourceId": "[data-cy='ad-posted-at']",
+            "sourceUrl": "link[rel='canonical']",
+            "sourceCreatedAt": "[data-cy='ad-posted-at']",
+            "sellerName": "[data-cy='seller-name']",
+            "sellerLocation": "[data-cy='seller-location']",
+            "sourcePhotos": ".swiper-slide img"
+          }
+        }
+      }
+    }
+  }
+}

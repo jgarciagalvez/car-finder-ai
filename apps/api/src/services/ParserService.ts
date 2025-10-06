@@ -2,6 +2,7 @@ import * as cheerio from 'cheerio';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Vehicle, VehicleSource, SellerInfo, SellerType } from '@car-finder/types';
+import { WorkspaceUtils } from '@car-finder/services';
 
 // Parser-specific types
 export type PageType = 'search' | 'detail';
@@ -45,7 +46,7 @@ export class ParserService {
   private schemaPath: string;
 
   constructor(schemaPath?: string) {
-    this.schemaPath = schemaPath || path.join(process.cwd(), 'parser-schema.json');
+    this.schemaPath = schemaPath || WorkspaceUtils.resolveSchemaFile('parser-schema.json');
     this.loadSchema();
   }
 

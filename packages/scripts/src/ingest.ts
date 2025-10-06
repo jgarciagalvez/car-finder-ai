@@ -2,9 +2,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { ScraperService } from '../../../apps/api/src/services/ScraperService';
-import { ParserService, SearchResult, ParseResult } from '../../../apps/api/src/services/ParserService';
-import { VehicleRepository, DatabaseService } from '@car-finder/db';
+import { ServiceRegistry, IScraperService, IParserService, IVehicleRepository, WorkspaceUtils } from '@car-finder/services';
+import { SearchResult, ParseResult } from '../../../apps/api/src/services/ParserService';
 import { Vehicle, VehicleSource } from '@car-finder/types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -45,21 +44,15 @@ interface IngestionStats {
 }
 
 export class IngestionPipeline {
-  private scraperService: ScraperService;
-  private parserService: ParserService;
-  private vehicleRepository: VehicleRepository;
+  private scraperService: IScraperService;
+  private parserService: IParserService;
+  private vehicleRepository: IVehicleRepository;
   private config: IngestionConfig;
   private stats: IngestionStats;
   private processedUrls: Set<string> = new Set();
 
   constructor() {
-    this.scraperService = new ScraperService();
-    this.parserService = new ParserService();
-    
-    // Initialize database and repository
-    const database = new DatabaseService();
-    this.vehicleRepository = new VehicleRepository(database.getDb());
-    
+    // Services will be initialized in run() method using ServiceRegistry
     this.config = this.loadConfiguration();
     this.stats = {
       totalSearchUrls: 0,
@@ -76,7 +69,7 @@ export class IngestionPipeline {
    * Load and validate search configuration from JSON file
    */
   private loadConfiguration(): IngestionConfig {
-    const configPath = path.join(process.cwd(), 'search-config.json');
+    const configPath = WorkspaceUtils.resolveConfigFile('search-config.json');
     
     if (!fs.existsSync(configPath)) {
       throw new Error(`Configuration file not found: ${configPath}`);
@@ -398,6 +391,11 @@ export class IngestionPipeline {
     try {
       console.log('🚀 Starting Car Finder AI Data Ingestion Pipeline');
       console.log(`📅 Started at: ${this.stats.startTime.toISOString()}`);
+
+      // Initialize services using ServiceRegistry
+      this.scraperService = ServiceRegistry.getScraperService();
+      this.parserService = ServiceRegistry.getParserService();
+      this.vehicleRepository = await ServiceRegistry.getVehicleRepository();
 
       // Collect all vehicle URLs from all search configurations
       const allVehicleUrls: { url: string; source: VehicleSource }[] = [];

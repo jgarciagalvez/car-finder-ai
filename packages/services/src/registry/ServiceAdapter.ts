@@ -1,5 +1,7 @@
 import { IScraperService, IParserService, IVehicleRepository, SERVICE_KEYS } from '../interfaces';
 import { getGlobalRegistry } from './index';
+import { WorkspaceUtils } from '../utils/WorkspaceUtils';
+import * as path from 'path';
 
 /**
  * Service adapter for runtime service binding
@@ -15,22 +17,30 @@ export class ServiceAdapter {
     // Register ScraperService (lazy loading to avoid circular dependencies)
     registry.registerSingleton(SERVICE_KEYS.SCRAPER_SERVICE, () => {
       // Dynamic import to avoid circular dependency
-      const { ScraperService } = require('../../../api/src/services/ScraperService');
+      const scraperPath = path.join(WorkspaceUtils.findWorkspaceRoot(), 'apps/api/src/services/ScraperService');
+      const { ScraperService } = require(scraperPath);
       return new ScraperService();
     });
 
     // Register ParserService
     registry.registerSingleton(SERVICE_KEYS.PARSER_SERVICE, () => {
-      const { ParserService } = require('../../../api/src/services/ParserService');
+      const parserPath = path.join(WorkspaceUtils.findWorkspaceRoot(), 'apps/api/src/services/ParserService');
+      const { ParserService } = require(parserPath);
       return new ParserService();
     });
 
-    // Register VehicleRepository
-    registry.registerSingleton(SERVICE_KEYS.VEHICLE_REPOSITORY, () => {
-      const { createDatabase } = require('../../db/src/database');
-      const { VehicleRepository } = require('../../db/src/repositories/vehicleRepository');
-      const db = createDatabase();
-      return new VehicleRepository(db);
+    // Register VehicleRepository with async database initialization
+    registry.registerSingleton(SERVICE_KEYS.VEHICLE_REPOSITORY, async () => {
+      const dbPath = path.join(WorkspaceUtils.findWorkspaceRoot(), 'packages/db/src/database');
+      const repoPath = path.join(WorkspaceUtils.findWorkspaceRoot(), 'packages/db/src/repositories/vehicleRepository');
+      const { DatabaseService } = require(dbPath);
+      const { VehicleRepository } = require(repoPath);
+      
+      // Initialize database with proper async handling
+      const database = new DatabaseService();
+      await database.initialize();
+      
+      return new VehicleRepository(database.getDb());
     });
   }
 

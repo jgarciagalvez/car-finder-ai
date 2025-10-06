@@ -1,0 +1,126 @@
+import express, { Express } from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import { ScraperService } from './services/ScraperService';
+import { ParserService } from './services/ParserService';
+
+// Load environment variables
+dotenv.config();
+
+const app: Express = express();
+const PORT = process.env.PORT || 3001;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'Car Finder AI API is running',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Placeholder API routes
+app.get('/api/vehicles', (req, res) => {
+  res.json({ 
+    message: 'Vehicles endpoint - to be implemented',
+    vehicles: []
+  });
+});
+
+// Parser service demonstration endpoint
+app.post('/api/parse', async (req, res) => {
+  try {
+    const { html, siteKey, expectedType } = req.body;
+    
+    if (!html || !siteKey) {
+      return res.status(400).json({ 
+        error: 'HTML and siteKey are required',
+        message: 'Please provide html and siteKey in the request body'
+      });
+    }
+
+    const parser = new ParserService();
+    const result = parser.parseHtml(html, siteKey, expectedType);
+    
+    res.json({
+      success: true,
+      data: result
+    });
+    
+  } catch (error) {
+    console.error('Parsing error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Parsing failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Scraper service demonstration endpoint
+app.post('/api/scrape', async (req, res) => {
+  try {
+    const { url } = req.body;
+    
+    if (!url) {
+      return res.status(400).json({ 
+        error: 'URL is required',
+        message: 'Please provide a URL in the request body'
+      });
+    }
+
+    // Note: In production, you'd want to initialize the scraper once and reuse it
+    // This is just for demonstration purposes
+    const scraper = new ScraperService({
+      delayRange: { min: 1000, max: 2000 },
+      timeout: 30000,
+      maxRetries: 3,
+      stealthMode: true
+    });
+
+    await scraper.initialize();
+    
+    try {
+      const result = await scraper.scrapeUrl(url);
+      
+      res.json({
+        success: true,
+        data: {
+          url: result.finalUrl,
+          statusCode: result.statusCode,
+          scrapingTime: result.scrapingTime,
+          htmlLength: result.html.length,
+          // Don't return full HTML in API response for performance
+          htmlPreview: result.html.substring(0, 500) + '...'
+        }
+      });
+    } finally {
+      await scraper.close();
+    }
+    
+  } catch (error) {
+    console.error('Scraping error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Scraping failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`🚗 Car Finder AI API running on port ${PORT}`);
+  console.log(`📍 Health check: http://localhost:${PORT}/health`);
+});
+
+// Export services for use by other parts of the application
+export { ScraperService } from './services/ScraperService';
+export { ParserService } from './services/ParserService';
+export type { PageType, ParseResult, SearchResult } from './services/ParserService';
+
+export default app;

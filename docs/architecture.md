@@ -37,6 +37,8 @@ graph TD
   * **Schema-Driven Parser:** The scraper's parsing logic is externalized to a JSON file. *Rationale:* This makes the scraper resilient to website changes.
   * **AI Provider Abstraction Layer:** AI calls are routed through an internal service. *Rationale:* Decouples the application from a specific AI provider, making it easy to add others in the future.
   * **Repository Pattern:** Database interactions will be handled by a dedicated "repository" layer. *Rationale:* This abstracts the data logic, making the application easier to test.
+  * **Service Contract Architecture:** Cross-package service dependencies use interface contracts and dependency injection. *Rationale:* Enables proper testing with mocks and maintains clean architectural boundaries.
+  * **Integration Testing Infrastructure:** Comprehensive testing framework with service abstractions and mock implementations. *Rationale:* Ensures reliable cross-package integration testing in the monorepo environment.
 
 ### Tech Stack
 
@@ -327,7 +329,7 @@ components:
 
 ### Components
 
-The system is broken down into Backend (Orchestration Scripts, Scraper, Parser, DB Service, AI Service, API Handler) and Frontend (API Client, Global State, Dashboard, Cards, Detail Page, Chat Panel) components.
+The system is broken down into Backend (Orchestration Scripts, Scraper, Parser, DB Service, AI Service, API Handler) and Frontend (API Client, Global State, Dashboard, Cards, Detail Page, Chat Panel) components, with a Service Abstraction Layer (Service Interfaces, Adapters, Mocks, Registry) providing clean integration testing capabilities.
 
 ### Core Workflows
 
@@ -347,7 +349,7 @@ The backend is a script-based model using `ingest.ts` and `analyze.ts` for backg
 
 ### Unified Project Structure
 
-A Turborepo monorepo will be used with `apps/web`, `apps/api`, and `packages/db`, `packages/scripts`, `packages/types`.
+A Turborepo monorepo will be used with `apps/web`, `apps/api`, and `packages/db`, `packages/scripts`, `packages/types`, `packages/services`, `packages/ai`.
 
 ### Development Workflow
 
@@ -359,6 +361,9 @@ Development is managed via `pnpm` scripts: `pnpm dev` (starts the UI), `pnpm ing
   * All DB access through the `packages/db` repository.
   * All frontend API calls through `lib/api.ts`.
   * API keys must be loaded from a `.env` file.
+  * Cross-package service dependencies must use `packages/services` interface contracts.
+  * All integration tests must use service mocks and abstractions from `packages/services`.
+  * AI operations must use the provider abstraction layer from `packages/ai`.
 
 ### Checklist Results Report
 

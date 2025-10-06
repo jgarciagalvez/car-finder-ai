@@ -138,6 +138,7 @@ The underlying codebase and architecture could serve as a reusable template for 
 * **Service Architecture:** A local script-based architecture.
 * **Parser Abstraction:** The scraping logic will read its instructions (e.g., CSS selectors) from an external 'HTML Parser Schema' file (e.g., `parser-schema.json`).
 * **Integration Requirements:** Secure local management of your Gemini API key.
+* **Testing Infrastructure:** Comprehensive integration testing framework with service abstraction layer to resolve monorepo module resolution issues and enable proper cross-package testing.
 
 ### Constraints & Assumptions (Revised)
 

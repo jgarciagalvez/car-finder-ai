@@ -2,12 +2,13 @@ import { Router, Request, Response } from 'express';
 import { ServiceRegistry } from '@car-finder/services';
 import { Vehicle } from '@car-finder/types';
 
-const router = Router();
+const router: Router = Router();
 
 // GET /api/vehicles - Get all vehicles
 router.get('/', async (req: Request, res: Response) => {
   try {
     const vehicleRepository = await ServiceRegistry.getVehicleRepository();
+    
     const vehicles = await vehicleRepository.getAllVehicles();
     
     // Transform vehicles for API response (exclude raw source fields for clarity)
@@ -15,6 +16,7 @@ router.get('/', async (req: Request, res: Response) => {
       id: vehicle.id,
       source: vehicle.source,
       sourceUrl: vehicle.sourceUrl,
+      sourceCreatedAt: vehicle.sourceCreatedAt.toISOString(),
       title: vehicle.title,
       description: vehicle.description,
       features: vehicle.features,
@@ -22,6 +24,7 @@ router.get('/', async (req: Request, res: Response) => {
       priceEur: vehicle.priceEur,
       year: vehicle.year,
       mileage: vehicle.mileage,
+      sellerInfo: vehicle.sellerInfo,
       photos: vehicle.photos,
       personalFitScore: vehicle.personalFitScore,
       marketValueScore: vehicle.marketValueScore,
@@ -63,6 +66,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       id: vehicle.id,
       source: vehicle.source,
       sourceUrl: vehicle.sourceUrl,
+      sourceCreatedAt: vehicle.sourceCreatedAt.toISOString(),
       title: vehicle.title,
       description: vehicle.description,
       features: vehicle.features,
@@ -70,6 +74,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       priceEur: vehicle.priceEur,
       year: vehicle.year,
       mileage: vehicle.mileage,
+      sellerInfo: vehicle.sellerInfo,
       photos: vehicle.photos,
       personalFitScore: vehicle.personalFitScore,
       marketValueScore: vehicle.marketValueScore,

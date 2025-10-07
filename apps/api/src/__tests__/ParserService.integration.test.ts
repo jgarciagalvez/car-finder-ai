@@ -41,6 +41,8 @@ describe('ParserService Integration Tests', () => {
               sellerId: 'seller.id',
               sellerType: 'seller.type',
               sellerLocation: 'seller.location.address',
+              year: 'details[label=Rok produkcji].value',
+              mileage: 'details[label=Przebieg].value',
               sourceParameters: 'details',
               sourceEquipment: 'equipment',
               sourcePhotos: 'images.photos'
@@ -226,6 +228,10 @@ describe('ParserService Integration Tests', () => {
           {
             label: 'Rok produkcji',
             value: '2017'
+          },
+          {
+            label: 'Przebieg',
+            value: '150 000 km'
           }
         ],
         equipment: [
@@ -270,8 +276,8 @@ describe('ParserService Integration Tests', () => {
       expect(vehicle.sourceTitle).toBe('Ford Transit Custom 320 L2H2 VA Trend');
       expect(vehicle.pricePln).toBe(70725);
       expect(vehicle.priceEur).toBeCloseTo(16266.75, 2);
-      expect(vehicle.sellerName).toBe('Paweł');
-      expect(vehicle.sellerType).toBe('PRIVATE');
+      expect(vehicle.sellerInfo.name).toBe('Paweł');
+      expect(vehicle.sellerInfo.type).toBe('PRIVATE');
       
       // Check normalized data
       expect(vehicle.description).toBe('Witam mam do sprzedania Ford Transit Custom...');
@@ -280,17 +286,54 @@ describe('ParserService Integration Tests', () => {
         'https://example.com/photo2.jpg'
       ]);
       
+      // Check direct field extraction
+      expect(vehicle.year).toBe(2017);
+      expect(vehicle.mileage).toBe(150000);
+      
       // Check parameters conversion
       expect(vehicle.sourceParameters).toEqual({
         'Marka pojazdu': 'Ford',
         'Model pojazdu': 'Transit Custom',
-        'Rok produkcji': '2017'
+        'Rok produkcji': '2017',
+        'Przebieg': '150 000 km'
       });
       
       // Check equipment conversion
       expect(vehicle.sourceEquipment).toEqual({
         'Audio i multimedia': ['Interfejs Bluetooth', 'Radio'],
         'Komfort i dodatki': ['Hak', 'Klimatyzacja manualna']
+      });
+    });
+
+    it('should handle various mileage formats correctly', () => {
+      const testCases = [
+        { input: '150 000 km', expected: 150000 },
+        { input: '75,500 km', expected: 75500 },
+        { input: '25000 km', expected: 25000 },
+        { input: '100 000', expected: 100000 }, // Without km
+        { input: '50 000 KM', expected: 50000 }, // Uppercase
+        { input: 'invalid', expected: 0 }, // Invalid input
+      ];
+
+      testCases.forEach(({ input, expected }) => {
+        const advertData = {
+          id: 'test',
+          title: 'Test',
+          url: '/test',
+          price: { value: 50000, currency: 'PLN' },
+          description: 'Test',
+          createdAt: '2023-01-01T00:00:00Z',
+          seller: { name: 'Test', id: '1', type: 'PRIVATE', location: { address: 'Test' } },
+          details: [{ label: 'Przebieg', value: input }],
+          equipment: [],
+          images: { photos: [] }
+        };
+
+        const nextData = { props: { pageProps: { advert: advertData } } };
+        const html = `<script id="__NEXT_DATA__">${JSON.stringify(nextData)}</script>`;
+        const result = parserService.parseHtml(html, 'otomoto');
+        
+        expect(result.data.mileage).toBe(expected);
       });
     });
 

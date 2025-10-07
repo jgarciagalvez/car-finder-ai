@@ -88,6 +88,7 @@ temp/
 
 # Database files (production data only - test databases are committed)
 data/vehicles.db
+db-query.js
 
 # Test databases in test directories (temporary files)
 **/__tests__/*.db

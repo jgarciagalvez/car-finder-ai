@@ -4,7 +4,18 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ServiceRegistry, IScraperService, IParserService, IVehicleRepository, WorkspaceUtils } from '@car-finder/services';
 import { SearchResult, ParseResult } from '../../../apps/api/src/services/ParserService';
-import { Vehicle, VehicleSource } from '@car-finder/types';
+import { Vehicle, VehicleSource, SellerType } from '@car-finder/types';
+
+// Extended vehicle interface for ingestion (temporary fields during parsing)
+interface ExtendedVehicleData extends Partial<Vehicle> {
+  sellerName?: string;
+  sellerId?: string;
+  sellerType?: SellerType;
+  sellerLocation?: string;
+  memberSince?: string;
+  fuelType?: string;
+  transmission?: string;
+}
 import { v4 as uuidv4 } from 'uuid';
 
 // Configuration interfaces
@@ -25,6 +36,7 @@ interface IngestionConfig {
     retryAttempts: number;
     batchSize: number;
     enableDeduplication: boolean;
+    enabledSources: ('otomoto' | 'olx')[];
   };
   currencyConversion: {
     plnToEurRate: number;
@@ -122,8 +134,34 @@ export class IngestionPipeline {
 
         // Extract URLs and add to collection
         const pageUrls = searchResults.map(result => result.sourceUrl);
-        vehicleUrls.push(...pageUrls);
         
+        // Smart pagination: Check if we've hit mostly existing vehicles
+        if (this.config.ingestionSettings.enableDeduplication && pageUrls.length > 0) {
+          let existingCount = 0;
+          
+          // Check a sample of URLs from this page to see if they already exist
+          const sampleSize = Math.min(5, pageUrls.length); // Check up to 5 URLs per page
+          for (let i = 0; i < sampleSize; i++) {
+            try {
+              const existingVehicle = await this.vehicleRepository.findVehicleByUrl(pageUrls[i]);
+              if (existingVehicle) {
+                existingCount++;
+              }
+            } catch (error) {
+              // Continue on error - don't let DB issues stop pagination
+            }
+          }
+          
+          // If most of the sample already exists, we've likely hit old content
+          const existingRatio = existingCount / sampleSize;
+          if (existingRatio >= 0.8) { // 80% or more already exist
+            console.log(`  🛑 Smart pagination: ${existingCount}/${sampleSize} vehicles already exist, stopping pagination`);
+            console.log(`  📊 Found ${vehicleUrls.length} new vehicle URLs before hitting existing content`);
+            break;
+          }
+        }
+        
+        vehicleUrls.push(...pageUrls);
         console.log(`  ✅ Found ${pageUrls.length} vehicle URLs on page ${currentPage}`);
 
         // Respectful delay between pages
@@ -142,6 +180,194 @@ export class IngestionPipeline {
 
     console.log(`✅ Search completed: ${vehicleUrls.length} vehicle URLs found`);
     return vehicleUrls;
+  }
+
+  /**
+   * Scrape complete vehicle data from OLX search pages (search-only approach)
+   */
+  private async scrapeOlxSearchVehicles(searchUrl: string): Promise<ExtendedVehicleData[]> {
+    const allVehicles: ExtendedVehicleData[] = [];
+    let currentPage = 1;
+    const maxPages = this.config.ingestionSettings.maxPagesPerSearch;
+
+    console.log(`🔍 Scraping OLX vehicles from search pages: ${searchUrl}`);
+
+    while (currentPage <= maxPages) {
+      try {
+        const pageUrl = currentPage === 1 ? searchUrl : `${searchUrl}&page=${currentPage}`;
+        console.log(`  📄 Processing page ${currentPage}/${maxPages}`);
+
+        const scrapeResult = await this.scraperService.scrapeUrl(pageUrl);
+        
+        // Debug: Save the scraped HTML for manual inspection
+        try {
+          const fs = require('fs');
+          const path = require('path');
+          const workspaceRoot = WorkspaceUtils.findWorkspaceRoot();
+          const debugDir = path.join(workspaceRoot, 'docs', 'example-files');
+          const debugHtmlPath = path.join(debugDir, 'olx-search-page-scraped.html');
+          
+          // Ensure directory exists
+          if (!fs.existsSync(debugDir)) {
+            fs.mkdirSync(debugDir, { recursive: true });
+          }
+          
+          fs.writeFileSync(debugHtmlPath, scrapeResult.html, 'utf8');
+          console.log(`  🐛 Debug: Saved scraped HTML to docs/example-files/olx-search-page-scraped.html`);
+        } catch (error) {
+          console.warn(`  ⚠️  Could not save debug HTML: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+        
+        const parseResult = await this.parserService.parseHtml(scrapeResult.html, 'olx', 'search');
+
+        if (parseResult.pageType !== 'search') {
+          console.log(`  ⚠️  Expected search page but got ${parseResult.pageType}, stopping pagination`);
+          break;
+        }
+
+        const vehicles = parseResult.data as ExtendedVehicleData[];
+        console.log(`  ✅ Found ${vehicles.length} vehicles on page ${currentPage}`);
+
+        if (vehicles.length === 0) {
+          console.log(`  🛑 No vehicles found on page ${currentPage}, stopping pagination`);
+          break;
+        }
+
+        // Smart pagination: check if we've seen these vehicles before
+        if (this.config.ingestionSettings.enableDeduplication && vehicles.length > 0) {
+          let existingCount = 0;
+          const sampleSize = Math.min(5, vehicles.length);
+          
+          for (let i = 0; i < sampleSize; i++) {
+            const vehicle = vehicles[i];
+            if (vehicle.sourceUrl) {
+              try {
+                const existingVehicle = await this.vehicleRepository.findVehicleByUrl(vehicle.sourceUrl);
+                if (existingVehicle) {
+                  existingCount++;
+                }
+              } catch (error) {
+                // Continue on error - don't let DB issues stop pagination
+              }
+            }
+          }
+          
+          const existingRatio = existingCount / sampleSize;
+          if (existingRatio >= 0.8) {
+            console.log(`  🛑 Smart pagination: ${existingCount}/${sampleSize} vehicles already exist, stopping pagination`);
+            console.log(`  📊 Found ${allVehicles.length} new vehicles before hitting existing content`);
+            break;
+          }
+        }
+
+        allVehicles.push(...vehicles);
+        currentPage++;
+
+        // Add delay between requests
+        if (currentPage <= maxPages) {
+          const delay = Math.random() * (this.config.ingestionSettings.delayBetweenRequests.max - this.config.ingestionSettings.delayBetweenRequests.min) + this.config.ingestionSettings.delayBetweenRequests.min;
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error(`  ❌ Error scraping page ${currentPage}: ${errorMessage}`);
+        this.stats.errors.push(`OLX search page ${currentPage}: ${errorMessage}`);
+        break;
+      }
+    }
+
+    console.log(`✅ OLX search completed: ${allVehicles.length} vehicles found`);
+    return allVehicles;
+  }
+
+  /**
+   * Process and save a single vehicle
+   */
+  private async processAndSaveVehicle(vehicleData: ExtendedVehicleData, source: VehicleSource): Promise<void> {
+    try {
+      // Check if vehicle already exists
+      if (vehicleData.sourceUrl) {
+        const existingVehicle = await this.vehicleRepository.findVehicleByUrl(vehicleData.sourceUrl);
+        if (existingVehicle) {
+          console.log(`  ⏭️  Vehicle already exists: ${vehicleData.sourceTitle || 'Unknown'}`);
+          this.stats.duplicateVehicles++;
+          return;
+        }
+      }
+
+      // Create complete vehicle object following the Vehicle interface
+      const now = new Date();
+      const sourceCreatedAt = vehicleData.sourceCreatedAt ? 
+        (typeof vehicleData.sourceCreatedAt === 'string' ? new Date(vehicleData.sourceCreatedAt) : vehicleData.sourceCreatedAt) : 
+        now;
+
+      // Build sourceParameters including additional fields like fuelType and transmission
+      const sourceParameters: Record<string, string> = {
+        ...(vehicleData.sourceParameters || {}),
+        ...(vehicleData.fuelType && { fuelType: vehicleData.fuelType }),
+        ...(vehicleData.transmission && { transmission: vehicleData.transmission })
+      };
+
+      const vehicle: Vehicle = {
+        id: uuidv4(),
+        source,
+        sourceId: vehicleData.sourceId || '',
+        sourceUrl: vehicleData.sourceUrl || '',
+        sourceCreatedAt,
+        
+        // Raw scraped data
+        sourceTitle: vehicleData.sourceTitle || 'Unknown Vehicle',
+        sourceDescriptionHtml: vehicleData.sourceDescriptionHtml || '',
+        sourceParameters,
+        sourceEquipment: vehicleData.sourceEquipment || {},
+        sourcePhotos: vehicleData.sourcePhotos || [],
+        
+        // Processed & normalized data
+        title: vehicleData.sourceTitle || 'Unknown Vehicle', // Use sourceTitle as initial title
+        description: vehicleData.sourceDescriptionHtml ? vehicleData.sourceDescriptionHtml.replace(/<[^>]*>/g, '') : '', // Strip HTML for description
+        features: [], // Initially empty, to be processed later
+        pricePln: vehicleData.pricePln || 0,
+        priceEur: vehicleData.priceEur || 0,
+        year: vehicleData.year || 0,
+        mileage: vehicleData.mileage || 0,
+        sellerInfo: {
+          name: vehicleData.sellerName || null,
+          id: vehicleData.sellerId || null,
+          type: vehicleData.sellerType || null,
+          location: vehicleData.sellerLocation || null,
+          memberSince: vehicleData.memberSince || null
+        },
+        photos: vehicleData.sourcePhotos || [], // Use sourcePhotos as initial photos
+        
+        // AI generated data (initially null)
+        personalFitScore: null,
+        marketValueScore: null,
+        aiPriorityRating: null,
+        aiPrioritySummary: null,
+        aiMechanicReport: null,
+        aiDataSanityCheck: null,
+        
+        // User workflow data
+        status: 'new',
+        personalNotes: null,
+        
+        // Timestamps
+        scrapedAt: now,
+        createdAt: now,
+        updatedAt: now
+      };
+
+      await this.vehicleRepository.insertVehicle(vehicle);
+      console.log(`  ✅ Saved vehicle: ${vehicle.sourceTitle} (${vehicle.pricePln} PLN)`);
+      this.stats.newVehicles++;
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`  ❌ Error saving vehicle: ${errorMessage}`);
+      this.stats.failedScrapes++;
+      this.stats.errors.push(`Save vehicle: ${errorMessage}`);
+    }
   }
 
   /**
@@ -400,20 +626,37 @@ export class IngestionPipeline {
       // Collect all vehicle URLs from all search configurations
       const allVehicleUrls: { url: string; source: VehicleSource }[] = [];
 
-      // Process Otomoto search URLs
-      for (const searchConfig of this.config.searchUrls.otomoto) {
-        console.log(`\n🔍 Processing Otomoto search: ${searchConfig.name}`);
-        const urls = await this.scrapeSearchResults(searchConfig.url, 'otomoto');
-        allVehicleUrls.push(...urls.map(url => ({ url, source: 'otomoto' as VehicleSource })));
-        this.stats.totalSearchUrls++;
+      // Process enabled sources only
+      const enabledSources = this.config.ingestionSettings.enabledSources || ['otomoto', 'olx'];
+      console.log(`📋 Enabled sources: ${enabledSources.join(', ')}`);
+
+      // Process Otomoto search URLs (if enabled)
+      if (enabledSources.includes('otomoto')) {
+        for (const searchConfig of this.config.searchUrls.otomoto) {
+          console.log(`\n🔍 Processing Otomoto search: ${searchConfig.name}`);
+          const urls = await this.scrapeSearchResults(searchConfig.url, 'otomoto');
+          allVehicleUrls.push(...urls.map(url => ({ url, source: 'otomoto' as VehicleSource })));
+          this.stats.totalSearchUrls++;
+        }
+      } else {
+        console.log(`⏭️  Skipping Otomoto (not in enabled sources)`);
       }
 
-      // Process OLX search URLs
-      for (const searchConfig of this.config.searchUrls.olx) {
-        console.log(`\n🔍 Processing OLX search: ${searchConfig.name}`);
-        const urls = await this.scrapeSearchResults(searchConfig.url, 'olx');
-        allVehicleUrls.push(...urls.map(url => ({ url, source: 'olx' as VehicleSource })));
-        this.stats.totalSearchUrls++;
+      // Process OLX search URLs (if enabled) - Search-only approach
+      if (enabledSources.includes('olx')) {
+        for (const searchConfig of this.config.searchUrls.olx) {
+          console.log(`\n🔍 Processing OLX search (search-only): ${searchConfig.name}`);
+          const vehicles = await this.scrapeOlxSearchVehicles(searchConfig.url);
+          
+          // Process vehicles directly from search page
+          for (const vehicle of vehicles) {
+            await this.processAndSaveVehicle(vehicle, 'olx');
+          }
+          
+          this.stats.totalSearchUrls++;
+        }
+      } else {
+        console.log(`⏭️  Skipping OLX (not in enabled sources)`);
       }
 
       // Deduplicate URLs across sources

@@ -16,7 +16,7 @@ export interface SearchResult {
 
 export interface ParseResult {
   pageType: PageType;
-  data: SearchResult[] | Partial<Vehicle>;
+  data: SearchResult[] | Partial<Vehicle> | any[];
 }
 
 interface ParserSchema {
@@ -96,20 +96,60 @@ export class ParserService {
   private parseWithJson(html: string, siteConfig: any, expectedType?: PageType): ParseResult {
     const $ = cheerio.load(html);
     
-    // Extract JSON from script tag
-    const scriptSelector = siteConfig.scriptSelector || 'script#__NEXT_DATA__';
-    const scriptContent = $(scriptSelector).html();
-    
-    if (!scriptContent) {
-      throw new Error(`Script tag not found: ${scriptSelector}`);
-    }
-
     let nextData: any;
-    try {
-      nextData = JSON.parse(scriptContent);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`Failed to parse JSON from script tag: ${errorMessage}`);
+    
+    // Handle different JSON extraction methods
+    if (siteConfig.dataExtraction === 'window.__PRERENDERED_STATE__') {
+      // OLX: Extract from window.__PRERENDERED_STATE__
+      // Try multiple patterns to find the JSON data
+      let match = html.match(/window\.__PRERENDERED_STATE__\s*=\s*"(.+?)";/s);
+      
+      if (!match) {
+        // Try alternative pattern without quotes
+        match = html.match(/window\.__PRERENDERED_STATE__\s*=\s*(.+?);/s);
+      }
+      
+      if (!match) {
+        // Debug: Check if the variable exists at all
+        const hasVariable = html.includes('__PRERENDERED_STATE__');
+        throw new Error(`window.__PRERENDERED_STATE__ not found. Variable exists in HTML: ${hasVariable}`);
+      }
+      
+      try {
+        let jsonString = match[1];
+        
+        // If the match includes quotes, it's a string that needs unescaping
+        if (jsonString.startsWith('"') && jsonString.endsWith('"')) {
+          jsonString = jsonString.slice(1, -1); // Remove surrounding quotes
+          
+          // Unescape the JSON string
+          jsonString = jsonString.replace(/\\u([0-9a-fA-F]{4})/g, (match, hex) => {
+            return String.fromCharCode(parseInt(hex, 16));
+          });
+          jsonString = jsonString.replace(/\\"/g, '"');
+          jsonString = jsonString.replace(/\\\\/g, '\\');
+        }
+        
+        nextData = JSON.parse(jsonString);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        throw new Error(`Failed to parse OLX JSON: ${errorMessage}. Raw match: ${match[1].substring(0, 200)}...`);
+      }
+    } else {
+      // Otomoto: Extract from script tag
+      const scriptSelector = siteConfig.scriptSelector || 'script#__NEXT_DATA__';
+      const scriptContent = $(scriptSelector).html();
+      
+      if (!scriptContent) {
+        throw new Error(`Script tag not found: ${scriptSelector}`);
+      }
+
+      try {
+        nextData = JSON.parse(scriptContent);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        throw new Error(`Failed to parse JSON from script tag: ${errorMessage}`);
+      }
     }
 
     // Auto-detect page type
@@ -126,10 +166,19 @@ export class ParserService {
     }
 
     if (pageType === 'search') {
-      return {
-        pageType,
-        data: this.extractSearchResults(nextData, pageConfig)
-      };
+      // For OLX, extract complete vehicle data from search page
+      if (siteConfig.dataExtraction === 'window.__PRERENDERED_STATE__') {
+        return {
+          pageType,
+          data: this.extractOlxSearchVehicles(nextData, pageConfig)
+        };
+      } else {
+        // For Otomoto, extract search results (URLs only)
+        return {
+          pageType,
+          data: this.extractSearchResults(nextData, pageConfig)
+        };
+      }
     } else {
       const rawData = this.extractDetailData(nextData, pageConfig);
       return {
@@ -153,6 +202,77 @@ export class ParserService {
       throw new Error(`No CSS selectors found for page type: ${pageType}`);
     }
 
+    // Handle search pages differently from detail pages
+    if (pageType === 'search') {
+      return this.parseSearchPageWithCss($, pageConfig);
+    } else {
+      return this.parseDetailPageWithCss($, pageConfig, pageType);
+    }
+  }
+
+  /**
+   * Parse search page using CSS selectors to extract multiple vehicle URLs
+   */
+  private parseSearchPageWithCss($: cheerio.CheerioAPI, pageConfig: any): ParseResult {
+    const selectors = pageConfig.selectors;
+    const searchResults: SearchResult[] = [];
+
+    // Find all listing items
+    const listItems = $(selectors.listItems);
+    
+    listItems.each((_, listItem) => {
+      try {
+        const $item = $(listItem);
+        
+        // Extract URL - look for link within this item
+        const linkElement = $item.find(selectors.sourceUrl);
+        let sourceUrl = linkElement.attr('href') || '';
+        
+        // Convert relative URLs to absolute URLs for OLX
+        if (sourceUrl && sourceUrl.startsWith('/d/oferta/')) {
+          sourceUrl = `https://www.olx.pl${sourceUrl}`;
+        }
+        
+        // Extract title
+        const titleElement = $item.find(selectors.sourceTitle);
+        const sourceTitle = titleElement.text().trim() || '';
+        
+        // Extract ID from the list item or URL
+        let sourceId = '';
+        if (selectors.sourceId) {
+          sourceId = $item.attr('id') || '';
+        }
+        if (!sourceId && sourceUrl) {
+          // Extract ID from URL pattern like /d/oferta/title-CID5-ID17J4yI.html
+          const idMatch = sourceUrl.match(/ID([^.]+)/);
+          sourceId = idMatch ? idMatch[1] : '';
+        }
+
+        // Only add if we have essential data
+        if (sourceUrl && sourceTitle) {
+          searchResults.push({
+            sourceId: sourceId || sourceUrl,
+            sourceUrl,
+            sourceTitle,
+            sourceCreatedAt: new Date().toISOString() // Default to current time
+          });
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.warn(`Failed to parse search result item: ${errorMessage}`);
+      }
+    });
+
+    return {
+      pageType: 'search',
+      data: searchResults
+    };
+  }
+
+  /**
+   * Parse detail page using CSS selectors to extract single vehicle data
+   */
+  private parseDetailPageWithCss($: cheerio.CheerioAPI, pageConfig: any, pageType: PageType): ParseResult {
     const data: Partial<Vehicle> = {};
     
     // Extract data using CSS selectors
@@ -174,6 +294,12 @@ export class ParserService {
             if (!value && (element.attr('href') || element.attr('content'))) {
               value = element.attr('href') || element.attr('content') || '';
             }
+            
+            // Apply special normalization for date fields
+            if (field === 'sourceCreatedAt' && value) {
+              value = this.normalizeDateString(value);
+            }
+            
             (data as any)[field] = value;
           }
         }
@@ -193,32 +319,139 @@ export class ParserService {
    * Auto-detect page type based on JSON structure
    */
   private detectPageType(nextData: any, siteConfig: any): PageType {
-    const pageProps = nextData?.props?.pageProps;
-    
-    if (!pageProps) {
-      throw new Error('Invalid JSON structure: missing props.pageProps');
-    }
-
     const { autoDetection } = siteConfig;
     if (!autoDetection) {
       throw new Error('Auto-detection configuration missing');
     }
 
-    // Check for detail page indicator (direct property check)
-    if (autoDetection.detailPageIndicator === 'props.pageProps.advert' && pageProps.advert) {
-      return 'detail';
-    }
+    // Handle OLX structure (different from Otomoto)
+    if (siteConfig.dataExtraction === 'window.__PRERENDERED_STATE__') {
+      // For OLX, check for listing.ads (search) or ad.ad (detail)
+      if (autoDetection.searchPageIndicator === 'listing.ads' && this.getNestedValue(nextData, 'listing.ads')) {
+        return 'search';
+      }
+      if (autoDetection.detailPageIndicator === 'ad.ad' && this.getNestedValue(nextData, 'ad.ad')) {
+        return 'detail';
+      }
+    } else {
+      // Handle Otomoto structure
+      const pageProps = nextData?.props?.pageProps;
+      
+      if (!pageProps) {
+        throw new Error('Invalid JSON structure: missing props.pageProps');
+      }
 
-    // Check for search page indicator (direct property check)
-    if (autoDetection.searchPageIndicator === 'props.pageProps.urqlState' && pageProps.urqlState) {
-      return 'search';
+      // Check for detail page indicator (direct property check)
+      if (autoDetection.detailPageIndicator === 'props.pageProps.advert' && pageProps.advert) {
+        return 'detail';
+      }
+
+      // Check for search page indicator (direct property check)
+      if (autoDetection.searchPageIndicator === 'props.pageProps.urqlState' && pageProps.urqlState) {
+        return 'search';
+      }
     }
 
     throw new Error('Unknown page type - neither search nor detail indicators found');
   }
 
   /**
-   * Extract search results from JSON data
+   * Extract complete vehicle data from OLX search page
+   */
+  private extractOlxSearchVehicles(nextData: any, pageConfig: any): any[] {
+    const basePath = pageConfig.basePath;
+    const ads = this.getNestedValue(nextData, basePath);
+    
+    if (!Array.isArray(ads)) {
+      throw new Error(`OLX ads not found at path: ${basePath}`);
+    }
+
+    const vehicles: any[] = [];
+    const fields = pageConfig.fields;
+    const parameterMapping = pageConfig.parameterMapping || {};
+
+    for (const ad of ads) {
+      const vehicle: any = {};
+      
+      // Extract basic fields
+      for (const [vehicleField, jsonPath] of Object.entries(fields)) {
+        const value = this.getNestedValue(ad, jsonPath as string);
+        if (value !== undefined && value !== null) {
+          if (vehicleField === 'sourceCreatedAt' && typeof value === 'string') {
+            vehicle[vehicleField] = this.normalizeDateString(value);
+          } else if (vehicleField === 'sourcePhotos' && Array.isArray(value)) {
+            vehicle[vehicleField] = value.map((photo: any) => photo.url || photo).filter(Boolean);
+          } else if (vehicleField === 'sourceParameters' && Array.isArray(value)) {
+            // Handle parameters separately
+            vehicle.sourceParameters = this.extractOlxParameters(value, parameterMapping);
+            
+            // Extract specific vehicle fields from parameters
+            this.mapOlxParametersToVehicleFields(value, vehicle, parameterMapping);
+          } else {
+            vehicle[vehicleField] = value;
+          }
+        }
+      }
+
+      // Convert price to EUR if PLN
+      if (vehicle.pricePln && typeof vehicle.pricePln === 'number') {
+        vehicle.priceEur = Math.round(vehicle.pricePln * 0.23); // Use configured rate
+      }
+
+      vehicles.push(vehicle);
+    }
+
+    return vehicles;
+  }
+
+  /**
+   * Extract and format OLX parameters
+   */
+  private extractOlxParameters(params: any[], parameterMapping: Record<string, string>): Record<string, any> {
+    const parameters: Record<string, any> = {};
+    
+    for (const param of params) {
+      if (param.key && param.value) {
+        parameters[param.key] = param.value;
+      }
+    }
+    
+    return parameters;
+  }
+
+  /**
+   * Map OLX parameters to specific vehicle fields
+   */
+  private mapOlxParametersToVehicleFields(params: any[], vehicle: any, parameterMapping: Record<string, string>): void {
+    for (const param of params) {
+      if (!param.key || !param.value) continue;
+      
+      // Map known parameters to vehicle fields
+      switch (param.key) {
+        case parameterMapping.year || 'rok-produkcji':
+          const year = parseInt(param.value);
+          if (!isNaN(year)) vehicle.year = year;
+          break;
+          
+        case parameterMapping.mileage || 'przebieg-pojazdu':
+          const mileageStr = param.value.replace(/\D/g, ''); // Remove non-digits
+          const mileage = parseInt(mileageStr);
+          if (!isNaN(mileage)) vehicle.mileage = mileage;
+          break;
+          
+        case parameterMapping.fuelType || 'rodzaj-paliwa':
+          vehicle.fuelType = param.value;
+          break;
+          
+        case parameterMapping.transmission || 'skrzynia-biegow':
+          vehicle.transmission = param.value;
+          break;
+      }
+    }
+  }
+
+  /**
+   * Extract search results from JSON data (Otomoto)
    */
   private extractSearchResults(nextData: any, pageConfig: any): SearchResult[] {
     const basePath = pageConfig.basePath;
@@ -326,6 +559,17 @@ export class ParserService {
         } else if (field === 'sourcePhotos' && Array.isArray(value)) {
           // Extract URLs from photos array
           value = value.map((photo: any) => photo.url || photo).filter(Boolean);
+        } else if (field === 'year' && value) {
+          // Convert year to number
+          const yearNum = parseInt(String(value), 10);
+          value = isNaN(yearNum) ? 0 : yearNum;
+        } else if (field === 'mileage' && value) {
+          // Convert mileage to number, handle Polish formatting (spaces, commas, "km" suffix)
+          const mileageStr = String(value)
+            .replace(/\s+km$/i, '') // Remove "km" suffix (case insensitive)
+            .replace(/[\s,]/g, ''); // Remove spaces and commas
+          const mileageNum = parseInt(mileageStr, 10);
+          value = isNaN(mileageNum) ? 0 : mileageNum;
         }
 
         // Handle seller-related fields
@@ -361,10 +605,25 @@ export class ParserService {
 
   /**
    * Get nested value from object using dot notation path
+   * Supports array selectors like: details[label=Rok produkcji].value
    */
   private getNestedValue(obj: any, path: string): any {
     return path.split('.').reduce((current, key) => {
-      return current && current[key] !== undefined ? current[key] : undefined;
+      if (!current) return undefined;
+      
+      // Handle array selector syntax: arrayName[property=value]
+      const arrayMatch = key.match(/^(\w+)\[(\w+)=(.+)\]$/);
+      if (arrayMatch) {
+        const [, arrayName, property, value] = arrayMatch;
+        const array = current[arrayName];
+        if (Array.isArray(array)) {
+          return array.find((item: any) => item[property] === value);
+        }
+        return undefined;
+      }
+      
+      // Regular property access
+      return current[key] !== undefined ? current[key] : undefined;
     }, obj);
   }
 
@@ -432,6 +691,87 @@ export class ParserService {
       .replace(/&gt;/g, '>')
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'");
+  }
+
+  /**
+   * Normalize date strings from various formats to ISO string
+   */
+  private normalizeDateString(dateText: string): string {
+    if (!dateText) return new Date().toISOString();
+    
+    const cleanText = this.normalizeTextContent(dateText).toLowerCase();
+    const now = new Date();
+    
+    // Handle Polish relative dates from OLX
+    if (cleanText.includes('dzisiaj') || cleanText.includes('today')) {
+      // "Dzisiaj o 07:18" -> today with time
+      const timeMatch = cleanText.match(/(\d{1,2}):(\d{2})/);
+      if (timeMatch) {
+        const [, hours, minutes] = timeMatch;
+        const date = new Date();
+        date.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+        return date.toISOString();
+      }
+      return now.toISOString();
+    }
+    
+    if (cleanText.includes('wczoraj') || cleanText.includes('yesterday')) {
+      // "Wczoraj o 15:30" -> yesterday with time
+      const timeMatch = cleanText.match(/(\d{1,2}):(\d{2})/);
+      const date = new Date(now);
+      date.setDate(date.getDate() - 1);
+      if (timeMatch) {
+        const [, hours, minutes] = timeMatch;
+        date.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+      }
+      return date.toISOString();
+    }
+    
+    // Handle "X dni temu" (X days ago)
+    const daysAgoMatch = cleanText.match(/(\d+)\s*(dni?|days?)\s*(temu|ago)/);
+    if (daysAgoMatch) {
+      const daysAgo = parseInt(daysAgoMatch[1], 10);
+      const date = new Date(now);
+      date.setDate(date.getDate() - daysAgo);
+      return date.toISOString();
+    }
+    
+    // Handle "X tygodni temu" (X weeks ago)
+    const weeksAgoMatch = cleanText.match(/(\d+)\s*(tygodni?|weeks?)\s*(temu|ago)/);
+    if (weeksAgoMatch) {
+      const weeksAgo = parseInt(weeksAgoMatch[1], 10);
+      const date = new Date(now);
+      date.setDate(date.getDate() - (weeksAgo * 7));
+      return date.toISOString();
+    }
+    
+    // Handle Polish month names (e.g., "02 października 2025")
+    const polishMonths: Record<string, number> = {
+      'stycznia': 0, 'lutego': 1, 'marca': 2, 'kwietnia': 3, 'maja': 4, 'czerwca': 5,
+      'lipca': 6, 'sierpnia': 7, 'września': 8, 'października': 9, 'listopada': 10, 'grudnia': 11
+    };
+    
+    const polishDateMatch = cleanText.match(/(\d{1,2})\s+(\w+)\s+(\d{4})/);
+    if (polishDateMatch) {
+      const [, day, monthName, year] = polishDateMatch;
+      const monthIndex = polishMonths[monthName.toLowerCase()];
+      if (monthIndex !== undefined) {
+        const date = new Date(parseInt(year, 10), monthIndex, parseInt(day, 10));
+        if (!isNaN(date.getTime())) {
+          return date.toISOString();
+        }
+      }
+    }
+    
+    // Try to parse as standard date format
+    const parsedDate = new Date(dateText);
+    if (!isNaN(parsedDate.getTime())) {
+      return parsedDate.toISOString();
+    }
+    
+    // Fallback to current date if parsing fails
+    console.warn(`Could not parse date: "${dateText}", using current date`);
+    return now.toISOString();
   }
 
   /**

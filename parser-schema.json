@@ -34,6 +34,8 @@
             "sellerType": "seller.type",
             "sellerLocation": "seller.location.address",
             "memberSince": "seller.featuresBadges[code=registration-date].label",
+            "year": "details[label=Rok produkcji].value",
+            "mileage": "details[label=Przebieg].value",
             "sourceParameters": "details",
             "sourceEquipment": "equipment",
             "sourcePhotos": "images.photos"
@@ -42,19 +44,58 @@
       }
     },
     "olx": {
-      "method": "css",
+      "method": "json",
+      "scriptSelector": "script",
+      "dataExtraction": "window.__PRERENDERED_STATE__",
+      "autoDetection": {
+        "searchPageIndicator": "listing.ads",
+        "detailPageIndicator": "ad.ad"
+      },
       "pageTypes": {
+        "search": {
+          "basePath": "listing.ads",
+          "listPath": "",
+          "fields": {
+            "sourceId": "id",
+            "sourceUrl": "url",
+            "sourceTitle": "title",
+            "sourceDescriptionHtml": "description",
+            "sourceCreatedAt": "createdTime",
+            "pricePln": "price.regularPrice.value",
+            "priceCurrency": "price.regularPrice.currencyCode",
+            "sellerName": "user.name",
+            "sellerId": "user.id",
+            "sellerLocation": "location.cityName",
+            "sellerRegion": "location.regionName",
+            "memberSince": "user.created",
+            "sourcePhotos": "photos",
+            "sourceParameters": "params"
+          },
+          "parameterMapping": {
+            "year": "rok-produkcji",
+            "mileage": "przebieg-pojazdu",
+            "fuelType": "rodzaj-paliwa",
+            "enginePower": "moc-silnika",
+            "engineSize": "pojemnosc-skokowa",
+            "transmission": "skrzynia-biegow",
+            "color": "kolor",
+            "condition": "stan"
+          }
+        },
         "detail": {
-          "selectors": {
-            "title": "h1[data-cy='ad_title']",
-            "price": "[data-testid='ad-price-container']",
-            "description": "[data-cy='ad_description']",
-            "sourceId": "[data-cy='ad-posted-at']",
-            "sourceUrl": "link[rel='canonical']",
-            "sourceCreatedAt": "[data-cy='ad-posted-at']",
-            "sellerName": "[data-cy='seller-name']",
-            "sellerLocation": "[data-cy='seller-location']",
-            "sourcePhotos": ".swiper-slide img"
+          "basePath": "ad.ad",
+          "fields": {
+            "sourceId": "id",
+            "sourceTitle": "title",
+            "sourceUrl": "url",
+            "sourceDescriptionHtml": "description",
+            "sourceCreatedAt": "created_time",
+            "pricePln": "price.value.raw",
+            "priceCurrency": "price.value.currency",
+            "sellerName": "user.name",
+            "sellerId": "user.id",
+            "sellerLocation": "location.city.name",
+            "sourcePhotos": "photos"
           }
         }
       }

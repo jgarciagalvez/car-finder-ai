@@ -187,7 +187,7 @@ export class ScraperService {
         try {
           // Navigate to the URL with timeout
           const response = await page.goto(url, {
-            waitUntil: 'domcontentloaded',
+            waitUntil: 'networkidle0', // Wait until network is idle
             timeout: this.config.timeout
           });
 
@@ -195,8 +195,29 @@ export class ScraperService {
             throw new Error('No response received from the page');
           }
 
-          // Wait for any dynamic content to load
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // For OLX pages, wait for dynamic content to load
+          if (url.includes('olx.pl')) {
+            try {
+              // Wait for either __PRERENDERED_STATE__ or visible content
+              await Promise.race([
+                // Wait for the JSON data to be available
+                page.waitForFunction(() => (window as any).__PRERENDERED_STATE__ !== undefined, { timeout: 10000 }),
+                // Or wait for visible vehicle listings
+                page.waitForSelector('[data-cy="l-card"], .css-1sw7q4x', { timeout: 10000 }),
+                // Or fallback timeout
+                new Promise(resolve => setTimeout(resolve, 8000))
+              ]);
+              
+              // Additional wait for any remaining dynamic content
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            } catch (error) {
+              console.warn(`⚠️  OLX dynamic content wait failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+              // Continue anyway - we'll try to parse what we have
+            }
+          } else {
+            // For other sites, use the original shorter wait
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
 
           // Get the HTML content and final URL
           const html = await page.content();

@@ -1,0 +1,21 @@
+# Cursor-specific ignore file
+# This overrides .gitignore for Cursor's file indexing
+
+# Keep these ignored for performance
+# node_modules/
+# **/node_modules/
+.next/
+coverage/
+*.log
+
+# Allow access to commonly used files that are in .gitignore
+# Uncomment lines below if you need access to these via @:
+# !dist/
+# !.turbo/
+# !*.tsbuildinfo
+# !.cursor/rules/
+# !.bmad-core/
+
+# OS generated files (keep ignored)
+.DS_Store
+Thumbs.db

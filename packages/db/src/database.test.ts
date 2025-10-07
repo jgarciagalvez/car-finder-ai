@@ -1,5 +1,6 @@
 import { DatabaseService } from './database';
 import { VehicleRepository } from './repositories/vehicleRepository';
+import { sql } from 'kysely';
 import path from 'path';
 import fs from 'fs';
 
@@ -19,20 +20,9 @@ describe('DatabaseService', () => {
       await dbService.close();
     }
     
-    // Remove test database file with retry for Windows file locking
+    // Remove test database file
     if (fs.existsSync(testDbPath)) {
-      try {
-        fs.unlinkSync(testDbPath);
-      } catch (error) {
-        // Retry after a short delay for Windows file locking issues
-        await new Promise(resolve => setTimeout(resolve, 100));
-        try {
-          fs.unlinkSync(testDbPath);
-        } catch (retryError) {
-          // If still fails, just warn - don't fail the test
-          console.warn(`Warning: Could not delete test database file: ${testDbPath}`);
-        }
-      }
+      fs.unlinkSync(testDbPath);
     }
   });
 
@@ -70,12 +60,12 @@ describe('DatabaseService', () => {
       const db = dbService.getDb();
       
       // Query the schema to verify table exists
-      const result = await db
-        .selectFrom('sqlite_master')
-        .select(['name', 'type'])
-        .where('type', '=', 'table')
-        .where('name', '=', 'vehicles')
-        .executeTakeFirst();
+      const result = await db.executeQuery(
+        sql<{name: string, type: string}>`
+          SELECT name, type FROM sqlite_master 
+          WHERE type = 'table' AND name = 'vehicles'
+        `.compile(db)
+      ).then(r => r.rows[0]);
       
       expect(result).toBeDefined();
       expect(result?.name).toBe('vehicles');
@@ -86,12 +76,12 @@ describe('DatabaseService', () => {
       const db = dbService.getDb();
       
       // Query for indexes
-      const indexes = await db
-        .selectFrom('sqlite_master')
-        .select('name')
-        .where('type', '=', 'index')
-        .where('name', 'like', 'idx_vehicles_%')
-        .execute();
+      const indexes = await db.executeQuery(
+        sql<{name: string}>`
+          SELECT name FROM sqlite_master 
+          WHERE type = 'index' AND name LIKE 'idx_vehicles_%'
+        `.compile(db)
+      ).then(r => r.rows);
       
       expect(indexes.length).toBeGreaterThan(0);
     });

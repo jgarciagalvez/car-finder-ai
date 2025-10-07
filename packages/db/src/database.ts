@@ -29,7 +29,17 @@ export class DatabaseService {
     };
     
     const projectRoot = findProjectRoot();
-    this.dbPath = dbPath || process.env.DATABASE_PATH || path.join(projectRoot, 'data', 'vehicles.db');
+    
+    // Correctly resolve the database path
+    if (dbPath) {
+      this.dbPath = dbPath;
+    } else if (process.env.DATABASE_PATH) {
+      // If DATABASE_PATH is relative, resolve it from the project root
+      this.dbPath = path.resolve(projectRoot, process.env.DATABASE_PATH);
+    } else {
+      // Fallback to the default path in the project root's data directory
+      this.dbPath = path.join(projectRoot, 'data', 'vehicles.db');
+    }
   }
 
   /**

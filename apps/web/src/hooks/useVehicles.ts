@@ -77,5 +77,6 @@ export function useVehicles() {
     loadVehicleById,
     updateVehicle,
     clearError,
+    refetch: loadVehicles, // Alias for refetching data
   };
 }

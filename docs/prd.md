@@ -1,29 +1,40 @@
 # Car Finder AI Product Requirements Document (PRD)
 
-### Goals and Background Context
+## Goals and Background Context
 
-#### Goals
+### Goals
 
-* **Automate Search:** Drastically reduce the time and manual effort required to find relevant vehicle listings by automating the daily aggregation from multiple online sources.
-* **Improve Decision-Making:** Equip the user with clear, data-driven insights—including a Personal Fit Score, objective Market Value Analysis, and an AI-generated Virtual Mechanic's Report—to build confidence and identify the best deals.
-* **Centralize Workflow:** Provide a single, unified interface to manage all aspects of the vehicle search, from initial discovery to tracking seller communications and personal notes.
-* **Enable a Successful Purchase:** The ultimate goal is to enable the user to efficiently find and purchase a qualifying vehicle that meets their specific, complex criteria.
+*   **Automate Search:** Drastically reduce the time and manual effort required to find relevant vehicle listings by automating the daily aggregation from multiple online sources.
+*   **Improve Decision-Making:** Equip the user with clear, data-driven insights—including a Personal Fit Score, objective Market Value Analysis, and an AI-generated Virtual Mechanic's Report—to build confidence and identify the best deals.
+*   **Centralize Workflow:** Provide a single, unified interface to manage all aspects of the vehicle search, from initial discovery to tracking seller communications and personal notes.
+*   **Enable a Successful Purchase:** The ultimate goal is to enable the user to efficiently find and purchase a qualifying vehicle that meets their specific, complex criteria.
+*   **Timeline:** Have a functional MVP ready by the end of the week (October 10th, 2025).
 
-#### Background Context
+### Success Metrics
+
+*   **Efficiency:** Reduce the time to review daily new vehicle listings from ~45 minutes (manual estimate) to under 5 minutes.
+*   **Effectiveness:** The tool should not miss any relevant vehicles that would have been found through a manual search.
+*   **Primary Outcome:** The user successfully purchases a vehicle found and tracked using the application.
+
+### User Persona
+
+The primary user is the project's developer, a technically proficient individual building this tool for personal use. The goal is to find a specific vehicle that meets a complex set of criteria, while minimizing the time spent on manual, repetitive searching.
+
+### Background Context
 
 The search for a specific used vehicle in Poland is a fragmented and inefficient process, requiring manual checks across multiple marketplaces like Otomoto.pl and OLX.pl. This leads to disorganized tracking, difficulty in comparing vehicles objectively, and a lack of readily available, model-specific mechanical knowledge.
 
 This project aims to solve that problem by creating a personal, automated application. It will act as a "mission control" for the vehicle search, providing the user with aggregated listings, intelligent scoring, and AI-powered analysis to streamline the entire process from discovery to purchase.
 
-#### Change Log
+### Change Log
 
 | Date          | Version | Description                               | Author      |
 | :------------ | :------ | :---------------------------------------- | :---------- |
 | Oct 3, 2025   | 1.0     | Initial draft based on the approved Project Brief. | John (PM)   |
 
-### Requirements
+## Requirements
 
-#### Functional Requirements
+### Functional
 
 * **FR1:** The system shall scrape new vehicle listings from Otomoto.pl and OLX.pl based on a configurable search schema file.
 * **FR2:** The system shall parse the HTML of each scraped listing to extract key data points (e.g., price, year, mileage, description, photos) using a configurable parser schema.
@@ -34,74 +45,92 @@ This project aims to solve that problem by creating a personal, automated applic
 * **FR7:** The system shall use an LLM to generate an "AI Priority Rating" and a natural-language summary for each vehicle, synthesizing all other data points.
 * **FR8:** The system shall use an LLM to generate a "Virtual Mechanic's Report" for each vehicle.
 * **FR9:** The system shall use an LLM to perform a "Data Sanity Check" to flag inconsistencies between an ad's structured data and its text description.
-* **FR10:** The system shall present all vehicles in a sortable, filterable, vehicled-based dashboard UI.
+* **FR10:** The system shall present all vehicles in a sortable, filterable, card-based dashboard UI.
 * **FR11:** The system shall provide a detail view for each vehicle, displaying all scraped information, scores, and AI reports.
 * **FR12:** The user shall be able to assign and update a status (e.g., `New`, `To Contact`, `Deleted`) for each vehicle from the dashboard UI.
 * **FR13:** The user shall be able to add, edit, and save personal text comments for each vehicle.
 * **FR14:** The system shall provide an LLM-powered "Communication Assistant" to help draft messages to sellers in Polish and translate replies.
 
-#### Non-Functional Requirements
+### Non-Functional
 
 * **NFR1:** The entire application (scraper, backend, and UI) must be capable of running on a local desktop machine.
 * **NFR2:** The application's operational costs must be near-zero, relying on local execution and staying within the free/low-cost tiers of the Gemini API.
 * **NFR3:** The user interface must remain responsive and performant, with long-running tasks like scraping and analysis executed in the background.
 * **NFR4:** The web scraper must operate using a headless browser configured with best practices (e.g., appropriate user agents, request throttling) to behave like a real user and minimize detection risk.
 * **NFR5:** The scraper's core logic (search URLs, parsing selectors) must be configurable via external JSON files, allowing for updates without changing the application's source code.
+* **NFR6 (Fault Tolerance):** To ensure resilience, the system shall cache the results of intermediate steps in any multi-step workflow (e.g., saving raw HTML after scraping, saving AI responses). In case of a failure, workflows should be able to resume from the last successfully completed step, preventing redundant work.
+* **NFR7 (Backup, Recovery, and Rollback):** The system shall provide a robust mechanism for data protection and recovery. This includes manual or automatic full database backups, as well as an automated pre-execution snapshot capability. Before any script that performs significant data modification (e.g., ingestion or analysis) is run, a timestamped database snapshot must be created to allow for a rapid rollback in case of failure or data corruption.
 
-### User Interface Design Goals
+### Out of Scope
 
-#### Overall UX Vision
+To ensure focus on the core MVP functionality, the following features and capabilities are explicitly out of scope for the initial version:
+
+*   **User Accounts and Authentication:** The application is for a single user and will not have a login system.
+*   **Support for Additional Scraper Sources:** The MVP will be built and tested only for `Otomoto.pl` and `OLX.pl`. Adding more sites is a future enhancement.
+*   **Cloud Hosting or Public Web Access:** The entire application is designed to run locally on a desktop machine and will not be deployed to the cloud.
+*   **Advanced AI Model Customization:** The AI prompts and models will be hardcoded for the MVP; a user interface for modifying them will not be included.
+*   **Mobile-Native Application:** The UI will be responsive for web browsers, but a dedicated iOS or Android app is not part of the MVP.
+
+## User Interface Design Goals
+
+### Overall UX Vision
 The application's user experience should be that of a powerful, data-rich analysis tool. The vision is a "mission control" dashboard that presents complex information in a clean, scannable, and actionable format. The focus is on efficiency, clarity, and empowering the user to make quick, informed decisions.
 
-#### Key Interaction Paradigms
-* **Vehicled-Based Layout:** The main view will use a vehicled for each vehicle, presenting key information at a glance.
-* **Direct Manipulation:** The user should be able to perform primary actions—like changing a vehicle's status or adding a quick note—directly from its vehicled on the dashboard.
-* **Hover-to-Preview:** Image carousels on the dashboard vehicleds should be interactive on mouse hover.
+### Key Interaction Paradigms
+* **Card-Based Layout:** The main view will use a card for each vehicle, presenting key information at a glance.
+* **Direct Manipulation:** The user should be able to perform primary actions—like changing a vehicle's status or adding a quick note—directly from its card on the dashboard.
+* **Hover-to-Preview:** Image carousels on the dashboard cards should be interactive on mouse hover.
 * **Fast Navigation:** The application should feel like a Single-Page App (SPA), with near-instant navigation between the main dashboard and the detailed view.
 
-#### Core Screens and Views
-1.  **Dashboard View:** The primary screen, featuring a grid or list of vehicle vehicleds with powerful sorting and filtering controls.
+### Core Screens and Views
+1.  **Dashboard View:** The primary screen, featuring a grid or list of vehicle cards with powerful sorting and filtering controls.
 2.  **Detail View:** A comprehensive page for a single vehicle, containing all scraped data, AI reports, comments, and the communication assistant.
 
-#### Accessibility
+### Accessibility
 * **Accessibility:** None. Formal accessibility compliance is not a requirement for this personal-use application.
 
-#### Branding
+### Branding
 * A clean, minimalist, "data-tool" aesthetic is preferred, potentially with a dark mode theme. No formal branding is required.
 
-#### Target Device and Platforms
+### Target Device and Platforms
 * **Target Device and Platforms:** Web Responsive, but primarily optimized for a desktop/laptop browser.
 
-### Technical Assumptions (Revised)
+## Technical Assumptions
 
-#### Repository Structure: Monorepo
+### Repository Structure
+**Decision:** Monorepo
+
 The project will be developed within a monorepo (e.g., using Turborepo) to simplify code sharing between the backend and frontend.
 
-#### Service Architecture
+### Service Architecture
+**Decision:** Local-First Execution Model
+
 The primary architecture for the MVP will be a **Local-First Execution Model**. The application will be designed as a set of Node.js scripts and a local web server that runs entirely on your machine.
 
-#### Testing Requirements: Unit + Integration Tests
+### Testing Requirements
+**Decision:** Unit + Integration Tests
+
 The testing strategy will focus on Unit Tests for complex functions and Integration Tests for the core scraping/parsing logic.
 
-#### Additional Technical Assumptions and Requests
+### Additional Technical Assumptions and Requests
 * The backend will be built with **Node.js**, **Express.js**, and **Puppeteer**.
 * The frontend will be built with **React/Next.js** and **Tailwind CSS**.
 * The database will be **LibSQL** (SQLite-compatible).
 * Data parsing will be driven by an external **`parser-schema.json`** file.
 * **AI Provider Abstraction:** The application will use an abstraction layer for AI interactions. For the MVP, only the **Google Gemini API** will be implemented.
 
-### Epic List
+## Epic List
 
 1.  **Epic 1: Foundation & Data Ingestion**
     * **Goal:** Establish the complete project foundation and build a fully functional, automated pipeline that scrapes vehicle listings, parses the data using the schema file, and populates a clean, standardized local database.
 2.  **Epic 2: AI Insights & Interactive UI**
     * **Goal:** Build the complete web interface that reads from the local database, executes all AI-powered analysis and scoring, and provides the full suite of interactive tools for the user to manage their search workflow.
 
-### Epic 1: Foundation & Data Ingestion
+## Epic 1: Foundation & Data Ingestion
 **Epic Goal:** Establish the complete project foundation and build a fully functional, automated pipeline that scrapes vehicle listings, parses the data using the schema file, and populates a clean, standardized local database.
 
 ---
-#### **Story 1.1: Project Initialization and Monorepo Setup**
+### **Story 1.1: Project Initialization and Monorepo Setup**
 **As a** user, **I want** a new monorepo project initialized with the basic folder structure and configuration files, **so that** I have a clean, organized foundation to start building the application.
 **Acceptance Criteria:**
 1. A new Turborepo project is initialized.
@@ -110,7 +139,7 @@ The testing strategy will focus on Unit Tests for complex functions and Integrat
 4. Base TypeScript (`tsconfig.json`) and ESLint configurations are set up for the monorepo.
 
 ---
-#### **Story 1.2: Local Database Initialization**
+### **Story 1.2: Local Database Initialization**
 **As a** user, **I want** a local SQLite database and a simple data access layer set up, **so that** scraped data can be stored persistently on my machine.
 **Acceptance Criteria:**
 1. The project includes `@libsql/client` and a query builder like `Kysely`.
@@ -119,7 +148,7 @@ The testing strategy will focus on Unit Tests for complex functions and Integrat
 4. The service exposes basic functions like `insertVehicle` and `findVehicleByUrl`.
 
 ---
-#### **Story 1.3: Headless Browser Scraper Service**
+### **Story 1.3: Headless Browser Scraper Service**
 **As a** user, **I want** a scraper service that uses a headless browser (Puppeteer) to visit URLs and retrieve their full HTML content, **so that** I can gather the raw data from the marketplace websites.
 **Acceptance Criteria:**
 1. Puppeteer is added as a dependency to the `api` application.
@@ -128,7 +157,7 @@ The testing strategy will focus on Unit Tests for complex functions and Integrat
 4. The service includes respectful delays between requests.
 
 ---
-#### **Story 1.4: Schema-Driven HTML Parser**
+### **Story 1.4: Schema-Driven HTML Parser**
 **As a** user, **I want** a parser that reads a `parser-schema.json` file and uses its rules (CSS selectors) to extract structured data from a raw HTML string, **so that** I can turn unstructured web pages into clean data without hardcoding parsing logic.
 **Acceptance Criteria:**
 1. A `parser-schema.json` file is created with placeholder selector structures.
@@ -136,7 +165,7 @@ The testing strategy will focus on Unit Tests for complex functions and Integrat
 3. The service has a function that takes raw HTML and a site key, reads the schema, applies the selectors, and returns a structured JSON object.
 
 ---
-#### **Story 1.5: Main Ingestion Pipeline**
+### **Story 1.5: Main Ingestion Pipeline**
 **As a** user, **I want** a main script that orchestrates the entire data ingestion process, **so that** I can run a single command to find and store all new vehicle listings.
 **Acceptance Criteria:**
 1. A main script (`packages/scripts/ingest.ts`) is created.
@@ -144,11 +173,11 @@ The testing strategy will focus on Unit Tests for complex functions and Integrat
 3. It uses the `ScraperService` to get a list of individual vehicle URLs.
 4. For each new URL, it uses the `ScraperService`, `ParserService`, and database service to save the new vehicle data.
 
-### Epic 2: AI Insights & Interactive UI
+## Epic 2: AI Insights & Interactive UI
 **Epic Goal:** Build the complete web interface that reads from the local database, executes all AI-powered analysis and scoring, and provides the full suite of interactive tools for the user to manage their search workflow.
 
 ---
-#### **Story 2.0: Integration Testing & Build Infrastructure**
+### **Story 2.0: Integration Testing & Build Infrastructure**
 **As a** developer, **I want** a comprehensive integration testing infrastructure that resolves monorepo module resolution issues, **so that** all Epic 2 stories can be properly tested and validated.
 **Acceptance Criteria:**
 1. A new `packages/services` package is created with service abstraction layer and interface contracts.
@@ -159,7 +188,7 @@ The testing strategy will focus on Unit Tests for complex functions and Integrat
 6. Epic 1 integration tests are retrofitted using the new infrastructure to validate the solution.
 
 ---
-#### **Story 2.1: Frontend Application Setup and API Connection**
+### **Story 2.1: Frontend Application Setup and API Connection**
 **As a** user, **I want** a basic Next.js frontend application created that can connect to a simple backend API, **so that** the foundation for the user interface is in place and can display data.
 **Acceptance Criteria:**
 1. A new `web` app is created in the `apps` directory.
@@ -168,7 +197,7 @@ The testing strategy will focus on Unit Tests for complex functions and Integrat
 4. Tailwind CSS is configured in the `web` application.
 
 ---
-#### **Story 2.2a: AI Infrastructure & Abstraction Layer**
+### **Story 2.2a: AI Infrastructure & Abstraction Layer**
 **As a** developer, **I want** a robust AI infrastructure with provider abstraction, **so that** the foundation for all AI-powered features is established with proper error handling and rate limiting.
 **Acceptance Criteria:**
 1. A new `packages/ai` package is created with provider interface and factory pattern.
@@ -178,7 +207,7 @@ The testing strategy will focus on Unit Tests for complex functions and Integrat
 5. Basic prompt engineering utilities and response validation are established.
 
 ---
-#### **Story 2.2b: AI Analysis Features**
+### **Story 2.2b: AI Analysis Features**
 **As a** user, **I want** comprehensive AI analysis for each vehicle including fit scores and reports, **so that** I have intelligent insights to guide my vehicle selection decisions.
 **Acceptance Criteria:**
 1. Personal Fit Score generation is implemented using LLM analysis of vehicle data against user criteria.
@@ -188,7 +217,7 @@ The testing strategy will focus on Unit Tests for complex functions and Integrat
 5. A separate script (`packages/scripts/analyze.ts`) is created to run analysis on all un-analyzed vehicles.
 
 ---
-#### **Story 2.3: Market Value Score Service**
+### **Story 2.3: Market Value Score Service**
 **As a** user, **I want** a backend service that can calculate the Market Value Score for each vehicle, **so that** I can objectively see if it is a good deal.
 **Acceptance Criteria:**
 1. A `MarketValueService` is created in the backend.
@@ -197,7 +226,7 @@ The testing strategy will focus on Unit Tests for complex functions and Integrat
 4. The main analysis script is updated to run this service.
 
 ---
-#### **Story 2.4: Vehicle-Based Vehicle Dashboard**
+### **Story 2.4: Card-Based Vehicle Dashboard**
 **As a** user, **I want** a dashboard UI that fetches and displays all the analyzed vehicles in a card-based layout, **so that** I can easily scan and compare all the potential vehicles.
 **Acceptance Criteria:**
 1. A dashboard page is created that fetches all vehicle data.
@@ -205,7 +234,7 @@ The testing strategy will focus on Unit Tests for complex functions and Integrat
 3. Basic sorting controls are added to the dashboard.
 
 ---
-#### **Story 2.5: Interactive Workflow Tools**
+### **Story 2.5: Interactive Workflow Tools**
 **As a** user, **I want** to be able to change the status of a vehicle and add notes directly from its card on the dashboard, **so that** I can manage my search workflow efficiently.
 **Acceptance Criteria:**
 1. The `VehicleCard` includes a working status dropdown that updates the database.
@@ -213,9 +242,61 @@ The testing strategy will focus on Unit Tests for complex functions and Integrat
 3. The dashboard can be filtered by status.
 
 ---
-#### **Story 2.6: Vehicle Detail View and Communication Assistant**
+### **Story 2.6: Vehicle Detail View and Communication Assistant**
 **As a** user, **I want** a full detail page for each vehicle that shows all information and includes the AI Communication Assistant, **so that** I can do a deep-dive analysis and prepare to contact the seller.
 **Acceptance Criteria:**
 1. Clicking a `VehicleCard` navigates to a unique detail page.
 2. The page displays all scraped data and the full Virtual Mechanic's Report.
 3. A "Communication Assistant" component uses the AI service to generate messages in Polish and translate replies.
+
+## Checklist Results Report
+
+### Executive Summary
+
+*   **Overall PRD Completeness:** 95%
+*   **MVP Scope Appropriateness:** Just Right
+*   **Readiness for Architecture Phase:** Ready
+*   **Most Critical Gaps (at start of review):** Lack of measurable success metrics, undefined scope boundaries, and no plan for data backup/recovery. All critical gaps were resolved during the interactive review.
+
+### Category Analysis
+
+| Category                         | Status | Critical Issues Resolved                                    |
+| :------------------------------- | :----- | :---------------------------------------------------------- |
+| 1. Problem Definition & Context  | ✅ PASS | Added Success Metrics and User Persona.                     |
+| 2. MVP Scope Definition          | ✅ PASS | Added a clear "Out of Scope" section.                       |
+| 3. User Experience Requirements  | ✅ PASS | Minor gap in UI error handling noted.                       |
+| 4. Functional Requirements       | ✅ PASS | None.                                                       |
+| 5. Non-Functional Requirements   | ✅ PASS | Added Fault Tolerance and Backup/Recovery.                  |
+| 6. Epic & Story Structure        | ✅ PASS | None.                                                       |
+| 7. Technical Guidance            | ✅ PASS | None.                                                       |
+| 8. Cross-Functional Requirements | ✅ PASS | None.                                                       |
+| 9. Clarity & Communication       | ✅ PASS | None.                                                       |
+
+### Top Issues by Priority
+
+*   **BLOCKERS:** None.
+*   **HIGH:** None.
+*   **MEDIUM:**
+    *   It is recommended to define how the UI should surface errors from background tasks (e.g., scraper or AI failures) to the user. This can be addressed during the UX/Architecture phase.
+*   **LOW:** None.
+
+### Final Decision
+
+*   **✅ READY FOR ARCHITECT:** The PRD and epics are comprehensive, well-structured, and ready for the architectural design phase. The interactive review has addressed all initial critical gaps.
+
+## Next Steps
+
+### UX Expert Prompt
+
+Review this PRD, particularly the **User Interface Design Goals** section (Goals, Key Interaction Paradigms, Core Screens). Create detailed UI/UX specifications, wireframes, and interaction flows that fulfill the vision and requirements defined here. Focus on the "mission control" dashboard concept and the card-based vehicle presentation model.
+
+### Architect Prompt
+
+Review this PRD comprehensively, including all **Functional Requirements** (FR1-FR14), **Non-Functional Requirements** (NFR1-NFR5), and **Technical Assumptions**. Create a detailed architecture document that defines:
+- System architecture and component structure
+- Database schema and data models
+- API specifications and service interfaces
+- Technology stack implementation details
+- Testing strategy and quality assurance approach
+
+Ensure the architecture supports the Local-First Execution Model and maintains the near-zero operational cost constraint while enabling all required AI-powered features.

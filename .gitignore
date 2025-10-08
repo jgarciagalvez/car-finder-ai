@@ -30,6 +30,8 @@ out/
 # BMad Method framework files
 .bmad-core/
 .bmad-infrastructure-devops/
+.ignore/
+.gemini/
 
 # OS generated files
 .DS_Store
@@ -96,3 +98,5 @@ scripts/
 # Test databases in test directories (temporary files)
 **/__tests__/*.db
 **/test-*.db
+
+# Old docs

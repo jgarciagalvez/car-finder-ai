@@ -1,0 +1,6 @@
+# BMad Method framework files
+!.bmad-core/
+.bmad-infrastructure-devops/
+.ignore/
+.gemini/
+!/.bmad-core/agents/

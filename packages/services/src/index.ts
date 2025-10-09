@@ -1,14 +1,14 @@
 // Service interfaces and contracts
-export * from './interfaces';
+export * from './interfaces/index';
 
 // Service registry and dependency injection
-export * from './registry';
+export * from './registry/index';
 
 // Static service registry wrapper
 export { ServiceRegistry } from './ServiceRegistry';
 
 // Mock implementations for testing
-export * from './mocks';
+export * from './mocks/index';
 
 // Test utilities
-export * from './utils';
+export * from './utils/index';

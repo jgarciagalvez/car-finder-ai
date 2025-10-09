@@ -14,3 +14,5 @@ export {
 } from './PromptBuilder';
 export { PromptLoader } from './PromptLoader';
 export type { ParsedPrompt } from './PromptLoader';
+export { DictionaryLoader } from './DictionaryLoader';
+export type { FeatureDictionary } from './DictionaryLoader';

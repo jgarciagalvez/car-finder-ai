@@ -191,6 +191,7 @@ export class VehicleAnalyzer {
       const needsAnalysis = this.vehicleNeedsAnalysis(vehicle);
       if (!needsAnalysis) {
         console.log(`\n✅ Vehicle ${options.vehicleId} already has complete AI analysis:`);
+        console.log(`   🌐 Translation: ${vehicle.description ? '✓ Present' : '✗ Missing'}`);
         console.log(`   📊 Personal Fit Score: ${vehicle.personalFitScore ?? 'N/A'}`);
         console.log(`   ⭐ AI Priority Rating: ${vehicle.aiPriorityRating ?? 'N/A'}`);
         console.log(`   🔧 Mechanic Report: ${vehicle.aiMechanicReport ? '✓ Present' : '✗ Missing'}`);
@@ -217,6 +218,8 @@ export class VehicleAnalyzer {
    */
   private vehicleNeedsAnalysis(vehicle: Vehicle): boolean {
     return (
+      !vehicle.description ||
+      !vehicle.features ||
       vehicle.personalFitScore === null ||
       vehicle.aiPriorityRating === null ||
       vehicle.aiPrioritySummary === null ||
@@ -230,12 +233,28 @@ export class VehicleAnalyzer {
    */
   private async analyzeVehicle(vehicle: Vehicle, options: AnalysisOptions): Promise<void> {
     const analysis: {
+      description?: string;
+      features?: string[];
       personalFitScore?: number;
       aiPriorityRating?: number;
       aiPrioritySummary?: string;
       aiMechanicReport?: string;
       aiDataSanityCheck?: string;
     } = {};
+
+    // 0. Translate vehicle content (must run FIRST to provide English content for other analyses)
+    if (!vehicle.description || !vehicle.features) {
+      try {
+        console.log('  🌐 Translating vehicle content (Polish → English)...');
+        const translation = await this.aiService.translateVehicleContent(vehicle);
+        analysis.description = translation.description;
+        analysis.features = translation.features;
+        console.log(`  ✓ Translation complete (${translation.features.length} features)`);
+      } catch (error) {
+        console.error('  ⚠️ Failed to translate vehicle content:', error);
+        // Translation failure is non-critical, continue with other analyses
+      }
+    }
 
     // 1. Generate Data Sanity Check (should be first to detect issues)
     if (!vehicle.aiDataSanityCheck && !options.skipSanityCheck) {

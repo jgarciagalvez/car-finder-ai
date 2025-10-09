@@ -2,11 +2,14 @@
  * Prompt engineering utilities for structured prompt construction
  */
 
-import { 
-  PromptTemplate, 
-  ChatMessage, 
-  ValidationError 
+import {
+  PromptTemplate,
+  ChatMessage,
+  ValidationError
 } from '../interfaces';
+import { WorkspaceUtils } from '@car-finder/services';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * System message types for different AI tasks
@@ -22,11 +25,31 @@ export enum SystemMessageType {
  * Prompt builder for structured prompt construction
  */
 export class PromptBuilder {
+  private static configCache: Record<string, string> = {};
+  private static configLoaded: boolean = false;
+
   private systemMessage: string = '';
   private context: Record<string, any> = {};
   private instructions: string[] = [];
   private examples: Array<{ input: string; output: string }> = [];
   private constraints: string[] = [];
+
+  /**
+   * Load system prompts from search-config.json
+   */
+  private static loadSystemPrompts(): Record<string, string> {
+    if (this.configLoaded) {
+      return this.configCache;
+    }
+
+    const configPath = WorkspaceUtils.resolveProjectFile('search-config.json');
+    const configContent = fs.readFileSync(configPath, 'utf-8');
+    const config = JSON.parse(configContent);
+
+    this.configCache = config.analysisSettings?.systemPrompts || {};
+    this.configLoaded = true;
+    return this.configCache;
+  }
 
   /**
    * Set system message
@@ -37,20 +60,20 @@ export class PromptBuilder {
   }
 
   /**
-   * Set system message by type
+   * Set system message by type (loads from search-config.json)
    */
   public setSystemMessageByType(type: SystemMessageType): PromptBuilder {
-    const systemMessages = {
-      [SystemMessageType.VEHICLE_ANALYSIS]: `You are an expert automotive analyst specializing in used car evaluation. You provide detailed, objective analysis of vehicle listings including market value assessment, condition evaluation, and purchase recommendations. Always base your analysis on factual data and industry standards.`,
-      
-      [SystemMessageType.COMMUNICATION_ASSISTANT]: `You are a professional communication assistant for car buyers. You help draft polite, effective messages to sellers, translate content between languages, and provide guidance on negotiation strategies. Always maintain a respectful and professional tone.`,
-      
-      [SystemMessageType.DATA_VALIDATION]: `You are a data validation specialist for automotive listings. You identify inconsistencies, missing information, and potential red flags in vehicle data. You provide clear explanations of any issues found and suggest corrections where appropriate.`,
-      
-      [SystemMessageType.GENERAL_ASSISTANT]: `You are a helpful AI assistant with expertise in automotive topics. You provide accurate, helpful information while being concise and user-friendly. Always prioritize user safety and make recommendations based on best practices.`
-    };
+    const systemPrompts = PromptBuilder.loadSystemPrompts();
 
-    this.systemMessage = systemMessages[type];
+    this.systemMessage = systemPrompts[type] || '';
+
+    if (!this.systemMessage) {
+      throw new ValidationError(
+        `System prompt not found for type: ${type}. Check search-config.json.`,
+        'systemMessageType'
+      );
+    }
+
     return this;
   }
 

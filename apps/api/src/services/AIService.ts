@@ -8,7 +8,7 @@
  * - Data Sanity Check (consistency validation)
  */
 
-import { AIProviderFactory, IAIProvider, PromptLoader } from '@car-finder/ai';
+import { AIProviderFactory, IAIProvider, PromptLoader, DictionaryLoader } from '@car-finder/ai';
 import { AIError, RateLimitError, ValidationError } from '@car-finder/ai';
 import { Vehicle } from '@car-finder/types';
 
@@ -56,6 +56,14 @@ export interface SanityCheckResult {
 }
 
 /**
+ * Translation result
+ */
+export interface TranslationResult {
+  description: string;
+  features: string[];
+}
+
+/**
  * Helper type for extracting vehicle properties from sourceParameters
  */
 interface VehicleExtractedData {
@@ -79,6 +87,98 @@ export class AIService {
     // Use factory to create provider from environment variables
     // This loads GEMINI_API_KEY and other settings from .env automatically
     this.provider = AIProviderFactory.createFromEnvironment();
+  }
+
+  /**
+   * Translate vehicle content (description and features) from Polish to English
+   * Uses dictionary-first approach: checks dictionary, only calls AI for unmapped features
+   */
+  async translateVehicleContent(vehicle: Vehicle): Promise<TranslationResult> {
+    try {
+      // Extract equipment from sourceParameters
+      let sourceParams: Record<string, any> = {};
+      try {
+        sourceParams = typeof vehicle.sourceParameters === 'string'
+          ? JSON.parse(vehicle.sourceParameters)
+          : vehicle.sourceParameters;
+      } catch (e) {
+        console.warn(`Failed to parse sourceParameters for vehicle ${vehicle.id}`);
+      }
+
+      // Get equipment array from sourceParameters
+      const polishEquipment: string[] = Array.isArray(sourceParams.equipment)
+        ? sourceParams.equipment
+        : [];
+
+      // Use dictionary to translate features
+      const { translated, unmapped } = DictionaryLoader.translateFeatures(polishEquipment);
+
+      let translatedEquipment: string[] = [];
+
+      // Only call AI if there are unmapped features
+      if (unmapped.length > 0) {
+        console.log(`Calling AI to translate ${unmapped.length} unmapped features for vehicle ${vehicle.id}`);
+
+        // Load prompt definition
+        const prompt = await PromptLoader.loadPrompt('translate-vehicle');
+
+        // Build prompt with unmapped equipment
+        const fullPrompt = PromptLoader.buildPrompt(prompt, {
+          sourceDescriptionHtml: vehicle.sourceDescriptionHtml || '',
+          unmappedEquipment: unmapped,
+        });
+
+        // Call AI provider
+        const response = await this.provider.generateStructured<{
+          description: string;
+          translatedEquipment: string[];
+        }>(fullPrompt, prompt.outputFormat);
+
+        // Validate response
+        if (!response.description || response.description.trim() === '') {
+          throw new ValidationError('Empty description returned from AI provider');
+        }
+
+        translatedEquipment = response.translatedEquipment || [];
+
+        // Combine dictionary translations with AI translations
+        const allFeatures = [...translated, ...translatedEquipment];
+
+        return {
+          description: response.description,
+          features: allFeatures,
+        };
+      } else {
+        // All features found in dictionary, only translate description
+        console.log(`All features found in dictionary for vehicle ${vehicle.id}, translating description only`);
+
+        const prompt = await PromptLoader.loadPrompt('translate-vehicle');
+        const fullPrompt = PromptLoader.buildPrompt(prompt, {
+          sourceDescriptionHtml: vehicle.sourceDescriptionHtml || '',
+          unmappedEquipment: [],
+        });
+
+        const response = await this.provider.generateStructured<{
+          description: string;
+          translatedEquipment: string[];
+        }>(fullPrompt, prompt.outputFormat);
+
+        if (!response.description || response.description.trim() === '') {
+          throw new ValidationError('Empty description returned from AI provider');
+        }
+
+        return {
+          description: response.description,
+          features: translated,
+        };
+      }
+    } catch (error) {
+      console.error(`Error translating vehicle content for ${vehicle.id}:`, error);
+      if (error instanceof AIError || error instanceof RateLimitError || error instanceof ValidationError) {
+        throw error;
+      }
+      throw new AIError(`Failed to translate vehicle content: ${(error as Error).message}`);
+    }
   }
 
   /**

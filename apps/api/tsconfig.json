@@ -25,6 +25,15 @@
   "references": [
     {
       "path": "../../packages/types"
+    },
+    {
+      "path": "../../packages/db"
+    },
+    {
+      "path": "../../packages/ai"
+    },
+    {
+      "path": "../../packages/services"
     }
   ]
 }

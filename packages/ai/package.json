@@ -15,8 +15,8 @@
   },
   "dependencies": {
     "@car-finder/types": "workspace:*",
-    "@google/generative-ai": "~0.11.0",
-    "dotenv": "^16.6.1"
+    "@car-finder/services": "workspace:*",
+    "@google/generative-ai": "~0.11.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.0",

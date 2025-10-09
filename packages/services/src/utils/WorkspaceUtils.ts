@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as dotenv from 'dotenv';
 
 /**
  * Workspace utilities for monorepo file resolution
@@ -7,6 +8,7 @@ import * as path from 'path';
  */
 export class WorkspaceUtils {
   private static cachedRoot: string | null = null;
+  private static envLoaded: boolean = false;
 
   /**
    * Find the workspace root by looking for package.json with workspaces
@@ -70,9 +72,34 @@ export class WorkspaceUtils {
   }
 
   /**
+   * Load environment variables from .env file in the workspace root.
+   * It's safe to call this multiple times; it will only load the file once.
+   */
+  static loadEnvFromRoot(): void {
+    if (this.envLoaded) {
+      return; // Already loaded
+    }
+
+    const workspaceRoot = this.findWorkspaceRoot();
+    const envPath = path.join(workspaceRoot, '.env');
+
+    if (fs.existsSync(envPath)) {
+      const result = dotenv.config({ path: envPath });
+      
+      if (result.error) {
+        console.warn(`⚠️  Warning: Failed to load .env file from ${envPath}:`, result.error.message);
+      }
+    }
+    // .env file not existing is not an error, vars can be set externally.
+    
+    this.envLoaded = true;
+  }
+
+  /**
    * Clear the cached workspace root (useful for testing)
    */
   static clearCache(): void {
     this.cachedRoot = null;
+    this.envLoaded = false;
   }
 }

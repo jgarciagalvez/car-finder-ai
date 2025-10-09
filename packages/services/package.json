@@ -12,7 +12,8 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
-    "@car-finder/types": "workspace:*"
+    "@car-finder/types": "workspace:*",
+    "dotenv": "^16.4.5"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

@@ -21,6 +21,7 @@ out/
 
 # IDE and editor files
 .cursor/
+.claude
 .vscode/
 .idea/
 *.swp
@@ -92,8 +93,8 @@ temp/
 data/vehicles.db
 data/exports/
 
-# Scripts
-scripts/
+# Scripts (root level only)
+/scripts/
 
 # Test databases in test directories (temporary files)
 **/__tests__/*.db

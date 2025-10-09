@@ -1,12 +1,12 @@
 import express, { Express } from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
+import { WorkspaceUtils } from '@car-finder/services';
 import { ScraperService } from './services/ScraperService';
 import { ParserService } from './services/ParserService';
 import vehiclesRouter from './routes/vehicles';
 
-// Load environment variables from root
-dotenv.config({ path: '../../.env' });
+// Load environment variables from workspace root
+WorkspaceUtils.loadEnvFromRoot();
 
 const app: Express = express();
 const PORT = process.env.API_PORT || 3000;

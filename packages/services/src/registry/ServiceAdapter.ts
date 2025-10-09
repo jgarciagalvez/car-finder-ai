@@ -44,8 +44,8 @@ export class ServiceAdapter {
       // Initialize database with proper async handling
       const database = new DatabaseService();
       await database.initialize();
-      
-      return new VehicleRepository(database.getDb());
+
+      return new VehicleRepository(database.getDatabase());
     });
   }
 

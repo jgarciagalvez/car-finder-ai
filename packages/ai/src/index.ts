@@ -22,3 +22,6 @@ export type { IAIProvider } from './interfaces/IAIProvider';
 export { GeminiProvider } from './providers/GeminiProvider';
 export { AIProviderFactory } from './factory/AIProviderFactory';
 export { PromptBuilder, SystemMessageType } from './utils/PromptBuilder';
+export { PromptLoader } from './utils/PromptLoader';
+export type { ParsedPrompt } from './utils/PromptLoader';
+export { AIError, RateLimitError, ValidationError } from './interfaces/errors';

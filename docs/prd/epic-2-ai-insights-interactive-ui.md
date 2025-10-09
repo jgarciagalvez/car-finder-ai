@@ -22,7 +22,7 @@
 4. Tailwind CSS is configured in the `web` application.
 
 ---
-### **Story 2.2a: AI Infrastructure & Abstraction Layer**
+### **Story 2.2: AI Infrastructure & Abstraction Layer**
 **As a** developer, **I want** a robust AI infrastructure with provider abstraction, **so that** the foundation for all AI-powered features is established with proper error handling and rate limiting.
 **Acceptance Criteria:**
 1. A new `packages/ai` package is created with provider interface and factory pattern.
@@ -32,26 +32,28 @@
 5. Basic prompt engineering utilities and response validation are established.
 
 ---
-### **Story 2.2b: AI Analysis Features**
+### **Story 2.3: AI Analysis Features**
 **As a** user, **I want** comprehensive AI analysis for each vehicle including fit scores and reports, **so that** I have intelligent insights to guide my vehicle selection decisions.
 **Acceptance Criteria:**
-1. Personal Fit Score generation is implemented using LLM analysis of vehicle data against user criteria.
-2. AI Priority Rating and natural-language summaries are generated synthesizing all data points.
-3. Virtual Mechanic's Report is created providing model-specific mechanical insights and inspection points.
-4. Data Sanity Check is implemented to flag inconsistencies between structured data and descriptions.
-5. A separate script (`apps/api/src/scripts/analyze.ts`) is created to run analysis on all un-analyzed vehicles.
+1. Vehicle descriptions and equipment lists are translated from Polish to English and stored in the `description` and `features` fields.
+2. Personal Fit Score generation is implemented using LLM analysis of vehicle data against user criteria.
+3. AI Priority Rating and natural-language summaries are generated synthesizing all data points.
+4. Virtual Mechanic's Report is created providing model-specific mechanical insights and inspection points.
+5. Data Sanity Check is implemented to flag inconsistencies between structured data and descriptions.
+6. AI prompts are organized as versioned markdown files following BMAD-style agent patterns, not hardcoded in TypeScript.
+7. A separate script (`apps/api/src/scripts/analyze.ts`) is created to run analysis on all un-analyzed vehicles.
 
 ---
-### **Story 2.3: Market Value Score Service**
+### **Story 2.4: Market Value Score Service**
 **As a** user, **I want** a backend service that can calculate the Market Value Score for each vehicle, **so that** I can objectively see if it is a good deal.
 **Acceptance Criteria:**
 1. A `MarketValueService` is created in the backend.
 2. It has a function that takes a vehicle, finds comparable vehicles in the database, calculates the average price, and returns the percentage difference.
-3. The result is saved to the vehicle's record in the database.
-4. The main analysis script is updated to run this service.
+3. The result is saved to the vehicle's record in the database (`marketValueScore` field).
+4. The main analysis script is updated to run this service after AI analyses are complete.
 
 ---
-### **Story 2.4: Card-Based Vehicle Dashboard**
+### **Story 2.5: Card-Based Vehicle Dashboard**
 **As a** user, **I want** a dashboard UI that fetches and displays all the analyzed vehicles in a card-based layout, **so that** I can easily scan and compare all the potential vehicles.
 **Acceptance Criteria:**
 1. A dashboard page is created that fetches all vehicle data.
@@ -59,7 +61,7 @@
 3. Basic sorting controls are added to the dashboard.
 
 ---
-### **Story 2.5: Interactive Workflow Tools**
+### **Story 2.6: Interactive Workflow Tools**
 **As a** user, **I want** to be able to change the status of a vehicle and add notes directly from its card on the dashboard, **so that** I can manage my search workflow efficiently.
 **Acceptance Criteria:**
 1. The `VehicleCard` includes a working status dropdown that updates the database.
@@ -67,7 +69,7 @@
 3. The dashboard can be filtered by status.
 
 ---
-### **Story 2.6: Vehicle Detail View and Communication Assistant**
+### **Story 2.7: Vehicle Detail View and Communication Assistant**
 **As a** user, **I want** a full detail page for each vehicle that shows all information and includes the AI Communication Assistant, **so that** I can do a deep-dive analysis and prepare to contact the seller.
 **Acceptance Criteria:**
 1. Clicking a `VehicleCard` navigates to a unique detail page.

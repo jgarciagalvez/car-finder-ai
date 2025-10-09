@@ -201,6 +201,89 @@ export class VehicleRepository {
   }
 
   /**
+   * Find vehicles that don't have AI analysis yet (for batch processing)
+   * Returns vehicles where any AI field is NULL
+   */
+  async findVehiclesWithoutAnalysis(): Promise<VehicleType[]> {
+    try {
+      const results = await this.db
+        .selectFrom('vehicles')
+        .selectAll()
+        .where((eb) =>
+          eb.or([
+            eb('personalFitScore', 'is', null),
+            eb('aiPriorityRating', 'is', null),
+            eb('aiMechanicReport', 'is', null),
+            eb('aiDataSanityCheck', 'is', null),
+          ])
+        )
+        .orderBy('createdAt', 'desc')
+        .execute();
+
+      return results.map(vehicle => this.mapDbVehicleToType(vehicle));
+    } catch (error) {
+      console.error('❌ Failed to find vehicles without analysis:', error);
+      throw new Error(`Vehicle retrieval failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Update AI analysis fields for a vehicle
+   * This is a specialized update method for batch analysis operations
+   */
+  async updateVehicleAnalysis(
+    id: string,
+    analysis: {
+      personalFitScore?: number;
+      aiPriorityRating?: number;
+      aiPrioritySummary?: string;
+      aiMechanicReport?: string;
+      aiDataSanityCheck?: string;
+    }
+  ): Promise<void> {
+    try {
+      const dbUpdates: VehicleUpdate = {};
+
+      // Map analysis fields to database updates
+      if (analysis.personalFitScore !== undefined) {
+        dbUpdates.personalFitScore = analysis.personalFitScore;
+      }
+      if (analysis.aiPriorityRating !== undefined) {
+        dbUpdates.aiPriorityRating = analysis.aiPriorityRating;
+      }
+      if (analysis.aiPrioritySummary !== undefined) {
+        dbUpdates.aiPrioritySummary = analysis.aiPrioritySummary;
+      }
+      if (analysis.aiMechanicReport !== undefined) {
+        dbUpdates.aiMechanicReport = analysis.aiMechanicReport;
+      }
+      if (analysis.aiDataSanityCheck !== undefined) {
+        dbUpdates.aiDataSanityCheck = analysis.aiDataSanityCheck;
+      }
+
+      if (Object.keys(dbUpdates).length === 0) {
+        console.log('⚠️ No analysis updates provided for vehicle:', id);
+        return;
+      }
+
+      const result = await this.db
+        .updateTable('vehicles')
+        .set(dbUpdates)
+        .where('id', '=', id)
+        .execute();
+
+      if (result.length === 0) {
+        throw new Error(`Vehicle with ID ${id} not found`);
+      }
+
+      console.log(`✅ Vehicle analysis updated successfully: ${id}`);
+    } catch (error) {
+      console.error('❌ Failed to update vehicle analysis:', error);
+      throw new Error(`Vehicle analysis update failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Map database vehicle record to @car-finder/types Vehicle interface
    */
   private mapDbVehicleToType(dbVehicle: Vehicle): VehicleType {

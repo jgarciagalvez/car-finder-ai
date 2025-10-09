@@ -97,7 +97,7 @@ export class DatabaseService {
   /**
    * Get the Kysely database instance
    */
-  getDb(): Kysely<DatabaseSchema> {
+  getDatabase(): Kysely<DatabaseSchema> {
     if (!this.db) {
       throw new Error('Database not initialized. Call initialize() first.');
     }

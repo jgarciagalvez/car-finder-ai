@@ -43,13 +43,13 @@ describe('DatabaseService', () => {
     });
 
     it('should throw error when getting db before initialization', () => {
-      expect(() => dbService.getDb()).toThrow('Database not initialized');
+      expect(() => dbService.getDatabase()).toThrow('Database not initialized');
     });
 
     it('should return database instance after initialization', async () => {
       await dbService.initialize();
-      
-      const db = dbService.getDb();
+
+      const db = dbService.getDatabase();
       expect(db).toBeDefined();
     });
   });
@@ -57,7 +57,7 @@ describe('DatabaseService', () => {
   describe('schema creation', () => {
     it('should create vehicles table', async () => {
       await dbService.initialize();
-      const db = dbService.getDb();
+      const db = dbService.getDatabase();
       
       // Query the schema to verify table exists
       const result = await db.executeQuery(
@@ -73,7 +73,7 @@ describe('DatabaseService', () => {
 
     it('should create indexes', async () => {
       await dbService.initialize();
-      const db = dbService.getDb();
+      const db = dbService.getDatabase();
       
       // Query for indexes
       const indexes = await db.executeQuery(

@@ -9,7 +9,7 @@
     "build": "tsc",
     "lint": "echo 'ESLint configured - TypeScript linting via type-check'",
     "type-check": "tsc --noEmit",
-    "test": "jest"
+    "test": "jest --passWithNoTests"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

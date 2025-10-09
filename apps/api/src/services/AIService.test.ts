@@ -5,7 +5,7 @@
 import { AIService, UserCriteria } from './AIService';
 import { IAIProvider } from '@car-finder/ai';
 import { AIError, RateLimitError, ValidationError } from '@car-finder/ai';
-import { PromptLoader } from '@car-finder/ai';
+import { PromptLoader, DictionaryLoader } from '@car-finder/ai';
 import { Vehicle } from '@car-finder/types';
 
 // Mock dependencies
@@ -15,10 +15,14 @@ jest.mock('@car-finder/ai', () => {
     ...actual,
     AIProviderFactory: {
       createProvider: jest.fn(),
+      createFromEnvironment: jest.fn(),
     },
     PromptLoader: {
       loadPrompt: jest.fn(),
       buildPrompt: jest.fn(),
+    },
+    DictionaryLoader: {
+      translateFeatures: jest.fn(),
     },
   };
 });
@@ -124,6 +128,197 @@ describe('AIService', () => {
       const { AIProviderFactory } = require('@car-finder/ai');
 
       expect(AIProviderFactory.createFromEnvironment).toHaveBeenCalled();
+    });
+  });
+
+  describe('translateVehicleContent', () => {
+    beforeEach(() => {
+      // Reset DictionaryLoader mock before each test
+      (DictionaryLoader.translateFeatures as jest.Mock).mockReset();
+    });
+
+    it('should translate vehicle description and features', async () => {
+      // Mock dictionary translations
+      (DictionaryLoader.translateFeatures as jest.Mock).mockReturnValue({
+        translated: ['Air Conditioning', 'ABS'],
+        unmapped: ['Podgrzewane fotele'],
+      });
+
+      // Mock AI response for unmapped features
+      mockProvider.generateStructured.mockResolvedValue({
+        description: 'Beautiful car in excellent condition',
+        translatedEquipment: ['Heated Seats'],
+      });
+
+      // Setup vehicle with Polish equipment
+      const vehicleWithPolishData = {
+        ...mockVehicle,
+        sourceParameters: JSON.stringify({
+          equipment: ['Klimatyzacja', 'ABS', 'Podgrzewane fotele'],
+        }),
+        sourceDescriptionHtml: '<p>Piękny samochód w doskonałym stanie</p>',
+      };
+
+      const result = await aiService.translateVehicleContent(vehicleWithPolishData);
+
+      expect(result.description).toBe('Beautiful car in excellent condition');
+      expect(result.features).toEqual(['Air Conditioning', 'ABS', 'Heated Seats']);
+      expect(PromptLoader.loadPrompt).toHaveBeenCalledWith('translate-vehicle');
+      expect(DictionaryLoader.translateFeatures).toHaveBeenCalledWith(['Klimatyzacja', 'ABS', 'Podgrzewane fotele']);
+    });
+
+    it('should only translate description when all features are in dictionary', async () => {
+      // Mock dictionary with all features found
+      (DictionaryLoader.translateFeatures as jest.Mock).mockReturnValue({
+        translated: ['Air Conditioning', 'ABS', 'Cruise Control'],
+        unmapped: [],
+      });
+
+      mockProvider.generateStructured.mockResolvedValue({
+        description: 'Great vehicle with low mileage',
+        translatedEquipment: [],
+      });
+
+      const vehicleWithKnownFeatures = {
+        ...mockVehicle,
+        sourceParameters: JSON.stringify({
+          equipment: ['Klimatyzacja', 'ABS', 'Tempomat'],
+        }),
+        sourceDescriptionHtml: '<p>Świetny pojazd z małym przebiegiem</p>',
+      };
+
+      const result = await aiService.translateVehicleContent(vehicleWithKnownFeatures);
+
+      expect(result.description).toBe('Great vehicle with low mileage');
+      expect(result.features).toEqual(['Air Conditioning', 'ABS', 'Cruise Control']);
+      expect(mockProvider.generateStructured).toHaveBeenCalled();
+
+      // Verify buildPrompt was called with empty unmapped array
+      const buildPromptCall = (PromptLoader.buildPrompt as jest.Mock).mock.calls[0];
+      expect(buildPromptCall[1].unmappedEquipment).toEqual([]);
+    });
+
+    it('should handle vehicles with no equipment', async () => {
+      (DictionaryLoader.translateFeatures as jest.Mock).mockReturnValue({
+        translated: [],
+        unmapped: [],
+      });
+
+      mockProvider.generateStructured.mockResolvedValue({
+        description: 'Basic vehicle',
+        translatedEquipment: [],
+      });
+
+      const vehicleNoEquipment = {
+        ...mockVehicle,
+        sourceParameters: JSON.stringify({
+          equipment: [],
+        }),
+        sourceDescriptionHtml: '<p>Podstawowy pojazd</p>',
+      };
+
+      const result = await aiService.translateVehicleContent(vehicleNoEquipment);
+
+      expect(result.description).toBe('Basic vehicle');
+      expect(result.features).toEqual([]);
+    });
+
+    it('should handle malformed sourceParameters in translation', async () => {
+      (DictionaryLoader.translateFeatures as jest.Mock).mockReturnValue({
+        translated: [],
+        unmapped: [],
+      });
+
+      mockProvider.generateStructured.mockResolvedValue({
+        description: 'Translated description',
+        translatedEquipment: [],
+      });
+
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      const vehicleBadParams = {
+        ...mockVehicle,
+        sourceParameters: 'invalid json',
+        sourceDescriptionHtml: '<p>Test</p>',
+      };
+
+      const result = await aiService.translateVehicleContent(vehicleBadParams);
+
+      expect(consoleWarnSpy).toHaveBeenCalled();
+      expect(result.description).toBe('Translated description');
+
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should throw ValidationError for empty description', async () => {
+      (DictionaryLoader.translateFeatures as jest.Mock).mockReturnValue({
+        translated: [],
+        unmapped: ['Feature1'],
+      });
+
+      mockProvider.generateStructured.mockResolvedValue({
+        description: '',
+        translatedEquipment: ['Feature 1'],
+      });
+
+      await expect(
+        aiService.translateVehicleContent(mockVehicle)
+      ).rejects.toThrow(ValidationError);
+    });
+
+    it('should log when calling AI for unmapped features', async () => {
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+
+      (DictionaryLoader.translateFeatures as jest.Mock).mockReturnValue({
+        translated: ['Known Feature'],
+        unmapped: ['Unknown Feature 1', 'Unknown Feature 2'],
+      });
+
+      mockProvider.generateStructured.mockResolvedValue({
+        description: 'Test description',
+        translatedEquipment: ['Unknown Feature 1 Translated', 'Unknown Feature 2 Translated'],
+      });
+
+      const vehicleWithEquipment = {
+        ...mockVehicle,
+        sourceParameters: JSON.stringify({
+          equipment: ['Known', 'Unknown1', 'Unknown2'],
+        }),
+      };
+
+      await aiService.translateVehicleContent(vehicleWithEquipment);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Calling AI to translate 2 unmapped features')
+      );
+
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should handle AI errors during translation', async () => {
+      (DictionaryLoader.translateFeatures as jest.Mock).mockReturnValue({
+        translated: [],
+        unmapped: ['Feature1'],
+      });
+
+      mockProvider.generateStructured.mockRejectedValue(new AIError('Translation failed'));
+
+      await expect(
+        aiService.translateVehicleContent(mockVehicle)
+      ).rejects.toThrow(AIError);
+    });
+
+    it('should handle rate limit errors during translation', async () => {
+      (DictionaryLoader.translateFeatures as jest.Mock).mockReturnValue({
+        translated: [],
+        unmapped: ['Feature1'],
+      });
+
+      mockProvider.generateStructured.mockRejectedValue(new RateLimitError('Rate limit exceeded'));
+
+      await expect(
+        aiService.translateVehicleContent(mockVehicle)
+      ).rejects.toThrow(RateLimitError);
     });
   });
 

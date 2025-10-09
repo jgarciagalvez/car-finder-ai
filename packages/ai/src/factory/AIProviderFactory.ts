@@ -2,11 +2,11 @@
  * AI Provider Factory for creating and managing AI provider instances
  */
 
-import { 
-  IAIProvider, 
-  AIProviderConfig, 
+import {
+  IAIProvider,
+  AIProviderConfig,
   ValidationError,
-  AuthenticationError 
+  AuthenticationError
 } from '../interfaces';
 import { GeminiProvider } from '../providers';
 

@@ -8,9 +8,11 @@ Complete architecture specification for the local-first vehicle search applicati
 
 | Date | Version | Description | Author |
 |:-----|:--------|:------------|:-------|
+| Oct 8, 2025 | 1.1 | Consolidated background scripts into `apps/api` - See [CHANGELOG](./CHANGELOG.md) | Architect |
 | Oct 7, 2025 | 1.0 | Initial architecture document | Architect |
 
 ## Sections
+- [CHANGELOG](./CHANGELOG.md) - Detailed architecture changes and migration notes
 - [High Level Architecture](./high-level-architecture.md)
 - [Tech Stack](./tech-stack.md)
 - [Data Models](./data-models.md)

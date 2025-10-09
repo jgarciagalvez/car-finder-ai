@@ -39,7 +39,7 @@
 2. AI Priority Rating and natural-language summaries are generated synthesizing all data points.
 3. Virtual Mechanic's Report is created providing model-specific mechanical insights and inspection points.
 4. Data Sanity Check is implemented to flag inconsistencies between structured data and descriptions.
-5. A separate script (`packages/scripts/analyze.ts`) is created to run analysis on all un-analyzed vehicles.
+5. A separate script (`apps/api/src/scripts/analyze.ts`) is created to run analysis on all un-analyzed vehicles.
 
 ---
 ### **Story 2.3: Market Value Score Service**

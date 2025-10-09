@@ -1,16 +1,21 @@
 # Components
 
-## Backend Services
+## Backend Services (apps/api/src/services/)
 
 - **ScraperService**: Puppeteer automation for listing extraction
 - **ParserService**: Schema-driven HTML parsing
 - **AIService**: LLM operations via provider abstraction layer
-- **VehicleRepository**: Database CRUD operations
+- **VehicleRepository**: Database CRUD operations (via @car-finder/db)
 
-## API Layer
+## API Layer (apps/api/src/routes/)
 
 - **Vehicle Routes**: GET/PATCH endpoints for vehicle data
 - **AI Routes**: POST endpoint for chat/analysis
+
+## Background Scripts (apps/api/src/scripts/)
+
+- **ingest.ts**: Data scraping pipeline that fetches vehicle listings from search pages
+- **analyze.ts**: AI analysis batch processor that generates scores and reports for vehicles
 
 ## Frontend Components
 

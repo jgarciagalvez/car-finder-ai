@@ -5,7 +5,7 @@ Complete monorepo structure using Turborepo for workspace management:
 ```
 car-finder-ai/
 ├── apps/
-│   ├── api/                     # Express.js API server
+│   ├── api/                     # Express.js API server & background scripts
 │   │   ├── src/
 │   │   │   ├── routes/          # HTTP endpoint handlers
 │   │   │   │   ├── vehicles.ts  # GET/PATCH /api/vehicles
@@ -15,6 +15,9 @@ car-finder-ai/
 │   │   │   │   ├── ScraperService.ts
 │   │   │   │   ├── ParserService.ts
 │   │   │   │   └── AIService.ts
+│   │   │   ├── scripts/         # Background processing scripts
+│   │   │   │   ├── ingest.ts    # Data scraping and ingestion
+│   │   │   │   └── analyze.ts   # AI analysis batch processing
 │   │   │   ├── middleware/      # Cross-cutting concerns
 │   │   │   │   ├── cors.ts
 │   │   │   │   ├── errorHandler.ts
@@ -82,14 +85,6 @@ car-finder-ai/
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   │
-│   ├── scripts/                 # Background processing
-│   │   ├── src/
-│   │   │   ├── ingest.ts        # Scraping script
-│   │   │   └── analyze.ts       # AI analysis script
-│   │   ├── __tests__/
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   │
 │   ├── services/                # Service abstraction layer
 │   │   ├── src/
 │   │   │   ├── interfaces/      # Service contracts
@@ -107,6 +102,16 @@ car-finder-ai/
 │       │   │   └── GeminiProvider.ts
 │       │   ├── interfaces/      # AI service contracts
 │       │   ├── factory/         # Provider factory
+│       │   ├── prompts/         # Markdown prompt definitions
+│       │   │   ├── personal-fit-score.md
+│       │   │   ├── priority-rating.md
+│       │   │   ├── mechanic-report.md
+│       │   │   ├── sanity-check.md
+│       │   │   └── README.md
+│       │   ├── utils/           # Utilities
+│       │   │   ├── PromptLoader.ts
+│       │   │   ├── RateLimiter.ts
+│       │   │   └── RetryHandler.ts
 │       │   └── index.ts
 │       ├── __tests__/
 │       ├── dist/

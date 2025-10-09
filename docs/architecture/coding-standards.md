@@ -9,6 +9,7 @@
 - Type files: `camelCase` - `vehicleTypes.ts`, `apiTypes.ts`
 - Test files: Match source file - `VehicleCard.test.tsx`, `api.test.ts`
 - Directories: `kebab-case` - `vehicle-detail/`, `ai-analysis/`
+- AI Prompt files: `kebab-case.md` - `personal-fit-score.md`, `priority-rating.md`
 
 **Variables & Functions**:
 - Variables: `camelCase` - `vehicleData`, `isLoading`
@@ -69,5 +70,6 @@
   * **Services**: Cross-package service dependencies must use `packages/services` interface contracts
   * **Testing**: All integration tests must use service mocks from `packages/services`
   * **AI**: AI operations must use the provider abstraction layer from `packages/ai`
+  * **AI Prompts**: AI prompts must be stored as markdown files in `packages/ai/src/prompts/`, never hardcoded in TypeScript
   * **Naming**: Follow established naming conventions for consistency across the monorepo
 

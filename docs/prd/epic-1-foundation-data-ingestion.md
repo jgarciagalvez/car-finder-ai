@@ -40,7 +40,7 @@
 ### **Story 1.5: Main Ingestion Pipeline**
 **As a** user, **I want** a main script that orchestrates the entire data ingestion process, **so that** I can run a single command to find and store all new vehicle listings.
 **Acceptance Criteria:**
-1. A main script (`packages/scripts/ingest.ts`) is created.
+1. A main script (`apps/api/src/scripts/ingest.ts`) is created.
 2. The script reads search URLs from a configuration file.
 3. It uses the `ScraperService` to get a list of individual vehicle URLs.
 4. For each new URL, it uses the `ScraperService`, `ParserService`, and database service to save the new vehicle data.

@@ -234,6 +234,8 @@ export class VehicleRepository {
   async updateVehicleAnalysis(
     id: string,
     analysis: {
+      description?: string;
+      features?: string[];
       personalFitScore?: number;
       aiPriorityRating?: number;
       aiPrioritySummary?: string;
@@ -244,7 +246,15 @@ export class VehicleRepository {
     try {
       const dbUpdates: VehicleUpdate = {};
 
-      // Map analysis fields to database updates
+      // Map translation fields (AC1)
+      if (analysis.description !== undefined) {
+        dbUpdates.description = analysis.description;
+      }
+      if (analysis.features !== undefined) {
+        dbUpdates.features = JSON.stringify(analysis.features);
+      }
+
+      // Map AI analysis fields
       if (analysis.personalFitScore !== undefined) {
         dbUpdates.personalFitScore = analysis.personalFitScore;
       }

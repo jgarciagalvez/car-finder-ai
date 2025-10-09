@@ -29,5 +29,26 @@
   "currencyConversion": {
     "plnToEurRate": 0.23,
     "lastUpdated": "2025-10-06"
+  },
+  "analysisSettings": {
+    "userCriteria": {
+      "budgetEur": {
+        "min": 5000,
+        "max": 20000
+      },
+      "preferredFeatures": [
+        "air_conditioning",
+        "parking_sensors",
+        "cruise_control",
+        "bluetooth"
+      ],
+      "useCase": "daily commute and weekend trips",
+      "priorityFactors": [
+        "fuel_efficiency",
+        "reliability",
+        "comfort",
+        "safety"
+      ]
+    }
   }
 }

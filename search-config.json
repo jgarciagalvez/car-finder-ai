@@ -2,15 +2,8 @@
   "searchUrls": {
     "otomoto": [
       {
-        "name": "Renault Trafic 2005-2014",
-        "url": "https://www.otomoto.pl/osobowe/renault/trafic/wroclaw?search%5Bdist%5D=300&search%5Bfilter_float_price%3Ato%5D=60000&search%5Bfilter_float_year%3Ato%5D=2014&search%5Border%5D=created_at_first%3Adesc",
-        "description": "Renault Trafic, <2014, <60k PLN, Wrocław"
-      }
-    ],
-    "olx": [
-      {
-        "name": "Renault Trafic 2005-2014",
-        "url": "https://www.olx.pl/motoryzacja/samochody/renault/wroclaw/?search%5Bdist%5D=100&search%5Border%5D=created_at:desc&search%5Bfilter_float_price:to%5D=60000&search%5Bfilter_enum_model%5D%5B0%5D=trafic&search%5Bfilter_float_year:to%5D=2014",
+        "name": "Nissan Primastar 2005-2014",
+        "url": "https://www.otomoto.pl/osobowe/nissan/primastar/wroclaw?search%5Bdist%5D=300&search%5Bfilter_float_price%3Ato%5D=60000&search%5Bfilter_float_year%3Ato%5D=2014&search%5Border%5D=created_at_first%3Adesc",
         "description": "Renault Trafic, <2014, <60k PLN, Wrocław"
       }
     ]
@@ -37,10 +30,7 @@
         "max": 20000
       },
       "preferredFeatures": [
-        "air_conditioning",
-        "parking_sensors",
-        "cruise_control",
-        "bluetooth"
+        "air_conditioning"
       ],
       "useCase": "daily commute and weekend trips",
       "priorityFactors": [

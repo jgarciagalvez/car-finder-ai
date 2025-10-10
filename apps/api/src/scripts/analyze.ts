@@ -21,6 +21,7 @@
  */
 
 import { AIService, UserCriteria } from '../services/AIService';
+import { MarketValueService } from '../services/MarketValueService';
 import { DatabaseService, VehicleRepository } from '@car-finder/db';
 import { Vehicle } from '@car-finder/types';
 import { AIError, RateLimitError, ValidationError } from '@car-finder/ai';
@@ -79,6 +80,7 @@ function loadUserCriteria(): UserCriteria {
 
 export class VehicleAnalyzer {
   private aiService: AIService;
+  private marketValueService!: MarketValueService;
   private vehicleRepository!: VehicleRepository;
   private userCriteria: UserCriteria;
   private stats: AnalysisStats;
@@ -111,6 +113,9 @@ export class VehicleAnalyzer {
     const dbService = new DatabaseService(databasePath);
     await dbService.initialize();
     analyzer.vehicleRepository = new VehicleRepository(dbService.getDatabase());
+
+    // Initialize market value service
+    analyzer.marketValueService = new MarketValueService(analyzer.vehicleRepository);
 
     return analyzer;
   }
@@ -236,6 +241,7 @@ export class VehicleAnalyzer {
       description?: string;
       features?: string[];
       personalFitScore?: number;
+      marketValueScore?: string;
       aiPriorityRating?: number;
       aiPrioritySummary?: string;
       aiMechanicReport?: string;
@@ -296,7 +302,24 @@ export class VehicleAnalyzer {
       }
     }
 
-    // 4. Generate Priority Rating (should be last since it uses other scores)
+    // 4. Calculate Market Value Score (before Priority Rating so AI can use it)
+    if (!vehicle.marketValueScore) {
+      try {
+        console.log('  💰 Calculating Market Value Score...');
+        const marketValue = await this.marketValueService.calculateMarketValue(vehicle);
+        if (marketValue !== null) {
+          analysis.marketValueScore = marketValue;
+          console.log(`  ✓ Market Value: ${marketValue}`);
+        } else {
+          console.log('  ⚠️ Market Value: No comparables found (insufficient data)');
+        }
+      } catch (error) {
+        console.error('  ⚠️ Failed to calculate market value:', error);
+        // Continue with other analyses
+      }
+    }
+
+    // 5. Generate Priority Rating (should be last since it uses other scores)
     if ((vehicle.aiPriorityRating === null || !vehicle.aiPrioritySummary) && !options.skipPriorityRating) {
       try {
         console.log('  ⭐ Generating Priority Rating...');
@@ -304,6 +327,7 @@ export class VehicleAnalyzer {
         const updatedVehicle: Vehicle = {
           ...vehicle,
           personalFitScore: analysis.personalFitScore ?? vehicle.personalFitScore,
+          marketValueScore: analysis.marketValueScore ?? vehicle.marketValueScore,
           aiDataSanityCheck: analysis.aiDataSanityCheck ?? vehicle.aiDataSanityCheck,
         };
 

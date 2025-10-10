@@ -237,6 +237,7 @@ export class VehicleRepository {
       description?: string;
       features?: string[];
       personalFitScore?: number;
+      marketValueScore?: string;
       aiPriorityRating?: number;
       aiPrioritySummary?: string;
       aiMechanicReport?: string;
@@ -257,6 +258,9 @@ export class VehicleRepository {
       // Map AI analysis fields
       if (analysis.personalFitScore !== undefined) {
         dbUpdates.personalFitScore = analysis.personalFitScore;
+      }
+      if (analysis.marketValueScore !== undefined) {
+        dbUpdates.marketValueScore = analysis.marketValueScore;
       }
       if (analysis.aiPriorityRating !== undefined) {
         dbUpdates.aiPriorityRating = analysis.aiPriorityRating;
@@ -290,6 +294,55 @@ export class VehicleRepository {
     } catch (error) {
       console.error('❌ Failed to update vehicle analysis:', error);
       throw new Error(`Vehicle analysis update failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Find comparable vehicles for market value analysis
+   * Returns vehicles matching make/model within specified year and mileage ranges
+   */
+  async findComparableVehicles(params: {
+    source: VehicleType['source'];
+    make: string;
+    model: string;
+    year: number;
+    mileage: number;
+    excludeId: string;
+  }): Promise<VehicleType[]> {
+    try {
+      const { source, make, model, year, mileage, excludeId } = params;
+
+      // Query with make/model JSON search and year/mileage range filtering
+      const results = await this.db
+        .selectFrom('vehicles')
+        .selectAll()
+        .where('source', '=', source)
+        .where((eb) =>
+          eb.or([
+            eb('sourceParameters', 'like', `%"Marka pojazdu":"${make}"%`),
+            eb('sourceParameters', 'like', `%"make":"${make}"%`),
+            eb('sourceParameters', 'like', `%"Make":"${make}"%`),
+          ])
+        )
+        .where((eb) =>
+          eb.or([
+            eb('sourceParameters', 'like', `%"Model pojazdu":"${model}"%`),
+            eb('sourceParameters', 'like', `%"model":"${model}"%`),
+            eb('sourceParameters', 'like', `%"Model":"${model}"%`),
+          ])
+        )
+        .where('year', '>=', year - 3) // ±3 years for older vehicles
+        .where('year', '<=', year + 3)
+        .where('mileage', '>=', mileage - 50000) // ±50k km wider range
+        .where('mileage', '<=', mileage + 50000)
+        .where('status', '!=', 'deleted')
+        .where('id', '!=', excludeId)
+        .execute();
+
+      return results.map(vehicle => this.mapDbVehicleToType(vehicle));
+    } catch (error) {
+      console.error('❌ Failed to find comparable vehicles:', error);
+      throw new Error(`Comparable vehicles lookup failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

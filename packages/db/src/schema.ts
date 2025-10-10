@@ -20,7 +20,7 @@ export interface VehicleTable {
   
   // Processed & normalized data
   title: string;
-  description: string;
+  description: string | null; // Translated by analyze script
   features: string; // JSON array string
   pricePln: number;
   priceEur: number;
@@ -79,7 +79,7 @@ export const CREATE_VEHICLES_TABLE = `
     
     -- Processed & normalized data
     title TEXT NOT NULL,
-    description TEXT NOT NULL,
+    description TEXT, -- Nullable - translated by analyze script
     features TEXT NOT NULL DEFAULT '[]',
     pricePln REAL NOT NULL,
     priceEur REAL NOT NULL,

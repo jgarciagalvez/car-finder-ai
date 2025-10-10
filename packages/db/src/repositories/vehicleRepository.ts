@@ -258,6 +258,95 @@ export class VehicleRepository {
   }
 
   /**
+   * Bulk update vehicles
+   * Updates all vehicles matching the where conditions (or all vehicles if no conditions)
+   * @returns Number of rows updated
+   */
+  async updateAll(
+    updates: Partial<{
+      description: string | null;
+      features: string[];
+      personalFitScore: number | null;
+      marketValueScore: string | null;
+      aiPriorityRating: number | null;
+      aiPrioritySummary: string | null;
+      aiMechanicReport: string | null;
+      aiDataSanityCheck: string | null;
+      status: VehicleType['status'];
+      personalNotes: string | null;
+    }>,
+    whereConditions?: Partial<{
+      status: VehicleType['status'];
+      source: VehicleType['source'];
+    }>
+  ): Promise<number> {
+    try {
+      const dbUpdates: VehicleUpdate = {};
+
+      // Map updates to database schema
+      if (updates.description !== undefined) {
+        dbUpdates.description = updates.description;
+      }
+      if (updates.features !== undefined) {
+        dbUpdates.features = JSON.stringify(updates.features);
+      }
+      if (updates.personalFitScore !== undefined) {
+        dbUpdates.personalFitScore = updates.personalFitScore;
+      }
+      if (updates.marketValueScore !== undefined) {
+        dbUpdates.marketValueScore = updates.marketValueScore;
+      }
+      if (updates.aiPriorityRating !== undefined) {
+        dbUpdates.aiPriorityRating = updates.aiPriorityRating;
+      }
+      if (updates.aiPrioritySummary !== undefined) {
+        dbUpdates.aiPrioritySummary = updates.aiPrioritySummary;
+      }
+      if (updates.aiMechanicReport !== undefined) {
+        dbUpdates.aiMechanicReport = updates.aiMechanicReport;
+      }
+      if (updates.aiDataSanityCheck !== undefined) {
+        dbUpdates.aiDataSanityCheck = updates.aiDataSanityCheck;
+      }
+      if (updates.status !== undefined) {
+        dbUpdates.status = updates.status;
+      }
+      if (updates.personalNotes !== undefined) {
+        dbUpdates.personalNotes = updates.personalNotes;
+      }
+
+      if (Object.keys(dbUpdates).length === 0) {
+        console.log('⚠️ No valid updates provided for bulk update');
+        return 0;
+      }
+
+      // Build query with optional where conditions
+      let query = this.db
+        .updateTable('vehicles')
+        .set(dbUpdates);
+
+      if (whereConditions) {
+        if (whereConditions.status !== undefined) {
+          query = query.where('status', '=', whereConditions.status);
+        }
+        if (whereConditions.source !== undefined) {
+          query = query.where('source', '=', whereConditions.source);
+        }
+      }
+
+      const result = await query.execute();
+
+      const rowsUpdated = result.length > 0 ? Number(result[0].numUpdatedRows) : 0;
+      console.log(`✅ Bulk update completed: ${rowsUpdated} rows updated`);
+
+      return rowsUpdated;
+    } catch (error) {
+      console.error('❌ Failed to perform bulk update:', error);
+      throw new Error(`Bulk update failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Update AI analysis fields for a vehicle
    * This is a specialized update method for batch analysis operations
    */

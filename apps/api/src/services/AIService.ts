@@ -95,19 +95,9 @@ export class AIService {
    */
   async translateVehicleContent(vehicle: Vehicle): Promise<TranslationResult> {
     try {
-      // Extract equipment from sourceParameters
-      let sourceParams: Record<string, any> = {};
-      try {
-        sourceParams = typeof vehicle.sourceParameters === 'string'
-          ? JSON.parse(vehicle.sourceParameters)
-          : vehicle.sourceParameters;
-      } catch (e) {
-        console.warn(`Failed to parse sourceParameters for vehicle ${vehicle.id}`);
-      }
-
-      // Get equipment array from sourceParameters
-      const polishEquipment: string[] = Array.isArray(sourceParams.equipment)
-        ? sourceParams.equipment
+      // Get equipment array from vehicle.sourceEquipment (not sourceParameters)
+      const polishEquipment: string[] = Array.isArray(vehicle.sourceEquipment)
+        ? vehicle.sourceEquipment
         : [];
 
       // Use dictionary to translate features
@@ -143,6 +133,15 @@ export class AIService {
           translatedEquipment: string[];
         }>(fullPrompt, prompt.outputFormat);
 
+        // DEBUG: Log AI response for translation debugging
+        console.log(`  🔍 DEBUG - AI Translation Response for ${vehicle.id}:`);
+        console.log(`     Description length: ${response.description?.length || 0} chars`);
+        console.log(`     Description preview: "${response.description?.substring(0, 80)}..."`);
+        console.log(`     Equipment translated: ${response.translatedEquipment?.length || 0} items`);
+        if (response.translatedEquipment && response.translatedEquipment.length > 0) {
+          console.log(`     Equipment preview: ${response.translatedEquipment.slice(0, 3).join(', ')}`);
+        }
+
         // If AI returns empty description, use placeholder
         if (!response.description || response.description.trim() === '') {
           console.warn(`  ⚠️  AI returned empty description for ${vehicle.id} - using placeholder`);
@@ -172,6 +171,12 @@ export class AIService {
           description: string;
           translatedEquipment: string[];
         }>(fullPrompt, prompt.outputFormat);
+
+        // DEBUG: Log AI response for translation debugging
+        console.log(`  🔍 DEBUG - AI Translation Response for ${vehicle.id}:`);
+        console.log(`     Description length: ${response.description?.length || 0} chars`);
+        console.log(`     Description preview: "${response.description?.substring(0, 80)}..."`);
+        console.log(`     Dictionary features: ${translated.length} items`);
 
         // If AI returns empty description, use placeholder
         if (!response.description || response.description.trim() === '') {

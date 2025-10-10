@@ -328,8 +328,8 @@ export class IngestionPipeline {
         
         // Processed & normalized data
         title: vehicleData.sourceTitle || 'Unknown Vehicle', // Use sourceTitle as initial title
-        description: vehicleData.sourceDescriptionHtml ? vehicleData.sourceDescriptionHtml.replace(/<[^>]*>/g, '') : '', // Strip HTML for description
-        features: [], // Initially empty, to be processed later
+        description: null, // Leave null - will be translated by analyze script
+        features: [], // Initially empty, to be translated by analyze script
         pricePln: vehicleData.pricePln || 0,
         priceEur: vehicleData.priceEur || 0,
         year: vehicleData.year || 0,
@@ -493,7 +493,7 @@ export class IngestionPipeline {
 
       // Processed & normalized data
       title: vehicleData.title || vehicleData.sourceTitle || 'Unknown Vehicle',
-      description: vehicleData.description || '',
+      description: null, // Leave null - will be translated by analyze script
       features: vehicleData.features || [],
       pricePln,
       priceEur,

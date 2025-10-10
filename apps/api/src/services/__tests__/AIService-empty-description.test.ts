@@ -65,9 +65,7 @@ describe('AIService - Empty Description Handling', () => {
   test('should return placeholder for null sourceDescriptionHtml', async () => {
     const vehicle = createVehicle({
       sourceDescriptionHtml: null as any,
-      sourceParameters: {
-        equipment: [],
-      },
+      sourceEquipment: [],
     });
 
     const result = await aiService.translateVehicleContent(vehicle);
@@ -79,9 +77,7 @@ describe('AIService - Empty Description Handling', () => {
   test('should return placeholder for empty string sourceDescriptionHtml', async () => {
     const vehicle = createVehicle({
       sourceDescriptionHtml: '',
-      sourceParameters: {
-        equipment: [],
-      },
+      sourceEquipment: [],
     });
 
     const result = await aiService.translateVehicleContent(vehicle);
@@ -93,9 +89,7 @@ describe('AIService - Empty Description Handling', () => {
   test('should return placeholder for whitespace-only sourceDescriptionHtml', async () => {
     const vehicle = createVehicle({
       sourceDescriptionHtml: '   \n\t  ',
-      sourceParameters: {
-        equipment: [],
-      },
+      sourceEquipment: [],
     });
 
     const result = await aiService.translateVehicleContent(vehicle);
@@ -107,15 +101,13 @@ describe('AIService - Empty Description Handling', () => {
   test('should still translate features when description is empty', async () => {
     const vehicle = createVehicle({
       sourceDescriptionHtml: null as any,
-      sourceParameters: {
-        equipment: ['Air Conditioning', 'Parking Sensors'], // Already in English
-      },
+      sourceEquipment: ['Klimatyzacja'], // Polish feature
     });
 
     const result = await aiService.translateVehicleContent(vehicle);
 
     expect(result.description).toBe('No description provided by seller.');
     // Features should still be processed (dictionary translation)
-    expect(Array.isArray(result.features)).toBe(true);
+    expect(result.features).toEqual(['Air conditioning']);
   });
 });

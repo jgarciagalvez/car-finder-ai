@@ -93,6 +93,11 @@ temp/
 data/vehicles.db
 data/exports/
 
+# Analysis run logs (runtime operational data)
+data/logs/
+!data/logs/.gitkeep
+!data/logs/analysis-runs/.gitkeep
+
 # Scripts (root level only)
 /scripts/
 

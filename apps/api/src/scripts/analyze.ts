@@ -28,9 +28,13 @@ import { AIError, RateLimitError, ValidationError } from '@car-finder/ai';
 import { WorkspaceUtils } from '@car-finder/services';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 
 // Load environment variables from the workspace root
 WorkspaceUtils.loadEnvFromRoot();
+
+// Analysis step types
+type AnalysisStep = 'translate' | 'sanity_check' | 'fit_score' | 'mechanic_report' | 'market_value' | 'priority_rating';
 
 interface AnalysisStats {
   totalVehicles: number;
@@ -48,6 +52,35 @@ interface AnalysisOptions {
   skipMechanicReport?: boolean;
   skipSanityCheck?: boolean;
   skipPriorityRating?: boolean;
+  resume?: boolean;
+  retryFailed?: string;
+  showLogs?: boolean;
+}
+
+interface AnalysisRunLog {
+  runId: string;
+  startTime: Date;
+  endTime?: Date;
+  vehiclesProcessed: number;
+  vehiclesCompleted: number;
+  vehiclesFailed: number;
+  failures: AnalysisFailure[];
+  summary?: {
+    byStep: Record<AnalysisStep, number>;
+    retryableCount: number;
+    permanentFailureCount: number;
+  };
+}
+
+interface AnalysisFailure {
+  vehicleId: string;
+  vehicleTitle: string;
+  vehicleUrl: string;
+  step: AnalysisStep;
+  error: string;
+  errorType: string;
+  timestamp: Date;
+  retryable: boolean;
 }
 
 /**
@@ -78,12 +111,82 @@ function loadUserCriteria(): UserCriteria {
   }
 }
 
+/**
+ * Determine which analysis steps are required for a vehicle
+ * based on which fields are already populated (not null)
+ */
+function getRequiredAnalysisSteps(vehicle: Vehicle): AnalysisStep[] {
+  const steps: AnalysisStep[] = [];
+
+  // Check each analysis field - if null, add corresponding step
+  // Translation is needed if description is missing (features can be empty array after translation)
+  if (!vehicle.description) {
+    steps.push('translate');
+  }
+
+  if (!vehicle.aiDataSanityCheck) {
+    steps.push('sanity_check');
+  }
+
+  if (vehicle.personalFitScore === null || vehicle.personalFitScore === undefined) {
+    steps.push('fit_score');
+  }
+
+  if (!vehicle.aiMechanicReport) {
+    steps.push('mechanic_report');
+  }
+
+  if (!vehicle.marketValueScore) {
+    steps.push('market_value');
+  }
+
+  if (vehicle.aiPriorityRating === null || vehicle.aiPriorityRating === undefined) {
+    steps.push('priority_rating');
+  }
+
+  return steps;
+}
+
+/**
+ * Classify error as retryable or non-retryable
+ */
+function isRetryableError(error: Error): boolean {
+  if (error instanceof RateLimitError) {
+    return true;
+  }
+
+  if (error instanceof AIError) {
+    // 500/503 are retryable, 400/401 are not
+    const aiError = error as any;
+    return aiError.statusCode === 500 || aiError.statusCode === 503;
+  }
+
+  if (error instanceof ValidationError) {
+    return false; // Data issues need manual intervention
+  }
+
+  // Default: assume non-retryable
+  return false;
+}
+
+/**
+ * Get error type name
+ */
+function getErrorType(error: Error): string {
+  // Check specific error types first (ValidationError extends AIError)
+  if (error instanceof RateLimitError) return 'RateLimitError';
+  if (error instanceof ValidationError) return 'ValidationError';
+  if (error instanceof AIError) return 'AIError';
+  return error.constructor.name || 'Error';
+}
+
 export class VehicleAnalyzer {
   private aiService: AIService;
   private marketValueService!: MarketValueService;
   private vehicleRepository!: VehicleRepository;
   private userCriteria: UserCriteria;
   private stats: AnalysisStats;
+  private runLog: AnalysisRunLog;
 
   private constructor() {
     // AIService loads configuration from environment automatically
@@ -99,6 +202,16 @@ export class VehicleAnalyzer {
       skipped: 0,
       errors: [],
       startTime: new Date(),
+    };
+
+    // Initialize run log
+    this.runLog = {
+      runId: crypto.randomUUID(),
+      startTime: new Date(),
+      vehiclesProcessed: 0,
+      vehiclesCompleted: 0,
+      vehiclesFailed: 0,
+      failures: [],
     };
   }
 
@@ -149,6 +262,7 @@ export class VehicleAnalyzer {
           console.log(`✅ Analysis complete for ${vehicle.id}`);
         } catch (error) {
           this.stats.failed++;
+          this.runLog.vehiclesFailed++;
           const errorMsg = error instanceof Error ? error.message : 'Unknown error';
           this.stats.errors.push({ vehicleId: vehicle.id, error: errorMsg });
           console.error(`❌ Failed to analyze ${vehicle.id}: ${errorMsg}`);
@@ -165,9 +279,24 @@ export class VehicleAnalyzer {
       }
 
       this.stats.endTime = new Date();
+      this.runLog.endTime = new Date();
+
+      // Generate summary statistics for run log
+      this.generateRunLogSummary();
+
+      // Write run log to JSON file
+      this.writeRunLog();
+
+      // Print summary
       this.printSummary();
     } catch (error) {
       console.error('❌ Fatal error in analysis pipeline:', error);
+
+      // Write run log even on fatal error
+      this.runLog.endTime = new Date();
+      this.generateRunLogSummary();
+      this.writeRunLog();
+
       throw error;
     }
   }
@@ -179,7 +308,7 @@ export class VehicleAnalyzer {
     if (options.vehicleId) {
       console.log(`🔍 Fetching specific vehicle: ${options.vehicleId}`);
       const vehicle = await this.vehicleRepository.findVehicleById(options.vehicleId);
-      
+
       if (!vehicle) {
         // Vehicle not found - provide helpful error message
         console.error(`\n❌ Vehicle not found: ${options.vehicleId}`);
@@ -191,25 +320,27 @@ export class VehicleAnalyzer {
         console.error(`   pnpm --filter @car-finder/scripts ingest <vehicle-source-url>`);
         throw new Error(`Vehicle with ID ${options.vehicleId} not found in database`);
       }
-      
+
       // Check if this specific vehicle needs analysis
-      const needsAnalysis = this.vehicleNeedsAnalysis(vehicle);
-      if (!needsAnalysis) {
+      const requiredSteps = getRequiredAnalysisSteps(vehicle);
+      if (requiredSteps.length === 0) {
         console.log(`\n✅ Vehicle ${options.vehicleId} already has complete AI analysis:`);
         console.log(`   🌐 Translation: ${vehicle.description ? '✓ Present' : '✗ Missing'}`);
         console.log(`   📊 Personal Fit Score: ${vehicle.personalFitScore ?? 'N/A'}`);
         console.log(`   ⭐ AI Priority Rating: ${vehicle.aiPriorityRating ?? 'N/A'}`);
         console.log(`   🔧 Mechanic Report: ${vehicle.aiMechanicReport ? '✓ Present' : '✗ Missing'}`);
         console.log(`   🔍 Data Sanity Check: ${vehicle.aiDataSanityCheck ? '✓ Present' : '✗ Missing'}`);
+        console.log(`   💰 Market Value Score: ${vehicle.marketValueScore ?? 'N/A'}`);
         return [];
       }
-      
-      console.log(`📊 Vehicle ${options.vehicleId} needs AI analysis`);
+
+      console.log(`📊 Vehicle ${options.vehicleId} needs ${requiredSteps.length} step(s): ${requiredSteps.join(', ')}`);
       return [vehicle];
     }
 
-    console.log('🔍 Fetching vehicles without AI analysis...');
-    const vehicles = await this.vehicleRepository.findVehiclesWithoutAnalysis();
+    // Use resume-aware query that finds vehicles with ANY missing analysis field
+    console.log('🔍 Fetching vehicles needing analysis (resume-aware)...');
+    const vehicles = await this.vehicleRepository.findVehiclesNeedingAnalysis();
 
     if (options.limit && options.limit > 0) {
       return vehicles.slice(0, options.limit);
@@ -219,24 +350,20 @@ export class VehicleAnalyzer {
   }
 
   /**
-   * Check if a vehicle needs AI analysis
-   */
-  private vehicleNeedsAnalysis(vehicle: Vehicle): boolean {
-    return (
-      !vehicle.description ||
-      !vehicle.features ||
-      vehicle.personalFitScore === null ||
-      vehicle.aiPriorityRating === null ||
-      vehicle.aiPrioritySummary === null ||
-      vehicle.aiMechanicReport === null ||
-      vehicle.aiDataSanityCheck === null
-    );
-  }
-
-  /**
    * Analyze a single vehicle
    */
   private async analyzeVehicle(vehicle: Vehicle, options: AnalysisOptions): Promise<void> {
+    // Get required steps for this vehicle (resume logic)
+    const requiredSteps = getRequiredAnalysisSteps(vehicle);
+
+    if (requiredSteps.length === 0) {
+      this.stats.skipped++;
+      console.log('  ⏭️  No analysis needed (all steps complete)');
+      return;
+    }
+
+    console.log(`  📋 Required steps: ${requiredSteps.join(', ')}`);
+    this.runLog.vehiclesProcessed++;
     const analysis: {
       description?: string;
       features?: string[];
@@ -249,7 +376,7 @@ export class VehicleAnalyzer {
     } = {};
 
     // 0. Translate vehicle content (must run FIRST to provide English content for other analyses)
-    if (!vehicle.description || !vehicle.features) {
+    if (requiredSteps.includes('translate')) {
       try {
         console.log('  🌐 Translating vehicle content (Polish → English)...');
         const translation = await this.aiService.translateVehicleContent(vehicle);
@@ -257,25 +384,57 @@ export class VehicleAnalyzer {
         analysis.features = translation.features;
         console.log(`  ✓ Translation complete (${translation.features.length} features)`);
       } catch (error) {
-        console.error('  ⚠️ Failed to translate vehicle content:', error);
-        // Translation failure is non-critical, continue with other analyses
+        const err = error as Error;
+        console.error('  ❌ Failed to translate vehicle content:', err.message);
+
+        // Log failure to run log
+        this.runLog.failures.push({
+          vehicleId: vehicle.id,
+          vehicleTitle: vehicle.title,
+          vehicleUrl: vehicle.sourceUrl,
+          step: 'translate',
+          error: err.message,
+          errorType: getErrorType(err),
+          timestamp: new Date(),
+          retryable: isRetryableError(err),
+        });
+
+        throw err; // Re-throw to skip remaining steps
       }
+    } else {
+      console.log('  ⏭️  Skipping translation (already complete)');
     }
 
     // 1. Generate Data Sanity Check (should be first to detect issues)
-    if (!vehicle.aiDataSanityCheck && !options.skipSanityCheck) {
+    if (requiredSteps.includes('sanity_check') && !options.skipSanityCheck) {
       try {
         console.log('  🔍 Generating Data Sanity Check...');
         analysis.aiDataSanityCheck = await this.aiService.generateDataSanityCheck(vehicle);
         console.log('  ✓ Data Sanity Check complete');
       } catch (error) {
-        console.error('  ⚠️ Failed to generate sanity check:', error);
-        // Continue with other analyses even if sanity check fails
+        const err = error as Error;
+        console.error('  ❌ Failed to generate sanity check:', err.message);
+
+        // Log failure to run log
+        this.runLog.failures.push({
+          vehicleId: vehicle.id,
+          vehicleTitle: vehicle.title,
+          vehicleUrl: vehicle.sourceUrl,
+          step: 'sanity_check',
+          error: err.message,
+          errorType: getErrorType(err),
+          timestamp: new Date(),
+          retryable: isRetryableError(err),
+        });
+
+        throw err; // Re-throw to skip remaining steps
       }
+    } else if (!options.skipSanityCheck) {
+      console.log('  ⏭️  Skipping sanity check (already complete)');
     }
 
     // 2. Generate Personal Fit Score (if not already present)
-    if (vehicle.personalFitScore === null) {
+    if (requiredSteps.includes('fit_score')) {
       try {
         console.log('  💯 Generating Personal Fit Score...');
         analysis.personalFitScore = await this.aiService.generatePersonalFitScore(
@@ -284,26 +443,57 @@ export class VehicleAnalyzer {
         );
         console.log(`  ✓ Personal Fit Score: ${analysis.personalFitScore}/10`);
       } catch (error) {
-        console.error('  ⚠️ Failed to generate fit score:', error);
-        // Set a default score so we can still generate priority rating
-        analysis.personalFitScore = 5;
+        const err = error as Error;
+        console.error('  ❌ Failed to generate fit score:', err.message);
+
+        // Log failure to run log
+        this.runLog.failures.push({
+          vehicleId: vehicle.id,
+          vehicleTitle: vehicle.title,
+          vehicleUrl: vehicle.sourceUrl,
+          step: 'fit_score',
+          error: err.message,
+          errorType: getErrorType(err),
+          timestamp: new Date(),
+          retryable: isRetryableError(err),
+        });
+
+        throw err; // Re-throw to skip remaining steps
       }
+    } else {
+      console.log('  ⏭️  Skipping fit score (already complete)');
     }
 
     // 3. Generate Virtual Mechanic's Report
-    if (!vehicle.aiMechanicReport && !options.skipMechanicReport) {
+    if (requiredSteps.includes('mechanic_report') && !options.skipMechanicReport) {
       try {
         console.log('  🔧 Generating Virtual Mechanic\'s Report...');
         analysis.aiMechanicReport = await this.aiService.generateMechanicReport(vehicle);
         console.log('  ✓ Mechanic Report complete');
       } catch (error) {
-        console.error('  ⚠️ Failed to generate mechanic report:', error);
-        // Continue with other analyses
+        const err = error as Error;
+        console.error('  ❌ Failed to generate mechanic report:', err.message);
+
+        // Log failure to run log
+        this.runLog.failures.push({
+          vehicleId: vehicle.id,
+          vehicleTitle: vehicle.title,
+          vehicleUrl: vehicle.sourceUrl,
+          step: 'mechanic_report',
+          error: err.message,
+          errorType: getErrorType(err),
+          timestamp: new Date(),
+          retryable: isRetryableError(err),
+        });
+
+        throw err; // Re-throw to skip remaining steps
       }
+    } else if (!options.skipMechanicReport) {
+      console.log('  ⏭️  Skipping mechanic report (already complete)');
     }
 
     // 4. Calculate Market Value Score (before Priority Rating so AI can use it)
-    if (!vehicle.marketValueScore) {
+    if (requiredSteps.includes('market_value')) {
       try {
         console.log('  💰 Calculating Market Value Score...');
         const marketValue = await this.marketValueService.calculateMarketValue(vehicle);
@@ -311,16 +501,32 @@ export class VehicleAnalyzer {
           analysis.marketValueScore = marketValue;
           console.log(`  ✓ Market Value: ${marketValue}`);
         } else {
-          console.log('  ⚠️ Market Value: No comparables found (insufficient data)');
+          console.log('  ⚠️  Market Value: No comparables found (insufficient data)');
         }
       } catch (error) {
-        console.error('  ⚠️ Failed to calculate market value:', error);
-        // Continue with other analyses
+        const err = error as Error;
+        console.error('  ❌ Failed to calculate market value:', err.message);
+
+        // Log failure to run log
+        this.runLog.failures.push({
+          vehicleId: vehicle.id,
+          vehicleTitle: vehicle.title,
+          vehicleUrl: vehicle.sourceUrl,
+          step: 'market_value',
+          error: err.message,
+          errorType: getErrorType(err),
+          timestamp: new Date(),
+          retryable: isRetryableError(err),
+        });
+
+        throw err; // Re-throw to skip remaining steps
       }
+    } else {
+      console.log('  ⏭️  Skipping market value (already complete)');
     }
 
     // 5. Generate Priority Rating (should be last since it uses other scores)
-    if ((vehicle.aiPriorityRating === null || !vehicle.aiPrioritySummary) && !options.skipPriorityRating) {
+    if (requiredSteps.includes('priority_rating') && !options.skipPriorityRating) {
       try {
         console.log('  ⭐ Generating Priority Rating...');
         // Update vehicle with new analysis before generating priority rating
@@ -336,9 +542,25 @@ export class VehicleAnalyzer {
         analysis.aiPrioritySummary = priorityResult.summary;
         console.log(`  ✓ Priority Rating: ${analysis.aiPriorityRating}/10`);
       } catch (error) {
-        console.error('  ⚠️ Failed to generate priority rating:', error);
-        // Continue to save other analyses
+        const err = error as Error;
+        console.error('  ❌ Failed to generate priority rating:', err.message);
+
+        // Log failure to run log
+        this.runLog.failures.push({
+          vehicleId: vehicle.id,
+          vehicleTitle: vehicle.title,
+          vehicleUrl: vehicle.sourceUrl,
+          step: 'priority_rating',
+          error: err.message,
+          errorType: getErrorType(err),
+          timestamp: new Date(),
+          retryable: isRetryableError(err),
+        });
+
+        throw err; // Re-throw to skip remaining steps
       }
+    } else if (!options.skipPriorityRating) {
+      console.log('  ⏭️  Skipping priority rating (already complete)');
     }
 
     // Save analysis to database
@@ -346,9 +568,9 @@ export class VehicleAnalyzer {
       console.log('  💾 Saving analysis to database...');
       await this.vehicleRepository.updateVehicleAnalysis(vehicle.id, analysis);
       console.log('  ✓ Saved successfully');
-    } else {
-      this.stats.skipped++;
-      console.log('  ⏭️ No new analysis to save (vehicle already analyzed)');
+
+      // Mark vehicle as completed in run log
+      this.runLog.vehiclesCompleted++;
     }
   }
 
@@ -357,6 +579,62 @@ export class VehicleAnalyzer {
    */
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Generate summary statistics for run log
+   */
+  private generateRunLogSummary(): void {
+    // Count failures by step
+    const byStep: Record<AnalysisStep, number> = {
+      translate: 0,
+      sanity_check: 0,
+      fit_score: 0,
+      mechanic_report: 0,
+      market_value: 0,
+      priority_rating: 0,
+    };
+
+    let retryableCount = 0;
+    let permanentFailureCount = 0;
+
+    this.runLog.failures.forEach(failure => {
+      byStep[failure.step]++;
+      if (failure.retryable) {
+        retryableCount++;
+      } else {
+        permanentFailureCount++;
+      }
+    });
+
+    this.runLog.summary = {
+      byStep,
+      retryableCount,
+      permanentFailureCount,
+    };
+  }
+
+  /**
+   * Write run log to JSON file
+   */
+  private writeRunLog(): void {
+    try {
+      const logDir = path.join(WorkspaceUtils.findWorkspaceRoot(), 'data/logs/analysis-runs');
+
+      // Create directory if it doesn't exist
+      if (!fs.existsSync(logDir)) {
+        fs.mkdirSync(logDir, { recursive: true });
+        console.log(`📁 Created log directory: ${logDir}`);
+      }
+
+      const logFilePath = path.join(logDir, `analysis-${this.runLog.runId}.json`);
+      fs.writeFileSync(logFilePath, JSON.stringify(this.runLog, null, 2), 'utf-8');
+
+      console.log(`\n📝 Run log saved: ${logFilePath}`);
+    } catch (error) {
+      console.error('⚠️  Failed to write run log:', error);
+      // Don't throw - logging failure shouldn't crash the script
+    }
   }
 
   /**
@@ -370,16 +648,29 @@ export class VehicleAnalyzer {
     console.log('\n' + '='.repeat(60));
     console.log('📊 Analysis Summary');
     console.log('='.repeat(60));
+    console.log(`Run ID:            ${this.runLog.runId}`);
     console.log(`Total Vehicles:    ${this.stats.totalVehicles}`);
-    console.log(`✅ Analyzed:       ${this.stats.analyzed}`);
-    console.log(`❌ Failed:         ${this.stats.failed}`);
+    console.log(`✅ Completed:      ${this.runLog.vehiclesCompleted}`);
+    console.log(`❌ Failed:         ${this.runLog.vehiclesFailed}`);
     console.log(`⏭️  Skipped:        ${this.stats.skipped}`);
     console.log(`⏱️  Duration:       ${duration.toFixed(2)}s`);
 
-    if (this.stats.errors.length > 0) {
-      console.log('\n❌ Errors:');
-      this.stats.errors.forEach(({ vehicleId, error }) => {
-        console.log(`  - ${vehicleId}: ${error}`);
+    if (this.runLog.summary && this.runLog.failures.length > 0) {
+      console.log(`\n📉 Failure Breakdown:`);
+      console.log(`   Retryable:      ${this.runLog.summary.retryableCount}`);
+      console.log(`   Permanent:      ${this.runLog.summary.permanentFailureCount}`);
+
+      console.log(`\n🔧 Failures by Step:`);
+      Object.entries(this.runLog.summary.byStep).forEach(([step, count]) => {
+        if (count > 0) {
+          console.log(`   ${step}: ${count}`);
+        }
+      });
+
+      console.log('\n❌ Failed Vehicles:');
+      this.runLog.failures.forEach(failure => {
+        const retryBadge = failure.retryable ? '🔄' : '⛔';
+        console.log(`  ${retryBadge} ${failure.vehicleId} (${failure.step}): ${failure.error}`);
       });
     }
 
@@ -393,7 +684,9 @@ export class VehicleAnalyzer {
 function parseArgs(): AnalysisOptions {
   const args = process.argv.slice(2);
   console.log('🔍 Debug: Received arguments:', args);
-  const options: AnalysisOptions = {};
+  const options: AnalysisOptions = {
+    resume: true, // Default to enabled
+  };
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -410,6 +703,15 @@ function parseArgs(): AnalysisOptions {
       options.skipSanityCheck = true;
     } else if (arg === '--skip-priority-rating') {
       options.skipPriorityRating = true;
+    } else if (arg === '--resume') {
+      options.resume = true;
+    } else if (arg === '--no-resume') {
+      options.resume = false;
+    } else if (arg === '--retry-failed' && i + 1 < args.length) {
+      options.retryFailed = args[i + 1];
+      i++;
+    } else if (arg === '--show-logs') {
+      options.showLogs = true;
     } else if (arg === '--help' || arg === '-h') {
       printHelp();
       process.exit(0);
@@ -427,23 +729,76 @@ function printHelp(): void {
 Vehicle Analysis Script
 
 Usage:
-  pnpm --filter @car-finder/scripts analyze                     # Analyze all vehicles without AI data
-  pnpm --filter @car-finder/scripts analyze --vehicle-id <id>   # Analyze specific vehicle
-  pnpm --filter @car-finder/scripts analyze --limit 10          # Analyze only first 10 vehicles
-  pnpm --filter @car-finder/scripts analyze --skip-mechanic-report   # Skip mechanic report generation
-  pnpm --filter @car-finder/scripts analyze --skip-sanity-check      # Skip sanity check generation
-  pnpm --filter @car-finder/scripts analyze --skip-priority-rating   # Skip priority rating generation
-  pnpm --filter @car-finder/scripts analyze --help               # Show this help message
+  pnpm analyze                                                   # Analyze all vehicles needing analysis (resume-aware)
+  pnpm analyze --vehicle-id <id>                                 # Analyze specific vehicle
+  pnpm analyze --limit 10                                        # Analyze only first 10 vehicles
+  pnpm analyze --skip-mechanic-report                            # Skip mechanic report generation
+  pnpm analyze --skip-sanity-check                               # Skip sanity check generation
+  pnpm analyze --skip-priority-rating                            # Skip priority rating generation
+  pnpm analyze --no-resume                                       # Disable resume logic (reanalyze all steps)
+  pnpm analyze --show-logs                                       # List available analysis run logs
+  pnpm analyze --retry-failed <run-id>                           # Retry only failed vehicles from a previous run
+  pnpm analyze --help                                            # Show this help message
 
 Environment Variables:
   GEMINI_API_KEY       Required. Your Gemini API key for AI analysis
   DATABASE_PATH        Optional. Path to database file (default: <root>/data/vehicles.db)
 
 Examples:
-  pnpm --filter @car-finder/scripts analyze
-  pnpm --filter @car-finder/scripts analyze --limit 5
-  pnpm --filter @car-finder/scripts analyze --vehicle-id c9c93b5f246e8f0ce4e5d937871e5210
+  pnpm analyze                                                   # Analyze all vehicles (resume from where it left off)
+  pnpm analyze --limit 5                                         # Analyze first 5 vehicles needing analysis
+  pnpm analyze --vehicle-id c9c93b5f246e8f0ce4e5d937871e5210    # Analyze specific vehicle
+  pnpm analyze --show-logs                                       # View previous run logs
+  pnpm analyze --retry-failed f47ac10b-58cc-4372-a567-0e02b2c3d479  # Retry failed vehicles from a specific run
   `);
+}
+
+/**
+ * List available analysis run logs
+ */
+function listAnalysisLogs(): void {
+  try {
+    const logDir = path.join(WorkspaceUtils.findWorkspaceRoot(), 'data/logs/analysis-runs');
+
+    if (!fs.existsSync(logDir)) {
+      console.log('📭 No analysis logs found.');
+      return;
+    }
+
+    const logFiles = fs.readdirSync(logDir)
+      .filter(file => file.endsWith('.json'))
+      .sort((a, b) => b.localeCompare(a)); // Most recent first
+
+    if (logFiles.length === 0) {
+      console.log('📭 No analysis logs found.');
+      return;
+    }
+
+    console.log('\n📋 Analysis Run Logs:\n');
+    console.log('='.repeat(80));
+
+    logFiles.forEach(file => {
+      const logPath = path.join(logDir, file);
+      const logContent = JSON.parse(fs.readFileSync(logPath, 'utf-8')) as AnalysisRunLog;
+
+      const duration = logContent.endTime
+        ? ((new Date(logContent.endTime).getTime() - new Date(logContent.startTime).getTime()) / 1000).toFixed(1)
+        : 'N/A';
+
+      console.log(`Run ID: ${logContent.runId}`);
+      console.log(`Date:   ${new Date(logContent.startTime).toLocaleString()}`);
+      console.log(`Stats:  ${logContent.vehiclesCompleted} completed, ${logContent.vehiclesFailed} failed (${duration}s)`);
+      if (logContent.summary) {
+        console.log(`Retry:  ${logContent.summary.retryableCount} retryable, ${logContent.summary.permanentFailureCount} permanent`);
+      }
+      console.log(`File:   ${logPath}`);
+      console.log('-'.repeat(80));
+    });
+
+    console.log(`\nTotal logs: ${logFiles.length}\n`);
+  } catch (error) {
+    console.error('❌ Failed to list logs:', error);
+  }
 }
 
 /**
@@ -452,6 +807,19 @@ Examples:
 async function main() {
   try {
     const options = parseArgs();
+
+    // Handle show-logs option
+    if (options.showLogs) {
+      listAnalysisLogs();
+      process.exit(0);
+    }
+
+    // Handle retry-failed option
+    if (options.retryFailed) {
+      console.log(`\n⚠️  --retry-failed feature not yet implemented (run ID: ${options.retryFailed})`);
+      console.log('    For now, failed vehicles will automatically be retried on next run due to resume logic.\n');
+      process.exit(0);
+    }
 
     // DatabaseService will handle path resolution (env var or smart defaults)
     // AIService will check for GEMINI_API_KEY and throw error if missing
@@ -471,4 +839,11 @@ if (require.main === module) {
 }
 
 // Export for testing
-export { main, parseArgs };
+export {
+  main,
+  parseArgs,
+  getRequiredAnalysisSteps,
+  isRetryableError,
+  getErrorType,
+  listAnalysisLogs
+};

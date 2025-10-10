@@ -228,6 +228,36 @@ export class VehicleRepository {
   }
 
   /**
+   * Find vehicles that need any analysis step (resumable pipeline)
+   * Returns vehicles where at least one analysis field is null
+   */
+  async findVehiclesNeedingAnalysis(): Promise<VehicleType[]> {
+    try {
+      const results = await this.db
+        .selectFrom('vehicles')
+        .selectAll()
+        .where((eb) =>
+          eb.or([
+            eb('description', 'is', null),
+            eb('aiDataSanityCheck', 'is', null),
+            eb('personalFitScore', 'is', null),
+            eb('aiMechanicReport', 'is', null),
+            eb('marketValueScore', 'is', null),
+            eb('aiPriorityRating', 'is', null),
+          ])
+        )
+        .where('status', '!=', 'deleted')
+        .orderBy('createdAt', 'desc')
+        .execute();
+
+      return results.map(vehicle => this.mapDbVehicleToType(vehicle));
+    } catch (error) {
+      console.error('❌ Failed to find vehicles needing analysis:', error);
+      throw new Error(`Vehicle retrieval failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Update AI analysis fields for a vehicle
    * This is a specialized update method for batch analysis operations
    */

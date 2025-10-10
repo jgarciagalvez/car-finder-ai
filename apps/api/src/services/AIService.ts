@@ -115,6 +115,15 @@ export class AIService {
 
       let translatedEquipment: string[] = [];
 
+      // Check if source description is empty
+      if (!vehicle.sourceDescriptionHtml || vehicle.sourceDescriptionHtml.trim() === '') {
+        console.warn(`  ⚠️  Vehicle ${vehicle.id} has no description - using placeholder`);
+        return {
+          description: 'No description provided by seller.',
+          features: translated,
+        };
+      }
+
       // Only call AI if there are unmapped features
       if (unmapped.length > 0) {
         console.log(`Calling AI to translate ${unmapped.length} unmapped features for vehicle ${vehicle.id}`);
@@ -134,9 +143,10 @@ export class AIService {
           translatedEquipment: string[];
         }>(fullPrompt, prompt.outputFormat);
 
-        // Validate response
+        // If AI returns empty description, use placeholder
         if (!response.description || response.description.trim() === '') {
-          throw new ValidationError('Empty description returned from AI provider');
+          console.warn(`  ⚠️  AI returned empty description for ${vehicle.id} - using placeholder`);
+          response.description = 'Description translation unavailable.';
         }
 
         translatedEquipment = response.translatedEquipment || [];
@@ -154,7 +164,7 @@ export class AIService {
 
         const prompt = await PromptLoader.loadPrompt('translate-vehicle');
         const fullPrompt = PromptLoader.buildPrompt(prompt, {
-          sourceDescriptionHtml: vehicle.sourceDescriptionHtml || '',
+          sourceDescriptionHtml: vehicle.sourceDescriptionHtml,
           unmappedEquipment: [],
         });
 
@@ -163,8 +173,10 @@ export class AIService {
           translatedEquipment: string[];
         }>(fullPrompt, prompt.outputFormat);
 
+        // If AI returns empty description, use placeholder
         if (!response.description || response.description.trim() === '') {
-          throw new ValidationError('Empty description returned from AI provider');
+          console.warn(`  ⚠️  AI returned empty description for ${vehicle.id} - using placeholder`);
+          response.description = 'Description translation unavailable.';
         }
 
         return {

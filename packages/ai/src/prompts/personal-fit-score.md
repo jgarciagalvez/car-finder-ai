@@ -58,20 +58,33 @@ Analyze how well a specific vehicle matches a user's stated criteria and prefere
 ## Output Format
 ```json
 {
-  "score": 8,
-  "reasoning": "This vehicle scores an 8/10 for your needs. It falls within your budget at €15,000, has excellent fuel efficiency (ideal for daily commuting), and includes 8 of your 10 preferred features including climate control and parking sensors. The mileage is reasonable for a 2018 model. Minor drawbacks include manual transmission rather than automatic, and slightly less cargo space than ideal for a family car.",
-  "strengths": [
-    "Within budget with good value for money",
-    "Excellent fuel efficiency for daily commute use case",
-    "Modern features including parking sensors and climate control",
-    "Low mileage for year (85,000 km on 2018 model)"
-  ],
-  "concerns": [
-    "Manual transmission (you preferred automatic)",
-    "Smaller cargo space than typical family cars",
-    "No leather seats (was on preferred features list)"
-  ],
-  "dealBreakers": []
+  "type": "object",
+  "properties": {
+    "score": {
+      "type": "number",
+      "description": "Personal fit score from 0-10"
+    },
+    "reasoning": {
+      "type": "string",
+      "description": "2-4 sentence explanation of the score"
+    },
+    "strengths": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of positive matches with user criteria"
+    },
+    "concerns": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of mismatches or compromises"
+    },
+    "dealBreakers": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Critical issues that make the vehicle unsuitable"
+    }
+  },
+  "required": ["score", "reasoning", "strengths", "concerns", "dealBreakers"]
 }
 ```
 

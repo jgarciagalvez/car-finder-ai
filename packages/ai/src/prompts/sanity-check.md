@@ -40,22 +40,35 @@ Compare the structured vehicle parameters (sourceParameters) against the seller'
 ## Output Format
 ```json
 {
-  "consistencyScore": 8,
-  "flags": [
-    "Minor inconsistency: Description mentions 'full service history' but no service records are listed in parameters."
-  ],
-  "warnings": [],
-  "trustLevel": "high",
-  "summary": "Data appears mostly consistent. Minor omission: seller mentions full service history in description but doesn't provide documentation links in structured fields. Otherwise, specs align well with description."
+  "type": "object",
+  "properties": {
+    "consistencyScore": {
+      "type": "number",
+      "description": "0-10 score where 10 = perfect consistency, 0 = major contradictions"
+    },
+    "flags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Array of specific inconsistencies found (minor issues)"
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Array of serious concerns (potential fraud, major contradictions)"
+    },
+    "trustLevel": {
+      "type": "string",
+      "enum": ["high", "medium", "low"],
+      "description": "Overall assessment of listing trustworthiness"
+    },
+    "summary": {
+      "type": "string",
+      "description": "2-3 sentence summary of findings"
+    }
+  },
+  "required": ["consistencyScore", "flags", "warnings", "trustLevel", "summary"]
 }
 ```
-
-**Field Definitions:**
-- **consistencyScore**: 0-10 (10 = perfect consistency, 0 = major contradictions)
-- **flags**: Array of specific inconsistencies found (minor issues)
-- **warnings**: Array of serious concerns (potential fraud, major contradictions)
-- **trustLevel**: "high", "medium", "low" (overall assessment of listing trustworthiness)
-- **summary**: 2-3 sentence summary of findings
 
 ## Example
 

@@ -31,12 +31,19 @@ Translate Polish vehicle descriptions and equipment lists into English. Preserve
 ## Output Format
 ```json
 {
-  "description": "Hello, I'm selling Toyota Corolla 2017. Car in excellent condition, regularly serviced at Toyota ASO. No accidents. Recently replaced brake pads and tires. Ideal for daily commuting. Economical gasoline engine. Trade-in possible, I'll consider reasonable offers.",
-  "translatedEquipment": [
-    "Automatic air conditioning",
-    "Rear parking sensors",
-    "Bluetooth system"
-  ]
+  "type": "object",
+  "properties": {
+    "description": {
+      "type": "string",
+      "description": "English translation of Polish vehicle description (HTML stripped)"
+    },
+    "translatedEquipment": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "English translations of unmapped Polish equipment items"
+    }
+  },
+  "required": ["description", "translatedEquipment"]
 }
 ```
 

@@ -17,7 +17,8 @@
     "type-check": "turbo type-check",
     "test": "turbo test",
     "ingest": "pnpm --filter @car-finder/api ingest",
-    "analyze": "pnpm --filter @car-finder/api analyze"
+    "analyze": "pnpm --filter @car-finder/api analyze",
+    "full-pipeline": "pnpm --filter @car-finder/api full-pipeline"
   },
   "devDependencies": {
     "turbo": "^2.0.0",

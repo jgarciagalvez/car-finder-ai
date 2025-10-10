@@ -6,7 +6,8 @@
         "url": "https://www.otomoto.pl/osobowe/nissan/primastar/wroclaw?search%5Bdist%5D=300&search%5Bfilter_float_price%3Ato%5D=60000&search%5Bfilter_float_year%3Ato%5D=2014&search%5Border%5D=created_at_first%3Adesc",
         "description": "Renault Trafic, <2014, <60k PLN, Wrocław"
       }
-    ]
+    ],
+    "olx": [] 
   },
   "ingestionSettings": {
     "maxPagesPerSearch": 30,
@@ -26,18 +27,19 @@
   "analysisSettings": {
     "userCriteria": {
       "budgetEur": {
-        "min": 5000,
+        "min": 1000,
         "max": 20000
       },
       "preferredFeatures": [
-        "air_conditioning"
+        ["air conditioning", "Climate control", "Cooling system"],
+        "tinted windows",
+        "tailgate"
       ],
-      "useCase": "daily commute and weekend trips",
+      "useCase": "Passenger van to convert to camper van, but keeping the passengers seats and use it as a hybrid vehicle. Vehicle needs to have air conditioning or some cooling system.",
       "priorityFactors": [
-        "fuel_efficiency",
+        "passenger seats",
         "reliability",
-        "comfort",
-        "safety"
+        "no separation between passengers and driver"
       ]
     },
     "systemPrompts": {

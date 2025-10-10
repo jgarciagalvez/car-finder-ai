@@ -53,8 +53,18 @@ Generate an overall Priority Rating (0-10) that synthesizes ALL available data p
 ## Output Format
 ```json
 {
-  "rating": 8,
-  "summary": "This vehicle represents excellent value and high personal fit (8/10). Priced 5% below market average for comparable models, it offers modern features and appropriate mileage for its age. The seller's description is consistent with listed specifications, suggesting transparency. Strong candidate for a test drive."
+  "type": "object",
+  "properties": {
+    "rating": {
+      "type": "number",
+      "description": "Priority rating from 0-10"
+    },
+    "summary": {
+      "type": "string",
+      "description": "2-4 sentence summary synthesizing all analysis factors"
+    }
+  },
+  "required": ["rating", "summary"]
 }
 ```
 

@@ -4,7 +4,22 @@
       {
         "name": "Nissan Primastar 2005-2014",
         "url": "https://www.otomoto.pl/osobowe/nissan/primastar/wroclaw?search%5Bdist%5D=300&search%5Bfilter_float_price%3Ato%5D=60000&search%5Bfilter_float_year%3Ato%5D=2014&search%5Border%5D=created_at_first%3Adesc",
+        "description": "Nissan Primastar, <2014, <60k PLN, Wrocław"
+      },
+      {
+        "name": "Renault Trafic 2005-2014",
+        "url": "https://www.otomoto.pl/osobowe/renault/trafic/wroclaw?search%5Bdist%5D=300&search%5Bfilter_float_price%3Ato%5D=60000&search%5Bfilter_float_year%3Ato%5D=2014&search%5Border%5D=created_at_first%3Adesc",
         "description": "Renault Trafic, <2014, <60k PLN, Wrocław"
+      },
+      {
+        "name": "Opel Vivaro 2005-2014",
+        "url": "https://www.otomoto.pl/osobowe/opel/vivaro/wroclaw?search%5Bdist%5D=300&search%5Bfilter_float_price%3Ato%5D=60000&search%5Bfilter_float_year%3Ato%5D=2014&search%5Border%5D=created_at_first%3Adesc",
+        "description": "Opel Vivaro, <2014, <60k PLN, Wrocław"
+      },
+      {
+        "name": "Ford Transit 2005-2014",
+        "url": "https://www.otomoto.pl/osobowe/ford/transit/wroclaw?search%5Bdist%5D=300&search%5Bfilter_float_price%3Ato%5D=60000&search%5Bfilter_float_year%3Ato%5D=2014&search%5Border%5D=created_at_first%3Adesc",
+        "description": "Ford Transit, <2014, <60k PLN, Wrocław"
       }
     ],
     "olx": [] 
@@ -47,6 +62,42 @@
       "communication_assistant": "You are a professional communication assistant for car buyers. You help draft polite, effective messages to sellers, translate content between languages, and provide guidance on negotiation strategies. Always maintain a respectful and professional tone.",
       "data_validation": "You are a data validation specialist for automotive listings. You identify inconsistencies, missing information, and potential red flags in vehicle data. You provide clear explanations of any issues found and suggest corrections where appropriate.",
       "general_assistant": "You are a helpful AI assistant with expertise in automotive topics. You provide accurate, helpful information while being concise and user-friendly. Always prioritize user safety and make recommendations based on best practices."
+    }
+  },
+  "marketValueSettings": {
+    "vehicleEquivalency": {
+      "groups": [
+        {
+          "name": "Renault-Nissan Alliance Platform",
+          "vehicles": [
+            { "make": "Renault", "model": "Trafic", "weight": 1.0 },
+            { "make": "Opel", "model": "Vivaro", "weight": 1.0 },
+            { "make": "Nissan", "model": "Primastar", "weight": 0.95 }
+          ]
+        },
+        {
+          "name": "Ford Transit Family",
+          "vehicles": [
+            { "make": "Ford", "model": "Transit", "weight": 0.85 },
+            { "make": "Ford", "model": "Transit Custom", "weight": 0.85 },
+            { "make": "Ford", "model": "Transit Tourneo", "weight": 0.90 }
+          ]
+        }
+      ]
+    },
+    "attributeWeights": {
+      "engineSize_tolerance_cc": 200,
+      "engineSize_penalty": 0.05,
+      "horsepower_tolerance_hp": 20,
+      "horsepower_penalty": 0.03,
+      "transmission_mismatch_penalty": 0.10,
+      "fuelType_mismatch_penalty": 0.15,
+      "wheelbase_mismatch_penalty": 0.08
+    },
+    "matchingCriteria": {
+      "yearRange": 3,
+      "mileageRange_km": 50000,
+      "minComparables": 3
     }
   }
 }

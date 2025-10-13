@@ -150,10 +150,13 @@ describe('AIService', () => {
         translatedEquipment: ['Heated Seats'],
       });
 
-      // Setup vehicle with Polish equipment
+      // Setup vehicle with Polish equipment (sourceEquipment is Record<string, string[]>)
       const vehicleWithPolishData = {
         ...mockVehicle,
-        sourceEquipment: ['Klimatyzacja', 'ABS', 'Podgrzewane fotele'],
+        sourceEquipment: {
+          'Komfort': ['Klimatyzacja', 'Podgrzewane fotele'],
+          'Bezpieczeństwo': ['ABS'],
+        },
         sourceDescriptionHtml: '<p>Piękny samochód w doskonałym stanie</p>',
       };
 
@@ -162,7 +165,7 @@ describe('AIService', () => {
       expect(result.description).toBe('Beautiful car in excellent condition');
       expect(result.features).toEqual(['Air Conditioning', 'ABS', 'Heated Seats']);
       expect(PromptLoader.loadPrompt).toHaveBeenCalledWith('translate-vehicle');
-      expect(DictionaryLoader.translateFeatures).toHaveBeenCalledWith(['Klimatyzacja', 'ABS', 'Podgrzewane fotele']);
+      expect(DictionaryLoader.translateFeatures).toHaveBeenCalledWith(['Klimatyzacja', 'Podgrzewane fotele', 'ABS']);
     });
 
     it('should only translate description when all features are in dictionary', async () => {
@@ -179,7 +182,10 @@ describe('AIService', () => {
 
       const vehicleWithKnownFeatures = {
         ...mockVehicle,
-        sourceEquipment: ['Klimatyzacja', 'ABS', 'Tempomat'],
+        sourceEquipment: {
+          'Komfort': ['Klimatyzacja', 'Tempomat'],
+          'Bezpieczeństwo': ['ABS'],
+        },
         sourceDescriptionHtml: '<p>Świetny pojazd z małym przebiegiem</p>',
       };
 
@@ -207,7 +213,7 @@ describe('AIService', () => {
 
       const vehicleNoEquipment = {
         ...mockVehicle,
-        sourceEquipment: [],
+        sourceEquipment: {},
         sourceDescriptionHtml: '<p>Podstawowy pojazd</p>',
       };
 
@@ -253,7 +259,9 @@ describe('AIService', () => {
 
       const vehicleWithEquipment = {
         ...mockVehicle,
-        sourceEquipment: ['Feature1'],
+        sourceEquipment: {
+          'Category': ['Feature1'],
+        },
       };
 
       const result = await aiService.translateVehicleContent(vehicleWithEquipment);
@@ -277,7 +285,9 @@ describe('AIService', () => {
 
       const vehicleWithEquipment = {
         ...mockVehicle,
-        sourceEquipment: ['Known', 'Unknown1', 'Unknown2'],
+        sourceEquipment: {
+          'Features': ['Known', 'Unknown1', 'Unknown2'],
+        },
       };
 
       await aiService.translateVehicleContent(vehicleWithEquipment);

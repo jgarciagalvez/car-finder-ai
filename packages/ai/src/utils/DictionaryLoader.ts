@@ -63,6 +63,49 @@ export class DictionaryLoader {
   }
 
   /**
+   * Add new translations to the dictionary file
+   * This allows the system to learn from AI translations
+   * @param newTranslations - Map of Polish feature -> English translation
+   */
+  static addTranslations(newTranslations: Record<string, string>): void {
+    const dictionaryPath = path.join(this.dictionariesDir, 'feature-dictionary.json');
+
+    // Load current dictionary
+    const dictionary = this.loadFeatureDictionary();
+
+    // Add new translations (don't overwrite existing ones)
+    let addedCount = 0;
+    for (const [polish, english] of Object.entries(newTranslations)) {
+      const trimmed = polish.trim();
+      if (!dictionary.features[trimmed]) {
+        dictionary.features[trimmed] = english;
+        addedCount++;
+      }
+    }
+
+    if (addedCount === 0) {
+      return; // No new translations to add
+    }
+
+    // Sort features alphabetically by Polish key for readability
+    const sortedFeatures: Record<string, string> = {};
+    Object.keys(dictionary.features)
+      .sort()
+      .forEach(key => {
+        sortedFeatures[key] = dictionary.features[key];
+      });
+    dictionary.features = sortedFeatures;
+
+    // Write back to file
+    fs.writeFileSync(dictionaryPath, JSON.stringify(dictionary, null, 2), 'utf-8');
+
+    // Clear cache so next load gets the updated dictionary
+    this.clearCache();
+
+    console.log(`  📚 Added ${addedCount} new translation(s) to dictionary`);
+  }
+
+  /**
    * Clear cache (useful for testing or when dictionary is updated)
    */
   static clearCache(): void {

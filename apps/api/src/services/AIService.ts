@@ -95,10 +95,14 @@ export class AIService {
    */
   async translateVehicleContent(vehicle: Vehicle): Promise<TranslationResult> {
     try {
-      // Get equipment array from vehicle.sourceEquipment (not sourceParameters)
-      const polishEquipment: string[] = Array.isArray(vehicle.sourceEquipment)
-        ? vehicle.sourceEquipment
-        : [];
+      // Get equipment array from vehicle.sourceEquipment
+      // sourceEquipment is Record<string, string[]> - flatten all arrays into single array
+      let polishEquipment: string[] = [];
+
+      if (vehicle.sourceEquipment && typeof vehicle.sourceEquipment === 'object') {
+        // Flatten all equipment arrays from all categories
+        polishEquipment = Object.values(vehicle.sourceEquipment).flat();
+      }
 
       // Use dictionary to translate features
       const { translated, unmapped } = DictionaryLoader.translateFeatures(polishEquipment);
@@ -149,6 +153,25 @@ export class AIService {
         }
 
         translatedEquipment = response.translatedEquipment || [];
+
+        // Save AI translations back to dictionary for future use
+        if (unmapped.length > 0 && translatedEquipment.length > 0) {
+          const newTranslations: Record<string, string> = {};
+
+          // Map each unmapped Polish feature to its AI translation
+          // Assume they're in the same order (the AI is instructed to maintain order)
+          for (let i = 0; i < Math.min(unmapped.length, translatedEquipment.length); i++) {
+            newTranslations[unmapped[i]] = translatedEquipment[i];
+          }
+
+          // Add to dictionary
+          try {
+            DictionaryLoader.addTranslations(newTranslations);
+          } catch (error) {
+            console.warn(`  ⚠️  Failed to save translations to dictionary: ${(error as Error).message}`);
+            // Don't fail the translation if dictionary update fails
+          }
+        }
 
         // Combine dictionary translations with AI translations
         const allFeatures = [...translated, ...translatedEquipment];

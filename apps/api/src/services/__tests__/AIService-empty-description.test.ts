@@ -33,7 +33,9 @@ describe('AIService - Empty Description Handling', () => {
     sourceParameters: {
       equipment: ['Klimatyzacja', 'GPS'],
     },
-    sourceEquipment: ['Klimatyzacja', 'GPS'],
+    sourceEquipment: {
+      'Komfort': ['Klimatyzacja', 'GPS'],
+    },
     sourcePhotos: [],
     title: 'Test Vehicle',
     description: null,
@@ -65,7 +67,7 @@ describe('AIService - Empty Description Handling', () => {
   test('should return placeholder for null sourceDescriptionHtml', async () => {
     const vehicle = createVehicle({
       sourceDescriptionHtml: null as any,
-      sourceEquipment: [],
+      sourceEquipment: {},
     });
 
     const result = await aiService.translateVehicleContent(vehicle);
@@ -77,7 +79,7 @@ describe('AIService - Empty Description Handling', () => {
   test('should return placeholder for empty string sourceDescriptionHtml', async () => {
     const vehicle = createVehicle({
       sourceDescriptionHtml: '',
-      sourceEquipment: [],
+      sourceEquipment: {},
     });
 
     const result = await aiService.translateVehicleContent(vehicle);
@@ -89,7 +91,7 @@ describe('AIService - Empty Description Handling', () => {
   test('should return placeholder for whitespace-only sourceDescriptionHtml', async () => {
     const vehicle = createVehicle({
       sourceDescriptionHtml: '   \n\t  ',
-      sourceEquipment: [],
+      sourceEquipment: {},
     });
 
     const result = await aiService.translateVehicleContent(vehicle);
@@ -101,7 +103,9 @@ describe('AIService - Empty Description Handling', () => {
   test('should still translate features when description is empty', async () => {
     const vehicle = createVehicle({
       sourceDescriptionHtml: null as any,
-      sourceEquipment: ['Klimatyzacja'], // Polish feature
+      sourceEquipment: {
+        'Komfort': ['Klimatyzacja'], // Polish feature
+      },
     });
 
     const result = await aiService.translateVehicleContent(vehicle);

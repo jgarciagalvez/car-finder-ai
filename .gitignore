@@ -91,6 +91,8 @@ temp/
 
 # Database files (production data only - test databases are committed)
 data/vehicles.db
+data/vehicles_old.db
+data/vehicles copy.db
 data/exports/
 
 # Analysis run logs (runtime operational data)
@@ -105,6 +107,6 @@ data/logs/
 **/__tests__/*.db
 **/test-*.db
 
-# Old docs
+# Other
 docs/Notes.md
-data/vehicles_old.db
+

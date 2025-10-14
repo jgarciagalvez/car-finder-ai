@@ -1,5 +1,91 @@
 # Architecture Changelog
 
+## 2025-10-14: Story 2.4c - Translation Extraction & Pipeline Optimization
+
+### Change Summary
+Extracted translation into standalone pipeline with automatic feature filtering and on-demand API endpoints.
+
+### What Changed
+
+**New Vehicle Status:**
+- Added `'not_interested'` to VehicleStatus enum
+- Used to mark vehicles automatically filtered during translation
+
+**Translation Pipeline:**
+- Created standalone `translate.ts` script (separate from `analyze.ts`)
+- Feature filtering happens BEFORE translation (saves API costs)
+- Uses `sourceEquipment` (Polish) for matching, not translated `features`
+- Filtered vehicles marked as `'not_interested'` status
+- Uses faster model (gemini-2.5-flash-lite) vs analysis model
+
+**Analysis Pipeline:**
+- Removed translation step from `analyze.ts`
+- Now assumes vehicles are pre-translated
+- Two-step workflow: `translate → analyze`
+
+**API Endpoints:**
+- Added `POST /api/vehicles/:id/translate` - Force re-translation with optional `force` query parameter
+- Added `POST /api/vehicles/:id/analyze` - Force re-analysis with optional `force` query parameter
+- Both return 202 Accepted with updated vehicle data
+
+**AIService Enhancement:**
+- Now accepts optional model parameter for per-operation model selection
+- Backward compatible (defaults to `process.env.GEMINI_MODEL`)
+
+**VehicleRepository:**
+- Added `findVehiclesNeedingTranslation()` method
+- Excludes `'not_interested'` status from translation query
+- Added field mappings for `description` and `features`
+
+### Rationale
+
+**Cost Optimization:**
+- Feature filtering BEFORE translation saves unnecessary AI API calls
+- Vehicles without required features don't consume translation credits
+
+**Pipeline Separation:**
+- Translation can use faster/cheaper model (flash-lite)
+- Analysis can use more powerful model (pro)
+- Independent execution allows better control
+
+**UI Integration:**
+- API endpoints enable manual override from frontend
+- Users can force re-translate/analyze specific vehicles
+- Useful for vehicles marked `'not_interested'` by mistake
+
+### Files Updated
+
+**Code:**
+- Created: `apps/api/src/scripts/translate.ts` - Translation script with VehicleTranslator class
+- Modified: `apps/api/src/scripts/analyze.ts` - Removed translation step, added force flag
+- Modified: `apps/api/src/services/AIService.ts` - Added optional model parameter
+- Modified: `packages/ai/src/factory/AIProviderFactory.ts` - Added model parameter
+- Modified: `packages/db/src/repositories/vehicleRepository.ts` - Added methods and field mappings
+- Modified: `packages/db/src/schema.ts` - Confirmed 'not_interested' status in CHECK constraint
+- Modified: `apps/api/src/routes/vehicles.ts` - Added POST /translate and /analyze endpoints
+- Modified: `search-config.json` - Added translationModel and requiredFeatures
+- Created: `apps/api/src/scripts/migrate-status-constraint.ts` - Database migration script
+
+**Documentation:**
+- `docs/architecture/data-models.md` - Updated VehicleStatus enum, added status field notes
+- `docs/architecture/core-workflows.md` - Added Translation workflow diagram, renumbered sections
+- `docs/architecture/api-specification.md` - Added POST /translate and /analyze endpoint specs
+- `docs/architecture/CHANGELOG.md` - This entry
+- `docs/stories/2.4c.story.md` - Completion notes and post-QA fixes
+
+### Impact on Story 2.5
+
+**Card-Based Vehicle Dashboard needs to:**
+1. Display `'not_interested'` status badge
+2. Add "Force Translate" and "Force Analyze" action buttons to VehicleCard
+3. Show buttons for vehicles with `status='not_interested'` or missing AI data
+4. Call new API endpoints with confirmation dialogs
+5. Update tests to include new status and API interactions
+
+See `docs/stories/2.4c-impact-checklist.md` for detailed Story 2.5 updates.
+
+---
+
 ## 2025-10-08: Scripts Consolidated into API App
 
 ### Change Summary

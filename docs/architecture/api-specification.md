@@ -72,6 +72,82 @@ paths:
         '404':
           description: "Vehicle not found."
 
+  /api/vehicles/{id}/translate:
+    post:
+      summary: "Force translate a vehicle on-demand"
+      description: "Triggers translation for a specific vehicle. Useful for re-translating vehicles marked as 'not_interested' or retrying failed translations. Source: Story 2.4c."
+      parameters:
+        - name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+            description: "The internal CUID or UUID of the vehicle."
+        - name: "force"
+          in: "query"
+          required: false
+          schema:
+            type: "boolean"
+            default: false
+            description: "If true, re-translate even if already translated and bypass feature filters."
+      responses:
+        '202':
+          description: "Translation accepted and completed. Returns updated vehicle."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+        '404':
+          description: "Vehicle not found."
+        '500':
+          description: "Translation failed."
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Translation failed"
+
+  /api/vehicles/{id}/analyze:
+    post:
+      summary: "Force analyze a vehicle on-demand"
+      description: "Triggers AI analysis for a specific vehicle. Useful for re-analyzing after user criteria changes or retrying failed analysis. Assumes vehicle is already translated. Source: Story 2.4c."
+      parameters:
+        - name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+            description: "The internal CUID or UUID of the vehicle."
+        - name: "force"
+          in: "query"
+          required: false
+          schema:
+            type: "boolean"
+            default: false
+            description: "If true, re-analyze all steps even if already completed."
+      responses:
+        '202':
+          description: "Analysis accepted and completed. Returns updated vehicle with AI data."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+        '404':
+          description: "Vehicle not found."
+        '500':
+          description: "Analysis failed."
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  error:
+                    type: "string"
+                    example: "Analysis failed"
+
   /api/ai/chat:
     post:
       summary: "Have a contextual conversation with the AI assistant"
@@ -142,7 +218,7 @@ components:
           nullable: true
         status:
           type: "string"
-          enum: ["new", "to_contact", "contacted", "to_visit", "visited", "deleted"]
+          enum: ["new", "to_contact", "contacted", "to_visit", "visited", "not_interested", "deleted"]
         personalNotes:
           type: "string"
           nullable: true
@@ -161,7 +237,7 @@ components:
       properties:
         status:
           type: "string"
-          enum: ["new", "to_contact", "contacted", "to_visit", "visited", "deleted"]
+          enum: ["new", "to_contact", "contacted", "to_visit", "visited", "not_interested", "deleted"]
         personalNotes:
           type: "string"
 

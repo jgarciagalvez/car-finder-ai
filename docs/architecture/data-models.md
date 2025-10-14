@@ -9,7 +9,7 @@ This interface will be placed in the shared `packages/types` directory within ou
 
 ```typescript
 export type VehicleSource = 'otomoto' | 'olx';
-export type VehicleStatus = 'new' | 'to_contact' | 'contacted' | 'to_visit' | 'visited' | 'deleted';
+export type VehicleStatus = 'new' | 'to_contact' | 'contacted' | 'to_visit' | 'visited' | 'not_interested' | 'deleted';
 export type SellerType = 'private' | 'company' | null;
 
 export interface SellerInfo {
@@ -63,6 +63,9 @@ export interface Vehicle {
   updatedAt: Date;
 }
 ```
+**Status Field Notes:**
+- `'not_interested'`: Vehicle automatically filtered out during translation due to missing required features (see Story 2.4c). Can be manually re-translated via UI action button with force flag.
+
 **Relationships:**
 For the scope of the MVP, the Vehicle model is a self-contained entity. It has no direct relationships with other data models.
 

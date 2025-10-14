@@ -840,7 +840,6 @@ if (require.main === module) {
 export {
   main,
   parseArgs,
-  getRequiredAnalysisSteps,
   isRetryableError,
   getErrorType,
   listAnalysisLogs

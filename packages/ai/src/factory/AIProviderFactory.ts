@@ -87,12 +87,13 @@ export class AIProviderFactory {
 
   /**
    * Create provider from environment variables
+   * @param modelName Optional model name override (if not provided, uses AI_MODEL env var)
    */
-  public static createFromEnvironment(): IAIProvider {
+  public static createFromEnvironment(modelName?: string): IAIProvider {
     const provider = process.env.AI_PROVIDER || this.defaultProvider;
     const apiKey = this.getApiKeyFromEnvironment(provider);
-    const model = process.env.AI_MODEL;
-    
+    const model = modelName || process.env.AI_MODEL;
+
     const config: AIProviderConfig = {
       provider: provider as AIProviderConfig['provider'],
       apiKey,

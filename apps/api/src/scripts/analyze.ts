@@ -33,8 +33,8 @@ import * as crypto from 'crypto';
 // Load environment variables from the workspace root
 WorkspaceUtils.loadEnvFromRoot();
 
-// Analysis step types
-type AnalysisStep = 'translate' | 'sanity_check' | 'fit_score' | 'mechanic_report' | 'market_value' | 'priority_rating';
+// Analysis step types (translation removed - now handled by translate.ts)
+type AnalysisStep = 'sanity_check' | 'fit_score' | 'mechanic_report' | 'market_value' | 'priority_rating';
 
 interface AnalysisStats {
   totalVehicles: number;
@@ -55,6 +55,7 @@ interface AnalysisOptions {
   resume?: boolean;
   retryFailed?: string;
   showLogs?: boolean;
+  force?: boolean;
 }
 
 interface AnalysisRunLog {
@@ -114,16 +115,18 @@ function loadUserCriteria(): UserCriteria {
 /**
  * Determine which analysis steps are required for a vehicle
  * based on which fields are already populated (not null)
+ * Note: Translation is now handled separately by translate.ts
+ * @exported for testing
  */
-function getRequiredAnalysisSteps(vehicle: Vehicle): AnalysisStep[] {
+export function getRequiredAnalysisSteps(vehicle: Vehicle, force: boolean = false): AnalysisStep[] {
   const steps: AnalysisStep[] = [];
 
-  // Check each analysis field - if null, add corresponding step
-  // Translation is needed if description is missing (features can be empty array after translation)
-  if (!vehicle.description) {
-    steps.push('translate');
+  // If force flag is set, re-analyze all steps
+  if (force) {
+    return ['sanity_check', 'fit_score', 'mechanic_report', 'market_value', 'priority_rating'];
   }
 
+  // Check each analysis field - if null, add corresponding step
   if (!vehicle.aiDataSanityCheck) {
     steps.push('sanity_check');
   }
@@ -317,13 +320,13 @@ export class VehicleAnalyzer {
         console.error(`   • Vehicle ID is incorrect or malformed`);
         console.error(`   • Wrong database being used (check DATABASE_PATH env var)`);
         console.error(`\n💡 To ingest a vehicle, run:`);
-        console.error(`   pnpm --filter @car-finder/scripts ingest <vehicle-source-url>`);
+        console.error(`   pnpm ingest <vehicle-source-url>`);
         throw new Error(`Vehicle with ID ${options.vehicleId} not found in database`);
       }
 
-      // Check if this specific vehicle needs analysis
-      const requiredSteps = getRequiredAnalysisSteps(vehicle);
-      if (requiredSteps.length === 0) {
+      // Check if this specific vehicle needs analysis (or force re-analysis)
+      const requiredSteps = getRequiredAnalysisSteps(vehicle, options.force);
+      if (requiredSteps.length === 0 && !options.force) {
         console.log(`\n✅ Vehicle ${options.vehicleId} already has complete AI analysis:`);
         console.log(`   🌐 Translation: ${vehicle.description ? '✓ Present' : '✗ Missing'}`);
         console.log(`   📊 Personal Fit Score: ${vehicle.personalFitScore ?? 'N/A'}`);
@@ -331,6 +334,7 @@ export class VehicleAnalyzer {
         console.log(`   🔧 Mechanic Report: ${vehicle.aiMechanicReport ? '✓ Present' : '✗ Missing'}`);
         console.log(`   🔍 Data Sanity Check: ${vehicle.aiDataSanityCheck ? '✓ Present' : '✗ Missing'}`);
         console.log(`   💰 Market Value Score: ${vehicle.marketValueScore ?? 'N/A'}`);
+        console.log(`\n💡 To force re-analysis, use: pnpm analyze --vehicle-id ${options.vehicleId} --force`);
         return [];
       }
 
@@ -339,8 +343,19 @@ export class VehicleAnalyzer {
     }
 
     // Use resume-aware query that finds vehicles with ANY missing analysis field
+    // Note: Only analyze vehicles that have been translated (description is not null)
     console.log('🔍 Fetching vehicles needing analysis (resume-aware)...');
-    const vehicles = await this.vehicleRepository.findVehiclesNeedingAnalysis();
+    const allVehicles = await this.vehicleRepository.findVehiclesNeedingAnalysis();
+
+    // Filter to only include vehicles with description (pre-translated)
+    const vehicles = options.force
+      ? allVehicles
+      : allVehicles.filter(v => v.description && v.description.trim() !== '');
+
+    const skippedCount = allVehicles.length - vehicles.length;
+    if (skippedCount > 0) {
+      console.log(`⚠️  Skipping ${skippedCount} vehicle(s) without translation - run 'pnpm translate' first`);
+    }
 
     if (options.limit && options.limit > 0) {
       return vehicles.slice(0, options.limit);
@@ -353,8 +368,15 @@ export class VehicleAnalyzer {
    * Analyze a single vehicle
    */
   private async analyzeVehicle(vehicle: Vehicle, options: AnalysisOptions): Promise<void> {
-    // Get required steps for this vehicle (resume logic)
-    const requiredSteps = getRequiredAnalysisSteps(vehicle);
+    // Check if vehicle has been translated
+    if (!vehicle.description || vehicle.description.trim() === '') {
+      console.log('  ⚠️  Vehicle missing translation - run translate.ts first');
+      this.stats.skipped++;
+      return;
+    }
+
+    // Get required steps for this vehicle (resume logic or force re-analysis)
+    const requiredSteps = getRequiredAnalysisSteps(vehicle, options.force);
 
     if (requiredSteps.length === 0) {
       this.stats.skipped++;
@@ -365,8 +387,6 @@ export class VehicleAnalyzer {
     console.log(`  📋 Required steps: ${requiredSteps.join(', ')}`);
     this.runLog.vehiclesProcessed++;
     const analysis: {
-      description?: string;
-      features?: string[];
       personalFitScore?: number;
       marketValueScore?: string;
       aiPriorityRating?: number;
@@ -374,36 +394,6 @@ export class VehicleAnalyzer {
       aiMechanicReport?: string;
       aiDataSanityCheck?: string;
     } = {};
-
-    // 0. Translate vehicle content (must run FIRST to provide English content for other analyses)
-    if (requiredSteps.includes('translate')) {
-      try {
-        console.log('  🌐 Translating vehicle content (Polish → English)...');
-        const translation = await this.aiService.translateVehicleContent(vehicle);
-        analysis.description = translation.description;
-        analysis.features = translation.features;
-        console.log(`  ✓ Translation complete (${translation.features.length} features)`);
-      } catch (error) {
-        const err = error as Error;
-        console.error('  ❌ Failed to translate vehicle content:', err.message);
-
-        // Log failure to run log
-        this.runLog.failures.push({
-          vehicleId: vehicle.id,
-          vehicleTitle: vehicle.title,
-          vehicleUrl: vehicle.sourceUrl,
-          step: 'translate',
-          error: err.message,
-          errorType: getErrorType(err),
-          timestamp: new Date(),
-          retryable: isRetryableError(err),
-        });
-
-        throw err; // Re-throw to skip remaining steps
-      }
-    } else {
-      console.log('  ⏭️  Skipping translation (already complete)');
-    }
 
     // 1. Generate Data Sanity Check (should be first to detect issues)
     if (requiredSteps.includes('sanity_check') && !options.skipSanityCheck) {
@@ -587,7 +577,6 @@ export class VehicleAnalyzer {
   private generateRunLogSummary(): void {
     // Count failures by step
     const byStep: Record<AnalysisStep, number> = {
-      translate: 0,
       sanity_check: 0,
       fit_score: 0,
       mechanic_report: 0,
@@ -683,7 +672,6 @@ export class VehicleAnalyzer {
  */
 function parseArgs(): AnalysisOptions {
   const args = process.argv.slice(2);
-  console.log('🔍 Debug: Received arguments:', args);
   const options: AnalysisOptions = {
     resume: true, // Default to enabled
   };
@@ -707,6 +695,8 @@ function parseArgs(): AnalysisOptions {
       options.resume = true;
     } else if (arg === '--no-resume') {
       options.resume = false;
+    } else if (arg === '--force') {
+      options.force = true;
     } else if (arg === '--retry-failed' && i + 1 < args.length) {
       options.retryFailed = args[i + 1];
       i++;
@@ -728,28 +718,36 @@ function printHelp(): void {
   console.log(`
 Vehicle Analysis Script
 
+IMPORTANT: Vehicles must be translated first using 'pnpm translate' before running analysis.
+
+Workflow:
+  1. pnpm translate         # Translate vehicle content (Polish → English)
+  2. pnpm analyze           # Run AI analysis on translated vehicles
+
 Usage:
   pnpm analyze                                                   # Analyze all vehicles needing analysis (resume-aware)
   pnpm analyze --vehicle-id <id>                                 # Analyze specific vehicle
   pnpm analyze --limit 10                                        # Analyze only first 10 vehicles
+  pnpm analyze --force                                           # Force re-analysis of all steps
   pnpm analyze --skip-mechanic-report                            # Skip mechanic report generation
   pnpm analyze --skip-sanity-check                               # Skip sanity check generation
   pnpm analyze --skip-priority-rating                            # Skip priority rating generation
-  pnpm analyze --no-resume                                       # Disable resume logic (reanalyze all steps)
   pnpm analyze --show-logs                                       # List available analysis run logs
-  pnpm analyze --retry-failed <run-id>                           # Retry only failed vehicles from a previous run
   pnpm analyze --help                                            # Show this help message
+
+Flags:
+  --force       Re-analyze all steps even if already complete
 
 Environment Variables:
   GEMINI_API_KEY       Required. Your Gemini API key for AI analysis
   DATABASE_PATH        Optional. Path to database file (default: <root>/data/vehicles.db)
 
 Examples:
-  pnpm analyze                                                   # Analyze all vehicles (resume from where it left off)
+  pnpm analyze                                                   # Analyze all translated vehicles
   pnpm analyze --limit 5                                         # Analyze first 5 vehicles needing analysis
-  pnpm analyze --vehicle-id c9c93b5f246e8f0ce4e5d937871e5210    # Analyze specific vehicle
+  pnpm analyze --vehicle-id abc123                               # Analyze specific vehicle
+  pnpm analyze --force --vehicle-id abc123                       # Force re-analyze all steps
   pnpm analyze --show-logs                                       # View previous run logs
-  pnpm analyze --retry-failed f47ac10b-58cc-4372-a567-0e02b2c3d479  # Retry failed vehicles from a specific run
   `);
 }
 

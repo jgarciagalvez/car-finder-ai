@@ -17,6 +17,7 @@
     "type-check": "turbo type-check",
     "test": "turbo test",
     "ingest": "pnpm --filter @car-finder/api ingest",
+    "translate": "pnpm --filter @car-finder/api translate",
     "analyze": "pnpm --filter @car-finder/api analyze",
     "full-pipeline": "pnpm --filter @car-finder/api full-pipeline"
   },

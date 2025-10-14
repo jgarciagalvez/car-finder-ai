@@ -1,7 +1,7 @@
 // Vehicle-related types based on architecture specifications
 
 export type VehicleSource = 'otomoto' | 'olx';
-export type VehicleStatus = 'new' | 'to_contact' | 'contacted' | 'to_visit' | 'visited' | 'deleted';
+export type VehicleStatus = 'new' | 'to_contact' | 'contacted' | 'to_visit' | 'visited' | 'not_interested' | 'deleted';
 export type SellerType = 'private' | 'company' | null;
 
 export interface SellerInfo {

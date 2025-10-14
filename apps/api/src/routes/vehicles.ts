@@ -111,7 +111,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
       });
     }
 
-    if (status && !['new', 'to_contact', 'contacted', 'to_visit', 'visited', 'deleted'].includes(status)) {
+    if (status && !['new', 'to_contact', 'contacted', 'to_visit', 'visited', 'not_interested', 'deleted'].includes(status)) {
       return res.status(400).json({
         error: 'Bad request',
         message: 'Invalid status value'
@@ -175,6 +175,119 @@ router.patch('/:id', async (req: Request, res: Response) => {
     res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to update vehicle in database'
+    });
+  }
+});
+
+// POST /api/vehicles/:id/translate - Translate specific vehicle on-demand
+router.post('/:id/translate', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const force = req.query.force === 'true';
+
+    const vehicleRepository = await ServiceRegistry.getVehicleRepository();
+
+    // Check if vehicle exists
+    const vehicle = await vehicleRepository.findVehicleById(id);
+    if (!vehicle) {
+      return res.status(404).json({
+        error: 'Vehicle not found',
+        message: `No vehicle found with ID: ${id}`
+      });
+    }
+
+    // Dynamic import to avoid circular dependencies
+    const { VehicleTranslator } = await import('../scripts/translate');
+
+    // Run translation
+    const translator = await VehicleTranslator.create();
+    await translator.run({ vehicleId: id, force });
+
+    // Fetch updated vehicle
+    const updatedVehicle = await vehicleRepository.findVehicleById(id);
+    if (!updatedVehicle) {
+      return res.status(500).json({
+        error: 'Internal server error',
+        message: 'Translation completed but vehicle could not be retrieved'
+      });
+    }
+
+    res.status(202).json({
+      message: 'Translation completed successfully',
+      vehicle: {
+        id: updatedVehicle.id,
+        description: updatedVehicle.description,
+        features: updatedVehicle.features,
+        status: updatedVehicle.status,
+      }
+    });
+  } catch (error) {
+    console.error('Error translating vehicle:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Failed to translate vehicle'
+    });
+  }
+});
+
+// POST /api/vehicles/:id/analyze - Analyze specific vehicle on-demand
+router.post('/:id/analyze', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const force = req.query.force === 'true';
+
+    const vehicleRepository = await ServiceRegistry.getVehicleRepository();
+
+    // Check if vehicle exists
+    const vehicle = await vehicleRepository.findVehicleById(id);
+    if (!vehicle) {
+      return res.status(404).json({
+        error: 'Vehicle not found',
+        message: `No vehicle found with ID: ${id}`
+      });
+    }
+
+    // Check if vehicle is translated
+    if (!vehicle.description || vehicle.description.trim() === '') {
+      return res.status(400).json({
+        error: 'Bad request',
+        message: 'Vehicle must be translated before analysis. Call /translate endpoint first.'
+      });
+    }
+
+    // Dynamic import to avoid circular dependencies
+    const { VehicleAnalyzer } = await import('../scripts/analyze');
+
+    // Run analysis
+    const analyzer = await VehicleAnalyzer.create();
+    await analyzer.run({ vehicleId: id, force });
+
+    // Fetch updated vehicle
+    const updatedVehicle = await vehicleRepository.findVehicleById(id);
+    if (!updatedVehicle) {
+      return res.status(500).json({
+        error: 'Internal server error',
+        message: 'Analysis completed but vehicle could not be retrieved'
+      });
+    }
+
+    res.status(202).json({
+      message: 'Analysis completed successfully',
+      vehicle: {
+        id: updatedVehicle.id,
+        personalFitScore: updatedVehicle.personalFitScore,
+        marketValueScore: updatedVehicle.marketValueScore,
+        aiPriorityRating: updatedVehicle.aiPriorityRating,
+        aiPrioritySummary: updatedVehicle.aiPrioritySummary,
+        aiMechanicReport: updatedVehicle.aiMechanicReport,
+        aiDataSanityCheck: updatedVehicle.aiDataSanityCheck,
+      }
+    });
+  } catch (error) {
+    console.error('Error analyzing vehicle:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Failed to analyze vehicle'
     });
   }
 });

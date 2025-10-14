@@ -12,8 +12,9 @@
     "type-check": "tsc --noEmit",
     "test": "jest",
     "ingest": "tsx src/scripts/ingest.ts",
+    "translate": "tsx src/scripts/translate.ts",
     "analyze": "tsx src/scripts/analyze.ts",
-    "full-pipeline": "tsx src/scripts/ingest.ts && tsx src/scripts/analyze.ts"
+    "full-pipeline": "tsx src/scripts/ingest.ts && tsx src/scripts/translate.ts && tsx src/scripts/analyze.ts"
   },
   "dependencies": {
     "@car-finder/types": "workspace:*",

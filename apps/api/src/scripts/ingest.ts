@@ -328,7 +328,7 @@ export class IngestionPipeline {
         
         // Processed & normalized data
         title: vehicleData.sourceTitle || 'Unknown Vehicle', // Use sourceTitle as initial title
-        description: null, // Leave null - will be translated by analyze script
+        description: '', // Leave empty - will be translated by analyze script
         features: [], // Initially empty, to be translated by analyze script
         pricePln: vehicleData.pricePln || 0,
         priceEur: vehicleData.priceEur || 0,
@@ -493,7 +493,7 @@ export class IngestionPipeline {
 
       // Processed & normalized data
       title: vehicleData.title || vehicleData.sourceTitle || 'Unknown Vehicle',
-      description: null, // Leave null - will be translated by analyze script
+      description: '', // Leave empty - will be translated by analyze script
       features: vehicleData.features || [],
       pricePln,
       priceEur,

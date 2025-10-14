@@ -111,6 +111,8 @@ export class VehicleRepository {
       const dbUpdates: VehicleUpdate = {};
 
       // Map only the fields that are being updated
+      if (updates.description !== undefined) dbUpdates.description = updates.description;
+      if (updates.features !== undefined) dbUpdates.features = JSON.stringify(updates.features);
       if (updates.status !== undefined) dbUpdates.status = updates.status;
       if (updates.personalNotes !== undefined) dbUpdates.personalNotes = updates.personalNotes;
       if (updates.personalFitScore !== undefined) dbUpdates.personalFitScore = updates.personalFitScore;
@@ -253,6 +255,41 @@ export class VehicleRepository {
       return results.map(vehicle => this.mapDbVehicleToType(vehicle));
     } catch (error) {
       console.error('❌ Failed to find vehicles needing analysis:', error);
+      throw new Error(`Vehicle retrieval failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Find vehicles that need translation
+   * Returns vehicles where description OR features is null or empty
+   * @param force If true, return all vehicles (for forced re-translation)
+   */
+  async findVehiclesNeedingTranslation(force: boolean = false): Promise<VehicleType[]> {
+    try {
+      let query = this.db
+        .selectFrom('vehicles')
+        .selectAll()
+        .where('status', '!=', 'deleted')
+        .where('status', '!=', 'not_interested');
+
+      if (!force) {
+        // Only fetch vehicles without translation (missing description OR features)
+        query = query.where((eb) =>
+          eb.or([
+            eb('description', 'is', null),
+            eb('description', '=', ''),
+            eb('features', 'is', null),
+          ])
+        );
+      }
+
+      const results = await query
+        .orderBy('createdAt', 'desc')
+        .execute();
+
+      return results.map(vehicle => this.mapDbVehicleToType(vehicle));
+    } catch (error) {
+      console.error('❌ Failed to find vehicles needing translation:', error);
       throw new Error(`Vehicle retrieval failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -485,7 +522,7 @@ export class VehicleRepository {
       
       // Processed & normalized data
       title: dbVehicle.title,
-      description: dbVehicle.description,
+      description: dbVehicle.description || '',
       features: JSON.parse(dbVehicle.features),
       pricePln: dbVehicle.pricePln,
       priceEur: dbVehicle.priceEur,

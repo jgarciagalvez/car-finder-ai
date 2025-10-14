@@ -83,10 +83,11 @@ interface VehicleExtractedData {
 export class AIService {
   private provider: IAIProvider;
 
-  constructor() {
+  constructor(modelName?: string) {
     // Use factory to create provider from environment variables
     // This loads GEMINI_API_KEY and other settings from .env automatically
-    this.provider = AIProviderFactory.createFromEnvironment();
+    // If modelName is provided, it will override the default model from environment
+    this.provider = AIProviderFactory.createFromEnvironment(modelName);
   }
 
   /**
@@ -137,15 +138,6 @@ export class AIService {
           translatedEquipment: string[];
         }>(fullPrompt, prompt.outputFormat);
 
-        // DEBUG: Log AI response for translation debugging
-        console.log(`  🔍 DEBUG - AI Translation Response for ${vehicle.id}:`);
-        console.log(`     Description length: ${response.description?.length || 0} chars`);
-        console.log(`     Description preview: "${response.description?.substring(0, 80)}..."`);
-        console.log(`     Equipment translated: ${response.translatedEquipment?.length || 0} items`);
-        if (response.translatedEquipment && response.translatedEquipment.length > 0) {
-          console.log(`     Equipment preview: ${response.translatedEquipment.slice(0, 3).join(', ')}`);
-        }
-
         // If AI returns empty description, use placeholder
         if (!response.description || response.description.trim() === '') {
           console.warn(`  ⚠️  AI returned empty description for ${vehicle.id} - using placeholder`);
@@ -194,12 +186,6 @@ export class AIService {
           description: string;
           translatedEquipment: string[];
         }>(fullPrompt, prompt.outputFormat);
-
-        // DEBUG: Log AI response for translation debugging
-        console.log(`  🔍 DEBUG - AI Translation Response for ${vehicle.id}:`);
-        console.log(`     Description length: ${response.description?.length || 0} chars`);
-        console.log(`     Description preview: "${response.description?.substring(0, 80)}..."`);
-        console.log(`     Dictionary features: ${translated.length} items`);
 
         // If AI returns empty description, use placeholder
         if (!response.description || response.description.trim() === '') {

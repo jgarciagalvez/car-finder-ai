@@ -40,7 +40,7 @@ export interface VehicleTable {
   aiDataSanityCheck: string | null;
   
   // User workflow data
-  status: 'new' | 'to_contact' | 'contacted' | 'to_visit' | 'visited' | 'deleted';
+  status: 'new' | 'to_contact' | 'contacted' | 'to_visit' | 'visited' | 'not_interested' | 'deleted';
   personalNotes: string | null;
   
   // Timestamps
@@ -99,7 +99,7 @@ export const CREATE_VEHICLES_TABLE = `
     aiDataSanityCheck TEXT,
     
     -- User workflow data
-    status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'to_contact', 'contacted', 'to_visit', 'visited', 'deleted')),
+    status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'to_contact', 'contacted', 'to_visit', 'visited', 'not_interested', 'deleted')),
     personalNotes TEXT,
     
     -- Timestamps

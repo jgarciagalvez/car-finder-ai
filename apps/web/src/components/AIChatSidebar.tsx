@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, KeyboardEvent } from 'react';
 import { ChatMessage, ChatRequest, ChatResponse } from '@car-finder/types';
 // Fallback icons if Heroicons are not available
 const XMarkIcon = ({ className }: { className?: string }) => (
@@ -86,7 +86,7 @@ export function AIChatSidebar({ isOpen, onClose, context = { view: 'dashboard' }
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = (e: KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();

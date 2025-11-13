@@ -4,6 +4,7 @@ import { WorkspaceUtils } from '@car-finder/services';
 import { ScraperService } from './services/ScraperService';
 import { ParserService } from './services/ParserService';
 import vehiclesRouter from './routes/vehicles';
+import aiRouter from './routes/ai';
 
 // Load environment variables from workspace root
 WorkspaceUtils.loadEnvFromRoot();
@@ -29,6 +30,7 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use('/api/vehicles', vehiclesRouter);
+app.use('/api/ai', aiRouter);
 
 // Parser service demonstration endpoint
 app.post('/api/parse', async (req, res) => {

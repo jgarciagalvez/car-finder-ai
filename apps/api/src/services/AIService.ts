@@ -10,7 +10,7 @@
 
 import { AIProviderFactory, IAIProvider, PromptLoader, DictionaryLoader } from '@car-finder/ai';
 import { AIError, RateLimitError, ValidationError } from '@car-finder/ai';
-import { Vehicle } from '@car-finder/types';
+import { Vehicle, ChatMessage } from '@car-finder/types';
 
 /**
  * User criteria for Personal Fit Score analysis
@@ -61,6 +61,14 @@ export interface SanityCheckResult {
 export interface TranslationResult {
   description: string;
   features: string[];
+}
+
+/**
+ * Chat context
+ */
+export interface ChatContext {
+  view: 'dashboard' | 'detail';
+  vehicleId?: string;
 }
 
 /**
@@ -398,6 +406,89 @@ export class AIService {
       sourceParameters: sourceParams,
       sourceDescriptionHtml: vehicle.sourceDescriptionHtml,
     };
+  }
+
+  /**
+   * Generate conversational AI response for communication assistant
+   * Supports vehicle-specific context when viewing detail page
+   */
+  async chat(
+    context: ChatContext,
+    conversationHistory: ChatMessage[],
+    userMessage: string,
+    vehicleData?: Vehicle
+  ): Promise<string> {
+    try {
+      // Load prompt definition
+      const prompt = await PromptLoader.loadPrompt('communication-assistant');
+
+      // Build vehicle context for system message if vehicle data is provided
+      let systemMessageContent = prompt.raw || '';
+
+      if (vehicleData) {
+        systemMessageContent += `\n\n## Current Vehicle Context\n\n`;
+        systemMessageContent += `**Title**: ${vehicleData.title}\n`;
+        systemMessageContent += `**Price**: €${vehicleData.priceEur.toLocaleString()} / ${vehicleData.pricePln.toLocaleString()} PLN\n`;
+        systemMessageContent += `**Year**: ${vehicleData.year}\n`;
+        systemMessageContent += `**Mileage**: ${vehicleData.mileage.toLocaleString()} km\n`;
+
+        if (vehicleData.description) {
+          systemMessageContent += `**Description**: ${vehicleData.description.substring(0, 200)}...\n`;
+        }
+
+        if (vehicleData.sellerInfo) {
+          systemMessageContent += `**Seller**: ${vehicleData.sellerInfo.name || 'N/A'} (${vehicleData.sellerInfo.type || 'N/A'}) - ${vehicleData.sellerInfo.location || 'N/A'}\n`;
+        }
+
+        if (vehicleData.personalFitScore !== null) {
+          systemMessageContent += `**Personal Fit Score**: ${vehicleData.personalFitScore}/100\n`;
+        }
+
+        if (vehicleData.marketValueScore) {
+          systemMessageContent += `**Market Value**: ${vehicleData.marketValueScore}\n`;
+        }
+
+        if (vehicleData.aiPrioritySummary) {
+          systemMessageContent += `**AI Summary**: ${vehicleData.aiPrioritySummary}\n`;
+        }
+
+        systemMessageContent += `**Source URL**: ${vehicleData.sourceUrl}\n`;
+      }
+
+      // Build conversation messages array
+      // First message is the system message with the prompt and vehicle context
+      const messages: ChatMessage[] = [
+        {
+          role: 'user',
+          content: systemMessageContent,
+        },
+        {
+          role: 'model',
+          content: 'I understand. I am your multilingual automotive communication assistant, ready to help with drafting messages in Polish, translating responses, providing negotiation advice, and answering questions about vehicles.',
+        },
+        ...conversationHistory,
+        {
+          role: 'user',
+          content: userMessage,
+        },
+      ];
+
+      // Call AI provider with full conversation history
+      const response = await this.provider.chat(messages);
+
+      // Validate response
+      if (!response || response.trim() === '') {
+        throw new ValidationError('Empty response returned from AI provider');
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Error generating chat response:', error);
+      if (error instanceof AIError || error instanceof RateLimitError || error instanceof ValidationError) {
+        throw error;
+      }
+      throw new AIError(`Failed to generate chat response: ${(error as Error).message}`);
+    }
   }
 
   /**

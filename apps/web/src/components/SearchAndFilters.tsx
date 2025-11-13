@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { SortOption } from '@/lib/utils';
+import { VehicleStatus } from '@car-finder/types';
 
 // Icons
 const SearchIcon = ({ className }: { className?: string }) => (
@@ -27,22 +28,37 @@ const PlusIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const ArrowPathIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+  </svg>
+);
+
 interface SearchAndFiltersProps {
   searchQuery?: string;
-  onSearchChange?: (query: string) => void;
+  onSearchChange?: (_query: string) => void;
   onScrapeNew?: () => void;
+  onRefresh?: () => void;
   vehicleCount?: number;
+  totalCount?: number;
+  sortBy?: SortOption;
+  onSortChange?: (_sortBy: SortOption) => void;
+  statusFilter?: VehicleStatus[] | null;
+  onStatusFilterChange?: (_statusFilter: VehicleStatus[] | null) => void;
 }
 
-export function SearchAndFilters({ 
-  searchQuery = '', 
-  onSearchChange, 
+export function SearchAndFilters({
+  searchQuery = '',
+  onSearchChange,
   onScrapeNew,
-  vehicleCount = 0 
+  onRefresh,
+  vehicleCount = 0,
+  totalCount,
+  sortBy = 'priority',
+  onSortChange,
+  statusFilter = null,
+  onStatusFilterChange
 }: SearchAndFiltersProps) {
-  const [aiPriority, setAiPriority] = useState('all');
-  const [status, setStatus] = useState('all');
-
   return (
     <div className="bg-white shadow-sm border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -50,16 +66,32 @@ export function SearchAndFilters({
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Car Finder AI</h2>
-            <p className="text-gray-600 mt-1">{vehicleCount} cars found</p>
+            <p className="text-gray-600 mt-1">
+              {statusFilter && statusFilter.length > 0 && totalCount !== undefined ? (
+                <>Showing {vehicleCount} of {totalCount} cars</>
+              ) : (
+                <>{vehicleCount} cars found</>
+              )}
+            </p>
           </div>
           
-          <button
-            onClick={onScrapeNew}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
-          >
-            <PlusIcon className="w-4 h-4" />
-            <span>Scrape New Listings</span>
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={onRefresh}
+              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+              title="Refresh vehicle list"
+            >
+              <ArrowPathIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+            <button
+              onClick={onScrapeNew}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+            >
+              <PlusIcon className="w-4 h-4" />
+              <span>Scrape New Listings</span>
+            </button>
+          </div>
         </div>
 
         {/* Search and Filters */}
@@ -76,19 +108,23 @@ export function SearchAndFilters({
             />
           </div>
 
-          {/* Filters */}
+          {/* Filters and Sorting */}
           <div className="flex gap-3">
-            {/* AI Priority Filter */}
+            {/* Sort Dropdown */}
             <div className="relative">
               <select
-                value={aiPriority}
-                onChange={(e) => setAiPriority(e.target.value)}
+                value={sortBy}
+                onChange={(e) => onSortChange?.(e.target.value as SortOption)}
                 className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-3 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="all">AI Priority</option>
-                <option value="high">High Priority</option>
-                <option value="medium">Medium Priority</option>
-                <option value="low">Low Priority</option>
+                <option value="priority">Sort: Priority</option>
+                <option value="price_asc">Sort: Price (Low to High)</option>
+                <option value="price_desc">Sort: Price (High to Low)</option>
+                <option value="year_desc">Sort: Year (Newest)</option>
+                <option value="year_asc">Sort: Year (Oldest)</option>
+                <option value="mileage_asc">Sort: Mileage (Lowest)</option>
+                <option value="mileage_desc">Sort: Mileage (Highest)</option>
+                <option value="personal_fit">Sort: Personal Fit</option>
               </select>
               <ChevronDownIcon className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             </div>
@@ -96,8 +132,15 @@ export function SearchAndFilters({
             {/* Status Filter */}
             <div className="relative">
               <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
+                value={statusFilter && statusFilter.length === 1 ? statusFilter[0] : 'all'}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === 'all') {
+                    onStatusFilterChange?.(null);
+                  } else {
+                    onStatusFilterChange?.([value as VehicleStatus]);
+                  }
+                }}
                 className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-3 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">All Status</option>
@@ -106,8 +149,15 @@ export function SearchAndFilters({
                 <option value="contacted">Contacted</option>
                 <option value="to_visit">To Visit</option>
                 <option value="visited">Visited</option>
+                <option value="not_interested">Not Interested</option>
+                <option value="deleted">Deleted</option>
               </select>
               <ChevronDownIcon className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              {statusFilter && statusFilter.length > 0 && (
+                <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {statusFilter.length}
+                </span>
+              )}
             </div>
 
             {/* Advanced Filters Button */}

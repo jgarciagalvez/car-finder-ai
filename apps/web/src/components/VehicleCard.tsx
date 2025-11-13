@@ -1,9 +1,21 @@
 'use client';
 
 import { Vehicle } from '@car-finder/types';
-import { formatPrice, formatMileage, formatYear, getStatusColor, getStatusLabel } from '@/lib/utils';
+import {
+  formatPrice,
+  formatMileage,
+  formatYear,
+  getStatusColor,
+  getStatusLabel,
+  getScoreColor,
+  getScoreTextColor,
+  getMarketValueColor,
+  getMarketValueTextColor,
+  formatMarketValue
+} from '@/lib/utils';
+import { useVehicles } from '@/hooks/useVehicles';
 import Link from 'next/link';
-import { useState } from 'react';
+import React, { useState, MouseEvent } from 'react';
 // Fallback icons if Heroicons are not available
 const ChevronLeftIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -29,38 +41,160 @@ interface VehicleCardProps {
 
 export function VehicleCard({ vehicle }: VehicleCardProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
+  const [notes, setNotes] = useState(vehicle.personalNotes || '');
+  const [isNotesExpanded, setIsNotesExpanded] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
+  const { forceTranslateVehicle, forceAnalyzeVehicle, updateVehicle } = useVehicles();
   const photos = vehicle.photos.length > 0 ? vehicle.photos : [];
 
-  const nextImage = (e: React.MouseEvent) => {
+  const nextImage = (e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setCurrentImageIndex((prev) => (prev + 1) % photos.length);
+    setImageError(false); // Reset error when changing images
   };
 
-  const prevImage = (e: React.MouseEvent) => {
+  const prevImage = (e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setCurrentImageIndex((prev) => (prev - 1 + photos.length) % photos.length);
+    setImageError(false); // Reset error when changing images
   };
 
-  const openOriginalPost = (e: React.MouseEvent) => {
+  const openOriginalPost = (e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     window.open(vehicle.sourceUrl, '_blank');
   };
 
+  const handleForceTranslate = async (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!confirm('Force re-translate this vehicle? This will use AI credits.')) return;
+
+    try {
+      setIsTranslating(true);
+      setActionError(null);
+      setActionSuccess(null);
+      await forceTranslateVehicle(vehicle.id);
+      setActionSuccess('Vehicle translated successfully!');
+      setTimeout(() => setActionSuccess(null), 3000);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Translation failed');
+      setTimeout(() => setActionError(null), 5000);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  const handleForceAnalyze = async (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!confirm('Force re-analyze this vehicle? This will use AI credits.')) return;
+
+    try {
+      setIsAnalyzing(true);
+      setActionError(null);
+      setActionSuccess(null);
+      await forceAnalyzeVehicle(vehicle.id);
+      setActionSuccess('Vehicle analyzed successfully!');
+      setTimeout(() => setActionSuccess(null), 3000);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Analysis failed');
+      setTimeout(() => setActionError(null), 5000);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleStatusChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const newStatus = e.target.value;
+
+    try {
+      setIsUpdatingStatus(true);
+      setActionError(null);
+      setActionSuccess(null);
+      await updateVehicle(vehicle.id, { status: newStatus });
+      setActionSuccess('Status updated successfully!');
+      setTimeout(() => setActionSuccess(null), 2000);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Status update failed');
+      setTimeout(() => setActionError(null), 5000);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleSaveNotes = async (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    try {
+      setIsSavingNotes(true);
+      setActionError(null);
+      setActionSuccess(null);
+      await updateVehicle(vehicle.id, { personalNotes: notes || '' });
+      setActionSuccess('Notes saved successfully!');
+      setTimeout(() => setActionSuccess(null), 2000);
+      setIsNotesExpanded(false);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Failed to save notes');
+      setTimeout(() => setActionError(null), 5000);
+    } finally {
+      setIsSavingNotes(false);
+    }
+  };
+
+  const handleCancelNotes = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setNotes(vehicle.personalNotes || '');
+    setIsNotesExpanded(false);
+  };
+
+  // Show action buttons for not_interested status or incomplete AI data
+  const showActions =
+    vehicle.status === 'not_interested' ||
+    !vehicle.description ||
+    !vehicle.aiPriorityRating;
+
   return (
-    <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden">
+    <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden relative">
+      {/* Action notifications */}
+      {actionSuccess && (
+        <div className="absolute top-2 right-2 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-10 text-sm">
+          {actionSuccess}
+        </div>
+      )}
+      {actionError && (
+        <div className="absolute top-2 right-2 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-10 text-sm">
+          {actionError}
+        </div>
+      )}
+
       <div className="flex flex-col lg:flex-row">
         {/* Image Carousel Section */}
         <div className="lg:w-80 lg:flex-shrink-0">
           <div className="aspect-video lg:aspect-square bg-gray-200 relative">
-            {photos.length > 0 ? (
+            {photos.length > 0 && !imageError ? (
               <>
                 <img
                   src={photos[currentImageIndex]}
                   alt={vehicle.title}
                   className="w-full h-full object-cover"
+                  loading="lazy"
+                  onError={() => setImageError(true)}
                 />
                 
                 {/* Image Navigation */}
@@ -89,8 +223,11 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
                 )}
               </>
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-500">
-                No Image Available
+              <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 bg-gradient-to-br from-gray-100 to-gray-200">
+                <svg className="w-16 h-16 mb-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span className="text-sm">{imageError ? 'Image Failed to Load' : 'No Image Available'}</span>
               </div>
             )}
             
@@ -164,77 +301,193 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
 
           {/* AI Scores Row */}
           <div className="flex gap-4 mb-4">
-            {/* AI Priority Score */}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center min-w-[80px]">
-              <div className="text-2xl font-bold text-green-600">
-                {vehicle.personalFitScore || 96}
+            {/* AI Priority Rating */}
+            <div className={`border rounded-lg p-4 text-center min-w-[80px] ${getScoreColor(vehicle.aiPriorityRating)}`}>
+              <div className={`text-2xl font-bold ${getScoreTextColor(vehicle.aiPriorityRating)}`}>
+                {vehicle.aiPriorityRating ?? 'N/A'}
               </div>
-              <div className="text-xs text-green-700 font-medium">AI Priority</div>
+              <div className="text-xs font-medium">AI Priority</div>
             </div>
 
             {/* Personal Fit Score */}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center min-w-[80px]">
-              <div className="text-2xl font-bold text-green-600">
-                {vehicle.aiPriorityRating || 94}
+            <div className={`border rounded-lg p-4 text-center min-w-[80px] ${getScoreColor(vehicle.personalFitScore)}`}>
+              <div className={`text-2xl font-bold ${getScoreTextColor(vehicle.personalFitScore)}`}>
+                {vehicle.personalFitScore ?? 'N/A'}
               </div>
-              <div className="text-xs text-green-700 font-medium">Personal Fit</div>
+              <div className="text-xs font-medium">Personal Fit</div>
             </div>
 
             {/* Market Value */}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center min-w-[80px]">
-              <div className="text-2xl font-bold text-green-600 flex items-center justify-center">
+            <div className={`border rounded-lg p-4 text-center min-w-[80px] ${getMarketValueColor(vehicle.marketValueScore)}`}>
+              <div className={`text-2xl font-bold ${getMarketValueTextColor(vehicle.marketValueScore)} flex items-center justify-center`}>
                 <span className="text-sm mr-1">📈</span>
-                {vehicle.marketValueScore || '15%'}
+                {formatMarketValue(vehicle.marketValueScore)}
               </div>
-              <div className="text-xs text-green-700 font-medium">vs Market</div>
+              <div className="text-xs font-medium">vs Market</div>
             </div>
           </div>
 
           {/* AI Summary */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-            <p className="text-sm text-blue-800">
-              {vehicle.aiPrioritySummary || 'Excellent condition Ducato Maxi with very low mileage. Perfect for camper conversion. Loaded with features. Price is exceptional for the condition.'}
-            </p>
+          {vehicle.aiPrioritySummary && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-blue-800">
+                {vehicle.aiPrioritySummary}
+              </p>
+            </div>
+          )}
+
+          {/* Personal Notes Section */}
+          <div className="mb-4">
+            {!isNotesExpanded ? (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsNotesExpanded(true);
+                }}
+                className="w-full text-left bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                {vehicle.personalNotes ? (
+                  <>
+                    <div className="font-medium text-gray-700 mb-1">📝 Personal Notes</div>
+                    <div className="line-clamp-2">{vehicle.personalNotes}</div>
+                  </>
+                ) : (
+                  <span className="text-gray-500">💭 Add personal notes...</span>
+                )}
+              </button>
+            ) : (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <div className="font-medium text-gray-700 mb-2">📝 Personal Notes</div>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  placeholder="Add your thoughts, questions, or reminders about this vehicle..."
+                  className="w-full border border-gray-300 rounded p-2 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows={4}
+                  disabled={isSavingNotes}
+                />
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={handleSaveNotes}
+                    disabled={isSavingNotes}
+                    className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    {isSavingNotes ? (
+                      <>
+                        <div className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full"></div>
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      'Save Notes'
+                    )}
+                  </button>
+                  <button
+                    onClick={handleCancelNotes}
+                    disabled={isSavingNotes}
+                    className="px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Bottom Row: Features and Status */}
           <div className="flex justify-between items-end">
             {/* Features */}
             <div className="flex flex-wrap gap-2 flex-1">
-              {vehicle.features.length > 0 ? (
-                vehicle.features.slice(0, 5).map((feature, index) => (
-                  <span
-                    key={index}
-                    className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-medium"
-                  >
-                    {feature.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                  </span>
-                ))
-              ) : (
+              {vehicle.features && vehicle.features.length > 0 ? (
                 <>
-                  <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-medium">Klimatyzacja</span>
-                  <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-medium">Tempomat</span>
-                  <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-medium">Elektryczne szyby</span>
-                  <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-medium">Bluetooth</span>
-                  <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">+6 more</span>
+                  {vehicle.features.slice(0, 5).map((feature, index) => (
+                    <span
+                      key={index}
+                      className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-medium"
+                    >
+                      {feature.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </span>
+                  ))}
+                  {vehicle.features.length > 5 && (
+                    <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">
+                      +{vehicle.features.length - 5} more
+                    </span>
+                  )}
                 </>
+              ) : (
+                <span className="text-sm text-gray-500">No features listed</span>
               )}
             </div>
 
             {/* Status Dropdown */}
-            <div className="ml-4">
-              <select 
-                className="bg-white border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                defaultValue={vehicle.status}
+            <div className="ml-4 flex items-center gap-2">
+              <select
+                className="bg-white border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                value={vehicle.status}
+                onChange={handleStatusChange}
+                disabled={isUpdatingStatus}
               >
                 <option value="new">New</option>
                 <option value="to_contact">To Contact</option>
                 <option value="contacted">Contacted</option>
                 <option value="to_visit">To Visit</option>
                 <option value="visited">Visited</option>
+                <option value="not_interested">Not Interested</option>
+                <option value="deleted">Deleted</option>
               </select>
+              {isUpdatingStatus && (
+                <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+              )}
             </div>
           </div>
+
+          {/* Action Buttons (shown for not_interested or incomplete AI data) */}
+          {showActions && (
+            <div className="mt-4 pt-4 border-t border-gray-200 flex gap-2">
+              <button
+                onClick={handleForceTranslate}
+                disabled={isTranslating}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 rounded-lg transition-colors"
+                title="Force re-translate this vehicle description"
+              >
+                {isTranslating ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full"></div>
+                    <span>Translating...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                    </svg>
+                    <span>Force Translate</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleForceAnalyze}
+                disabled={isAnalyzing}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 rounded-lg transition-colors"
+                title="Force re-analyze this vehicle with AI"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full"></div>
+                    <span>Analyzing...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    <span>Force Analyze</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

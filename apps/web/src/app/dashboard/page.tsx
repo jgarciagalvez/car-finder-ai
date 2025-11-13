@@ -17,7 +17,7 @@ const ChatBubbleLeftRightIcon = ({ className }: { className?: string }) => (
 export default function DashboardPage() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const { vehicles, loading, error, refetch } = useVehicles();
+  const { vehicles, allVehicles, refetch, sortBy, setSortBy, statusFilter, setStatusFilter } = useVehicles();
 
   const handleRefresh = () => {
     refetch();
@@ -58,7 +58,13 @@ export default function DashboardPage() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onScrapeNew={handleScrapeNew}
+          onRefresh={handleRefresh}
           vehicleCount={vehicles.length}
+          totalCount={allVehicles.length}
+          sortBy={sortBy}
+          onSortChange={setSortBy}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
         />
 
         {/* Vehicle Dashboard */}

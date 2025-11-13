@@ -1,27 +1,57 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useVehicleContext } from '@/context/VehicleContext';
-import { fetchVehicles, fetchVehicleById, updateVehicle as updateVehicleApi, ApiError } from '@/lib/api';
+import {
+  fetchVehicles,
+  fetchVehicleById,
+  updateVehicle as updateVehicleApi,
+  translateVehicle as translateVehicleApi,
+  analyzeVehicle as analyzeVehicleApi,
+  ApiError
+} from '@/lib/api';
 import { Vehicle } from '@car-finder/types';
+import { sortVehicles } from '@/lib/utils';
 
 export function useVehicles() {
-  const { state, setLoading, setVehicles, setError, clearError } = useVehicleContext();
+  const { state, setLoading, setVehicles, appendVehicles, setError, clearError, setSortBy, setStatusFilter, updateVehicle: updateVehicleInContext } = useVehicleContext();
 
   const loadVehicles = useCallback(async () => {
     try {
       setLoading(true);
       clearError();
-      const vehicles = await fetchVehicles();
-      setVehicles(vehicles);
+      const response = await fetchVehicles({ offset: 0, limit: 50 });
+      setVehicles(response.vehicles, response.pagination.hasMore, response.pagination.total);
     } catch (error) {
       if (error instanceof ApiError) {
         setError(`Failed to load vehicles: ${error.message}`);
       } else {
         setError('Failed to load vehicles: Unknown error occurred');
       }
+    } finally {
+      setLoading(false);
     }
   }, [setLoading, setVehicles, setError, clearError]);
+
+  const loadMoreVehicles = useCallback(async () => {
+    if (!state.hasMore || state.loading) return;
+
+    try {
+      setLoading(true);
+      clearError();
+      const currentOffset = state.vehicles.length;
+      const response = await fetchVehicles({ offset: currentOffset, limit: 50 });
+      appendVehicles(response.vehicles, response.pagination.hasMore, response.pagination.total);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setError(`Failed to load more vehicles: ${error.message}`);
+      } else {
+        setError('Failed to load more vehicles: Unknown error occurred');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [state.hasMore, state.loading, state.vehicles.length, setLoading, appendVehicles, setError, clearError]);
 
   const loadVehicleById = useCallback(async (id: string): Promise<Vehicle | null> => {
     try {
@@ -42,41 +72,101 @@ export function useVehicles() {
   }, [setLoading, setError, clearError]);
 
   const updateVehicle = useCallback(async (
-    id: string, 
+    id: string,
     updates: { status?: string; personalNotes?: string }
-  ): Promise<boolean> => {
+  ): Promise<Vehicle | null> => {
     try {
       setLoading(true);
       clearError();
       const updatedVehicle = await updateVehicleApi(id, updates);
-      // The context will handle updating the vehicle in state
-      return true;
+      updateVehicleInContext(updatedVehicle);
+      return updatedVehicle;
     } catch (error) {
       if (error instanceof ApiError) {
         setError(`Failed to update vehicle: ${error.message}`);
       } else {
         setError('Failed to update vehicle: Unknown error occurred');
       }
-      return false;
+      throw error; // Re-throw so caller can handle it
     } finally {
       setLoading(false);
     }
-  }, [setLoading, setError, clearError]);
+  }, [setLoading, setError, clearError, updateVehicleInContext]);
 
-  // Auto-load vehicles on mount
+  const forceTranslateVehicle = useCallback(async (vehicleId: string): Promise<void> => {
+    try {
+      setLoading(true);
+      clearError();
+      const updatedVehicle = await translateVehicleApi(vehicleId, true);
+      updateVehicleInContext(updatedVehicle);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setError(`Failed to translate vehicle: ${error.message}`);
+      } else {
+        setError('Failed to translate vehicle: Unknown error occurred');
+      }
+      throw error; // Re-throw so the caller can handle it
+    } finally {
+      setLoading(false);
+    }
+  }, [setLoading, clearError, updateVehicleInContext, setError]);
+
+  const forceAnalyzeVehicle = useCallback(async (vehicleId: string): Promise<void> => {
+    try {
+      setLoading(true);
+      clearError();
+      const updatedVehicle = await analyzeVehicleApi(vehicleId, true);
+      updateVehicleInContext(updatedVehicle);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setError(`Failed to analyze vehicle: ${error.message}`);
+      } else {
+        setError('Failed to analyze vehicle: Unknown error occurred');
+      }
+      throw error; // Re-throw so the caller can handle it
+    } finally {
+      setLoading(false);
+    }
+  }, [setLoading, clearError, updateVehicleInContext, setError]);
+
+  // Auto-load vehicles on mount (only once)
   useEffect(() => {
     loadVehicles();
-  }, [loadVehicles]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array - only run once on mount
+
+  // Apply sorting and filtering
+  const filteredVehicles = useMemo(() => {
+    // First sort the vehicles
+    const sorted = sortVehicles(state.vehicles, state.sortBy);
+
+    // Then apply status filter if active
+    if (state.statusFilter && state.statusFilter.length > 0) {
+      return sorted.filter(v => state.statusFilter!.includes(v.status));
+    }
+
+    return sorted;
+  }, [state.vehicles, state.sortBy, state.statusFilter]);
 
   return {
-    vehicles: state.vehicles,
+    vehicles: filteredVehicles,
+    allVehicles: state.vehicles, // Expose unfiltered count
     loading: state.loading,
     error: state.error,
     selectedVehicle: state.selectedVehicle,
+    sortBy: state.sortBy,
+    statusFilter: state.statusFilter,
+    hasMore: state.hasMore,
+    total: state.total,
     loadVehicles,
+    loadMoreVehicles,
     loadVehicleById,
     updateVehicle,
     clearError,
+    setSortBy,
+    setStatusFilter,
+    forceTranslateVehicle,
+    forceAnalyzeVehicle,
     refetch: loadVehicles, // Alias for refetching data
   };
 }

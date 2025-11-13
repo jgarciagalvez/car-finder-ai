@@ -2,11 +2,44 @@
 
 import { useVehicles } from '@/hooks/useVehicles';
 import { VehicleCard } from './VehicleCard';
+import { useRef, useEffect, useCallback } from 'react';
 
 export function VehicleDashboard() {
-  const { vehicles, loading, error, clearError } = useVehicles();
+  const { vehicles, allVehicles, loading, error, clearError, statusFilter, hasMore, loadMoreVehicles } = useVehicles();
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
-  if (loading) {
+  // Infinite scroll with Intersection Observer
+  const handleLoadMore = useCallback(() => {
+    if (hasMore && !loading) {
+      loadMoreVehicles();
+    }
+  }, [hasMore, loading, loadMoreVehicles]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const target = entries[0];
+        if (target.isIntersecting) {
+          handleLoadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentRef = loadMoreRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, [handleLoadMore]);
+
+  // Only show full loading spinner on initial load (when no vehicles are loaded yet)
+  if (loading && allVehicles.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-64">
         <div className="text-center">
@@ -42,14 +75,22 @@ export function VehicleDashboard() {
   }
 
   if (vehicles.length === 0) {
+    // Check if there are vehicles but they're filtered out
+    const isFiltered = statusFilter && statusFilter.length > 0 && allVehicles.length > 0;
+
     return (
       <div className="text-center py-12">
         <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
         </svg>
-        <h3 className="mt-2 text-sm font-medium text-gray-900">No vehicles found</h3>
+        <h3 className="mt-2 text-sm font-medium text-gray-900">
+          {isFiltered ? 'No vehicles match your filter' : 'No vehicles found'}
+        </h3>
         <p className="mt-1 text-sm text-gray-500">
-          No vehicles have been scraped yet. Run the ingestion script to populate the database.
+          {isFiltered
+            ? 'Try selecting a different status filter to see more vehicles.'
+            : 'No vehicles have been scraped yet. Run the ingestion script to populate the database.'
+          }
         </p>
       </div>
     );
@@ -61,6 +102,31 @@ export function VehicleDashboard() {
       {vehicles.map((vehicle) => (
         <VehicleCard key={vehicle.id} vehicle={vehicle} />
       ))}
+
+      {/* Infinite scroll sentinel element */}
+      {hasMore && (
+        <div ref={loadMoreRef} className="flex items-center justify-center py-8">
+          {loading ? (
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-2 text-sm text-gray-600">Loading more vehicles...</p>
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500">Scroll to load more</div>
+          )}
+        </div>
+      )}
+
+      {/* End of results indicator */}
+      {!hasMore && allVehicles.length > 0 && (
+        <div className="text-center py-8 text-sm text-gray-500 border-t border-gray-200">
+          {statusFilter && statusFilter.length > 0 ? (
+            <>Showing {vehicles.length} of {allVehicles.length} vehicles</>
+          ) : (
+            <>All vehicles loaded ({allVehicles.length} total)</>
+          )}
+        </div>
+      )}
     </div>
   );
 }

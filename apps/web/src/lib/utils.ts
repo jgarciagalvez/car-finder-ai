@@ -1,5 +1,16 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { Vehicle } from '@car-finder/types';
+
+export type SortOption =
+  | 'priority'
+  | 'price_asc'
+  | 'price_desc'
+  | 'year_desc'
+  | 'year_asc'
+  | 'mileage_asc'
+  | 'mileage_desc'
+  | 'personal_fit';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -48,9 +59,103 @@ export function getStatusLabel(status: string): string {
       return 'To Visit';
     case 'visited':
       return 'Visited';
+    case 'not_interested':
+      return 'Not Interested';
     case 'deleted':
       return 'Deleted';
     default:
       return status;
   }
+}
+
+// Score color coding helpers
+export function getScoreColor(score: number | null): string {
+  if (score === null) return 'bg-gray-50 border-gray-200 text-gray-600';
+
+  if (score >= 80) return 'bg-green-50 border-green-200 text-green-700';
+  if (score >= 60) return 'bg-yellow-50 border-yellow-200 text-yellow-700';
+  return 'bg-red-50 border-red-200 text-red-700';
+}
+
+export function getScoreTextColor(score: number | null): string {
+  if (score === null) return 'text-gray-600';
+
+  if (score >= 80) return 'text-green-600';
+  if (score >= 60) return 'text-yellow-600';
+  return 'text-red-600';
+}
+
+export function getMarketValueColor(marketValue: string | null): string {
+  if (!marketValue) return 'bg-gray-50 border-gray-200 text-gray-600';
+
+  // Good deal (negative percentage means below market)
+  if (marketValue.startsWith('-')) return 'bg-green-50 border-green-200 text-green-700';
+
+  // Market average
+  if (marketValue === 'market_avg') return 'bg-gray-50 border-gray-200 text-gray-600';
+
+  // Overpriced (positive percentage means above market)
+  return 'bg-red-50 border-red-200 text-red-700';
+}
+
+export function getMarketValueTextColor(marketValue: string | null): string {
+  if (!marketValue) return 'text-gray-600';
+
+  if (marketValue.startsWith('-')) return 'text-green-600';
+  if (marketValue === 'market_avg') return 'text-gray-600';
+  return 'text-red-600';
+}
+
+export function formatMarketValue(marketValue: string | null): string {
+  if (!marketValue) return 'N/A';
+  if (marketValue === 'market_avg') return 'Market';
+  return marketValue;
+}
+
+// Sorting functions
+export function sortVehicles(vehicles: Vehicle[], sortBy: SortOption): Vehicle[] {
+  const sorted = [...vehicles]; // Create copy to avoid mutation
+
+  // Helper to push not_interested and deleted to end
+  const pushUnwantedToEnd = (a: Vehicle, b: Vehicle): number => {
+    const aUnwanted = a.status === 'not_interested' || a.status === 'deleted';
+    const bUnwanted = b.status === 'not_interested' || b.status === 'deleted';
+
+    if (aUnwanted && !bUnwanted) return 1;  // a goes after b
+    if (!aUnwanted && bUnwanted) return -1; // a goes before b
+    return 0; // Both wanted or both unwanted, continue with normal sort
+  };
+
+  sorted.sort((a, b) => {
+    // First, check for unwanted statuses (only for priority sort)
+    if (sortBy === 'priority') {
+      const unwantedSort = pushUnwantedToEnd(a, b);
+      if (unwantedSort !== 0) return unwantedSort;
+    }
+
+    // Then apply the specific sort logic
+    switch (sortBy) {
+      case 'priority':
+        return (b.aiPriorityRating ?? b.personalFitScore ?? 0) -
+               (a.aiPriorityRating ?? a.personalFitScore ?? 0);
+      case 'price_asc':
+        return a.priceEur - b.priceEur;
+      case 'price_desc':
+        return b.priceEur - a.priceEur;
+      case 'year_desc':
+        return b.year - a.year;
+      case 'year_asc':
+        return a.year - b.year;
+      case 'mileage_asc':
+        return a.mileage - b.mileage;
+      case 'mileage_desc':
+        return b.mileage - a.mileage;
+      case 'personal_fit':
+        return (b.personalFitScore ?? 0) - (a.personalFitScore ?? 0);
+      default:
+        return 0;
+    }
+  });
+
+  return sorted;
 }

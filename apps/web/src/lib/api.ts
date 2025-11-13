@@ -2,24 +2,41 @@ import { Vehicle } from '@car-finder/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
 
+export interface PaginationMetadata {
+  offset: number;
+  limit: number;
+  total: number;
+  hasMore: boolean;
+}
+
+export interface VehiclesResponse {
+  vehicles: Vehicle[];
+  pagination: PaginationMetadata;
+}
+
 export class ApiError extends Error {
+  public status: number;
+  public response?: any;
+
   constructor(
     message: string,
-    public status: number,
-    public response?: any
+    status: number,
+    response?: any
   ) {
     super(message);
     this.name = 'ApiError';
+    this.status = status;
+    this.response = response;
   }
 }
 
 async function apiRequest<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: globalThis.RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
-  
-  const config: RequestInit = {
+
+  const config: globalThis.RequestInit = {
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,
@@ -54,8 +71,20 @@ async function apiRequest<T>(
 }
 
 // Vehicle API functions
-export async function fetchVehicles(): Promise<Vehicle[]> {
-  return apiRequest<Vehicle[]>('/api/vehicles');
+export async function fetchVehicles(options?: { offset?: number; limit?: number }): Promise<VehiclesResponse> {
+  const params = new URLSearchParams();
+
+  if (options?.offset !== undefined) {
+    params.append('offset', options.offset.toString());
+  }
+  if (options?.limit !== undefined) {
+    params.append('limit', options.limit.toString());
+  }
+
+  const queryString = params.toString();
+  const endpoint = `/api/vehicles${queryString ? `?${queryString}` : ''}`;
+
+  return apiRequest<VehiclesResponse>(endpoint);
 }
 
 export async function fetchVehicleById(id: string): Promise<Vehicle> {
@@ -63,13 +92,23 @@ export async function fetchVehicleById(id: string): Promise<Vehicle> {
 }
 
 export async function updateVehicle(
-  id: string, 
+  id: string,
   updates: { status?: string; personalNotes?: string }
 ): Promise<Vehicle> {
   return apiRequest<Vehicle>(`/api/vehicles/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(updates),
   });
+}
+
+export async function translateVehicle(vehicleId: string, force: boolean = false): Promise<Vehicle> {
+  const url = `/api/vehicles/${vehicleId}/translate${force ? '?force=true' : ''}`;
+  return apiRequest<Vehicle>(url, { method: 'POST' });
+}
+
+export async function analyzeVehicle(vehicleId: string, force: boolean = false): Promise<Vehicle> {
+  const url = `/api/vehicles/${vehicleId}/analyze${force ? '?force=true' : ''}`;
+  return apiRequest<Vehicle>(url, { method: 'POST' });
 }
 
 // Health check

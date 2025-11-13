@@ -3,22 +3,22 @@
     "otomoto": [
       {
         "name": "Nissan Primastar 2005-2014",
-        "url": "https://www.otomoto.pl/osobowe/nissan/primastar/wroclaw?search%5Bdist%5D=300&search%5Bfilter_float_price%3Ato%5D=60000&search%5Bfilter_float_year%3Ato%5D=2014&search%5Border%5D=created_at_first%3Adesc",
+        "url": "https://www.otomoto.pl/osobowe/nissan/primastar/wroclaw?search%5Bdist%5D=150&search%5Bfilter_float_price%3Ato%5D=60000&search%5Bfilter_float_year%3Ato%5D=2014&search%5Border%5D=created_at_first%3Adesc",
         "description": "Nissan Primastar, <2014, <60k PLN, Wrocław"
       },
       {
         "name": "Renault Trafic 2005-2014",
-        "url": "https://www.otomoto.pl/osobowe/renault/trafic/wroclaw?search%5Bdist%5D=300&search%5Bfilter_float_price%3Ato%5D=60000&search%5Bfilter_float_year%3Ato%5D=2014&search%5Border%5D=created_at_first%3Adesc",
+        "url": "https://www.otomoto.pl/osobowe/renault/trafic/wroclaw?search%5Bdist%5D=150&search%5Bfilter_float_price%3Ato%5D=60000&search%5Bfilter_float_year%3Ato%5D=2014&search%5Border%5D=created_at_first%3Adesc",
         "description": "Renault Trafic, <2014, <60k PLN, Wrocław"
       },
       {
         "name": "Opel Vivaro 2005-2014",
-        "url": "https://www.otomoto.pl/osobowe/opel/vivaro/wroclaw?search%5Bdist%5D=300&search%5Bfilter_float_price%3Ato%5D=60000&search%5Bfilter_float_year%3Ato%5D=2014&search%5Border%5D=created_at_first%3Adesc",
+        "url": "https://www.otomoto.pl/osobowe/opel/vivaro/wroclaw?search%5Bdist%5D=150&search%5Bfilter_float_price%3Ato%5D=60000&search%5Bfilter_float_year%3Ato%5D=2014&search%5Border%5D=created_at_first%3Adesc",
         "description": "Opel Vivaro, <2014, <60k PLN, Wrocław"
       },
       {
         "name": "Ford Transit 2005-2014",
-        "url": "https://www.otomoto.pl/osobowe/ford/transit/wroclaw?search%5Bdist%5D=300&search%5Bfilter_float_price%3Ato%5D=60000&search%5Bfilter_float_year%3Ato%5D=2014&search%5Border%5D=created_at_first%3Adesc",
+        "url": "https://www.otomoto.pl/osobowe/ford/transit/wroclaw?search%5Bdist%5D=150&search%5Bfilter_float_price%3Ato%5D=60000&search%5Bfilter_float_year%3Ato%5D=2014&search%5Border%5D=created_at_first%3Adesc",
         "description": "Ford Transit, <2014, <60k PLN, Wrocław"
       }
     ],

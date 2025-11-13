@@ -4,15 +4,21 @@ import { Vehicle } from '@car-finder/types';
 
 const router: Router = Router();
 
-// GET /api/vehicles - Get all vehicles
+// GET /api/vehicles - Get all vehicles (with optional limit and offset)
 router.get('/', async (req: Request, res: Response) => {
   try {
     const vehicleRepository = await ServiceRegistry.getVehicleRepository();
-    
+
+    // Get limit and offset from query params
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+    const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
     const vehicles = await vehicleRepository.getAllVehicles();
-    
+
+    // Apply offset and limit for pagination
+    const paginatedVehicles = vehicles.slice(offset, offset + (limit > 0 ? limit : vehicles.length));
+
     // Transform vehicles for API response (exclude raw source fields for clarity)
-    const apiVehicles = vehicles.map(vehicle => ({
+    const apiVehicles = paginatedVehicles.map(vehicle => ({
       id: vehicle.id,
       source: vehicle.source,
       sourceUrl: vehicle.sourceUrl,
@@ -37,7 +43,15 @@ router.get('/', async (req: Request, res: Response) => {
       updatedAt: vehicle.updatedAt.toISOString(),
     }));
 
-    res.json(apiVehicles);
+    res.json({
+      vehicles: apiVehicles,
+      pagination: {
+        offset,
+        limit,
+        total: vehicles.length,
+        hasMore: offset + limit < vehicles.length
+      }
+    });
   } catch (error) {
     console.error('Error fetching vehicles:', error);
     res.status(500).json({

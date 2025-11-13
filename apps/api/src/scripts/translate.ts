@@ -67,7 +67,7 @@ interface SearchConfig {
 /**
  * Load configuration from search-config.json
  */
-function loadSearchConfig(): SearchConfig {
+export function loadSearchConfig(): SearchConfig {
   try {
     const configPath = path.join(WorkspaceUtils.findWorkspaceRoot(), 'search-config.json');
     const configContent = fs.readFileSync(configPath, 'utf-8');
@@ -88,7 +88,7 @@ function loadSearchConfig(): SearchConfig {
  * Check if vehicle has at least one of the required features (ANY-match logic)
  * Checks the ORIGINAL Polish sourceEquipment field before translation
  */
-function hasRequiredFeatures(vehicle: Vehicle, requiredFeatures: string[]): boolean {
+export function hasRequiredFeatures(vehicle: Vehicle, requiredFeatures: string[]): boolean {
   if (requiredFeatures.length === 0) {
     // If no required features configured, all vehicles pass
     return true;
@@ -462,8 +462,6 @@ if (require.main === module) {
 export {
   main,
   parseArgs,
-  loadSearchConfig,
-  hasRequiredFeatures,
   isRetryableError,
   getErrorType
 };

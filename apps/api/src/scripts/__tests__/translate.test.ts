@@ -2,10 +2,17 @@
  * Unit tests for translate.ts
  */
 
-import { hasRequiredFeatures, loadSearchConfig } from '../translate';
 import { Vehicle } from '@car-finder/types';
 import * as path from 'path';
-import * as fs from 'fs';
+
+// Mock fs module
+jest.mock('fs', () => {
+  const actualFs = jest.requireActual('fs');
+  return {
+    ...actualFs,
+    readFileSync: jest.fn(),
+  };
+});
 
 // Mock WorkspaceUtils
 jest.mock('@car-finder/services', () => ({
@@ -15,52 +22,82 @@ jest.mock('@car-finder/services', () => ({
   },
 }));
 
+import { hasRequiredFeatures, loadSearchConfig } from '../translate';
+import * as fs from 'fs';
+
 describe('translate.ts', () => {
   describe('hasRequiredFeatures', () => {
     it('should return false for vehicle with no features', () => {
-      const vehicle = { features: [] } as Vehicle;
+      const vehicle = {
+        sourceEquipment: JSON.stringify({ comfort: [], safety: [] })
+      } as Vehicle;
       const requiredFeatures = ['Klimatyzacja'];
 
       expect(hasRequiredFeatures(vehicle, requiredFeatures)).toBe(false);
     });
 
     it('should return true if vehicle has at least one required feature (exact match)', () => {
-      const vehicle = { features: ['Klimatyzacja', 'ABS'] } as Vehicle;
+      const vehicle = {
+        sourceEquipment: JSON.stringify({
+          comfort: ['Klimatyzacja', 'Radio'],
+          safety: ['ABS']
+        })
+      } as Vehicle;
       const requiredFeatures = ['Klimatyzacja'];
 
       expect(hasRequiredFeatures(vehicle, requiredFeatures)).toBe(true);
     });
 
     it('should return true if vehicle has at least one required feature (partial match)', () => {
-      const vehicle = { features: ['Klimatyzacja automatyczna', 'ABS'] } as Vehicle;
+      const vehicle = {
+        sourceEquipment: JSON.stringify({
+          comfort: ['Klimatyzacja automatyczna', 'Radio'],
+          safety: ['ABS']
+        })
+      } as Vehicle;
       const requiredFeatures = ['Klimatyzacja'];
 
       expect(hasRequiredFeatures(vehicle, requiredFeatures)).toBe(true);
     });
 
     it('should return false if vehicle has none of the required features', () => {
-      const vehicle = { features: ['ABS', 'ESP', 'Poduszki powietrzne'] } as Vehicle;
+      const vehicle = {
+        sourceEquipment: JSON.stringify({
+          safety: ['ABS', 'ESP', 'Poduszki powietrzne']
+        })
+      } as Vehicle;
       const requiredFeatures = ['Klimatyzacja', 'Klimatyzacja automatyczna'];
 
       expect(hasRequiredFeatures(vehicle, requiredFeatures)).toBe(false);
     });
 
     it('should be case-insensitive', () => {
-      const vehicle = { features: ['KLIMATYZACJA'] } as Vehicle;
+      const vehicle = {
+        sourceEquipment: JSON.stringify({
+          comfort: ['KLIMATYZACJA']
+        })
+      } as Vehicle;
       const requiredFeatures = ['klimatyzacja'];
 
       expect(hasRequiredFeatures(vehicle, requiredFeatures)).toBe(true);
     });
 
     it('should return true if no required features configured (empty array)', () => {
-      const vehicle = { features: ['ABS'] } as Vehicle;
+      const vehicle = {
+        sourceEquipment: JSON.stringify({ safety: ['ABS'] })
+      } as Vehicle;
       const requiredFeatures: string[] = [];
 
       expect(hasRequiredFeatures(vehicle, requiredFeatures)).toBe(true);
     });
 
     it('should work with multiple required features - ANY match logic', () => {
-      const vehicle = { features: ['ESP', 'Klimatyzacja dwustrefowa', 'ABS'] } as Vehicle;
+      const vehicle = {
+        sourceEquipment: JSON.stringify({
+          safety: ['ESP', 'ABS'],
+          comfort: ['Klimatyzacja dwustrefowa', 'Radio']
+        })
+      } as Vehicle;
       const requiredFeatures = [
         'Klimatyzacja',
         'Klimatyzacja automatyczna',
@@ -73,9 +110,11 @@ describe('translate.ts', () => {
   });
 
   describe('loadSearchConfig', () => {
+    const mockReadFileSync = fs.readFileSync as jest.MockedFunction<typeof fs.readFileSync>;
+
     beforeEach(() => {
       // Clean up any existing mocks
-      jest.clearAllMocks();
+      mockReadFileSync.mockReset();
     });
 
     it('should load translationModel and requiredFeatures from search-config.json', () => {
@@ -85,7 +124,7 @@ describe('translate.ts', () => {
         requiredFeatures: ['Klimatyzacja', 'Klimatyzacja automatyczna'],
       };
 
-      jest.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(mockConfig));
+      mockReadFileSync.mockReturnValue(JSON.stringify(mockConfig));
 
       const config = loadSearchConfig();
 
@@ -94,7 +133,7 @@ describe('translate.ts', () => {
     });
 
     it('should throw error if search-config.json is not found', () => {
-      jest.spyOn(fs, 'readFileSync').mockImplementation(() => {
+      mockReadFileSync.mockImplementation(() => {
         throw new Error('ENOENT: no such file or directory');
       });
 

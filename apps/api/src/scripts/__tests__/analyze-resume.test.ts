@@ -42,10 +42,10 @@ describe('getRequiredAnalysisSteps', () => {
     ...overrides,
   });
 
-  test('should return all steps for vehicle with no analysis', () => {
+  test('should return all analysis steps for vehicle with no analysis (translation is now separate)', () => {
     const vehicle = createVehicle({
-      description: null,
-      features: [],
+      description: 'Already translated', // Translation now happens in separate translate.ts script
+      features: ['AC', 'GPS'],
       aiDataSanityCheck: null,
       personalFitScore: null,
       aiMechanicReport: null,
@@ -56,13 +56,14 @@ describe('getRequiredAnalysisSteps', () => {
     const steps = getRequiredAnalysisSteps(vehicle);
 
     expect(steps).toEqual([
-      'translate',
       'sanity_check',
       'fit_score',
       'mechanic_report',
       'market_value',
       'priority_rating',
     ]);
+    // Translation is no longer part of analysis pipeline (Story 2.4c)
+    expect(steps).not.toContain('translate');
   });
 
   test('should return 5 steps when translation is complete', () => {
@@ -120,7 +121,7 @@ describe('getRequiredAnalysisSteps', () => {
     expect(steps).toEqual([]);
   });
 
-  test('should include translate if description is null', () => {
+  test('should NOT include translate even if description is null (translation is separate pipeline)', () => {
     const vehicle = createVehicle({
       description: null,
       features: ['AC'],
@@ -128,7 +129,9 @@ describe('getRequiredAnalysisSteps', () => {
 
     const steps = getRequiredAnalysisSteps(vehicle);
 
-    expect(steps).toContain('translate');
+    // Translation is no longer part of analysis pipeline (Story 2.4c)
+    // Vehicles must be pre-translated via translate.ts before analysis
+    expect(steps).not.toContain('translate');
   });
 
   test('should NOT include translate if description exists (even if features empty)', () => {

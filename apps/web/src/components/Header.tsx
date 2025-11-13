@@ -1,7 +1,5 @@
 'use client';
 
-import { useState } from 'react';
-
 // Icons
 const VanIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="currentColor" viewBox="0 0 24 24">

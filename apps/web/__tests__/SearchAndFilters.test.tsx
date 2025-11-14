@@ -8,7 +8,6 @@ describe('SearchAndFilters', () => {
   const defaultProps = {
     searchQuery: '',
     onSearchChange: jest.fn(),
-    onScrapeNew: jest.fn(),
     vehicleCount: 0,
     sortBy: 'priority' as SortOption,
     onSortChange: jest.fn()
@@ -21,17 +20,22 @@ describe('SearchAndFilters', () => {
   describe('Basic Rendering', () => {
     it('should render the component', () => {
       render(<SearchAndFilters {...defaultProps} />);
-      expect(screen.getByText('Car Finder AI')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Search cars...')).toBeInTheDocument();
     });
 
     it('should display vehicle count', () => {
       render(<SearchAndFilters {...defaultProps} vehicleCount={42} />);
-      expect(screen.getByText('42 cars found')).toBeInTheDocument();
+      expect(screen.getByText('42 cars')).toBeInTheDocument();
     });
 
     it('should display zero cars when count is 0', () => {
       render(<SearchAndFilters {...defaultProps} vehicleCount={0} />);
-      expect(screen.getByText('0 cars found')).toBeInTheDocument();
+      expect(screen.getByText('0 cars')).toBeInTheDocument();
+    });
+
+    it('should display total count when provided', () => {
+      render(<SearchAndFilters {...defaultProps} vehicleCount={0} totalCount={100} />);
+      expect(screen.getByText('100 total')).toBeInTheDocument();
     });
   });
 
@@ -56,23 +60,6 @@ describe('SearchAndFilters', () => {
       fireEvent.change(searchInput, { target: { value: 'test search' } });
 
       expect(onSearchChange).toHaveBeenCalledWith('test search');
-    });
-  });
-
-  describe('Scrape New Listings Button', () => {
-    it('should render scrape button', () => {
-      render(<SearchAndFilters {...defaultProps} />);
-      expect(screen.getByText('Scrape New Listings')).toBeInTheDocument();
-    });
-
-    it('should call onScrapeNew when clicked', () => {
-      const onScrapeNew = jest.fn();
-      render(<SearchAndFilters {...defaultProps} onScrapeNew={onScrapeNew} />);
-
-      const scrapeButton = screen.getByText('Scrape New Listings');
-      fireEvent.click(scrapeButton);
-
-      expect(onScrapeNew).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -193,13 +180,6 @@ describe('SearchAndFilters', () => {
       render(<SearchAndFilters {...defaultProps} onSortChange={undefined} />);
       const sortDropdown = screen.getByDisplayValue('Sort: Priority');
       fireEvent.change(sortDropdown, { target: { value: 'price_asc' } });
-      // Should not throw
-    });
-
-    it('should not crash when onScrapeNew is undefined', () => {
-      render(<SearchAndFilters {...defaultProps} onScrapeNew={undefined} />);
-      const scrapeButton = screen.getByText('Scrape New Listings');
-      fireEvent.click(scrapeButton);
       // Should not throw
     });
   });

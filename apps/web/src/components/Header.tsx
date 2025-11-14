@@ -20,14 +20,21 @@ const SettingsIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const PlusIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+  </svg>
+);
+
 interface HeaderProps {
   vehicleCount?: number;
   lastUpdated?: string;
   onRefresh?: () => void;
+  onScrapeNew?: () => void;
   onSettings?: () => void;
 }
 
-export function Header({ vehicleCount = 0, lastUpdated, onRefresh, onSettings }: HeaderProps) {
+export function Header({ vehicleCount = 0, lastUpdated, onRefresh, onScrapeNew, onSettings }: HeaderProps) {
   return (
     <header className="bg-blue-600 text-white shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -51,21 +58,25 @@ export function Header({ vehicleCount = 0, lastUpdated, onRefresh, onSettings }:
               </div>
             )}
 
-            {/* Vehicle Count */}
-            <div className="bg-blue-500 px-4 py-2 rounded-lg">
-              <p className="text-blue-100 text-sm">Vehicles tracked</p>
-              <p className="text-white font-bold text-lg">{vehicleCount}</p>
-            </div>
-
             {/* Actions */}
             <div className="flex items-center space-x-2">
+              <button
+                onClick={onScrapeNew}
+                className="bg-white hover:bg-blue-50 text-blue-600 px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors font-medium"
+                title="Scrape New Listings"
+              >
+                <PlusIcon className="w-4 h-4" />
+                <span className="hidden lg:inline">Scrape New Listings</span>
+                <span className="lg:hidden">Scrape</span>
+              </button>
+
               <button
                 onClick={onRefresh}
                 className="bg-blue-500 hover:bg-blue-400 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
                 title="Refresh Data"
               >
                 <RefreshIcon className="w-4 h-4" />
-                <span className="hidden sm:inline">Refresh Data</span>
+                <span className="hidden sm:inline">Refresh</span>
               </button>
 
               <button

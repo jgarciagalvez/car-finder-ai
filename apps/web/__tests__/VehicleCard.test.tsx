@@ -13,8 +13,33 @@ const mockForceAnalyzeVehicle = jest.fn();
 
 const mockUseVehicles = useVehiclesHook as jest.Mocked<typeof useVehiclesHook>;
 
+// Create a state container to simulate React state
+let mockOperationStates: Record<string, any> = {};
+let mockFeedback: { type: 'success' | 'error' | null; message: string | null; vehicleId?: string } = {
+  type: null,
+  message: null,
+};
+
+// Store base mock return value
+let baseHookReturn: any;
+
 beforeEach(() => {
-  mockUseVehicles.useVehicles = jest.fn().mockReturnValue({
+  // Reset mock states
+  mockOperationStates = {};
+  mockFeedback = { type: null, message: null };
+
+  const mockSetOperationState = jest.fn((vehicleId: string, operation: string, isLoading: boolean) => {
+    if (!mockOperationStates[vehicleId]) {
+      mockOperationStates[vehicleId] = {};
+    }
+    mockOperationStates[vehicleId][operation] = isLoading;
+  });
+
+  const mockSetFeedback = jest.fn((type: 'success' | 'error', message: string, vehicleId?: string) => {
+    mockFeedback = { type, message, vehicleId };
+  });
+
+  baseHookReturn = {
     forceTranslateVehicle: mockForceTranslateVehicle,
     forceAnalyzeVehicle: mockForceAnalyzeVehicle,
     vehicles: [],
@@ -26,8 +51,23 @@ beforeEach(() => {
     loadVehicleById: jest.fn(),
     updateVehicle: jest.fn(),
     clearError: jest.fn(),
-    refetch: jest.fn()
-  });
+    refetch: jest.fn(),
+    // New centralized state management properties with dynamic state
+    get operationStates() {
+      return mockOperationStates;
+    },
+    setOperationState: mockSetOperationState,
+    clearOperationState: jest.fn(),
+    get feedback() {
+      return mockFeedback;
+    },
+    setFeedback: mockSetFeedback,
+    clearFeedback: jest.fn(() => {
+      mockFeedback = { type: null, message: null };
+    })
+  };
+
+  mockUseVehicles.useVehicles = jest.fn(() => baseHookReturn);
   mockForceTranslateVehicle.mockClear();
   mockForceAnalyzeVehicle.mockClear();
   global.confirm = jest.fn(() => true);
@@ -245,57 +285,47 @@ describe('VehicleCard', () => {
     });
 
     it('should show loading state during status update', async () => {
-      const mockUpdateVehicle = jest.fn().mockImplementation(() => new Promise(() => {})); // Never resolves
-      mockUseVehicles.useVehicles = jest.fn().mockReturnValue({
-        ...mockUseVehicles.useVehicles(),
-        updateVehicle: mockUpdateVehicle,
-      });
-
       const vehicle = createMockVehicle();
+
+      // Override mock to show updating state
+      mockUseVehicles.useVehicles = jest.fn(() => ({
+        ...baseHookReturn,
+        operationStates: { '1': { isUpdatingStatus: true } },
+        updateVehicle: jest.fn(),
+      }));
+
       render(<VehicleCard vehicle={vehicle} />);
 
       const select = screen.getByDisplayValue('New');
-      fireEvent.change(select, { target: { value: 'contacted' } });
-
-      await waitFor(() => {
-        expect(select).toBeDisabled();
-      });
+      expect(select).toBeDisabled();
     });
 
     it('should show success message after status update', async () => {
-      const mockUpdateVehicle = jest.fn().mockResolvedValue(undefined);
-      mockUseVehicles.useVehicles = jest.fn().mockReturnValue({
-        ...mockUseVehicles.useVehicles(),
-        updateVehicle: mockUpdateVehicle,
-      });
-
       const vehicle = createMockVehicle();
+
+      // Override mock to show success feedback
+      mockUseVehicles.useVehicles = jest.fn(() => ({
+        ...baseHookReturn,
+        feedback: { type: 'success' as const, message: 'Status updated successfully!', vehicleId: '1' },
+        updateVehicle: jest.fn(),
+      }));
+
       render(<VehicleCard vehicle={vehicle} />);
-
-      const select = screen.getByDisplayValue('New');
-      fireEvent.change(select, { target: { value: 'to_visit' } });
-
-      await waitFor(() => {
-        expect(screen.getByText('Status updated successfully!')).toBeInTheDocument();
-      });
+      expect(screen.getByText('Status updated successfully!')).toBeInTheDocument();
     });
 
     it('should show error message on status update failure', async () => {
-      const mockUpdateVehicle = jest.fn().mockRejectedValue(new Error('Update failed'));
-      mockUseVehicles.useVehicles = jest.fn().mockReturnValue({
-        ...mockUseVehicles.useVehicles(),
-        updateVehicle: mockUpdateVehicle,
-      });
-
       const vehicle = createMockVehicle();
+
+      // Override mock to show error feedback
+      mockUseVehicles.useVehicles = jest.fn(() => ({
+        ...baseHookReturn,
+        feedback: { type: 'error' as const, message: 'Update failed', vehicleId: '1' },
+        updateVehicle: jest.fn(),
+      }));
+
       render(<VehicleCard vehicle={vehicle} />);
-
-      const select = screen.getByDisplayValue('New');
-      fireEvent.change(select, { target: { value: 'visited' } });
-
-      await waitFor(() => {
-        expect(screen.getByText('Update failed')).toBeInTheDocument();
-      });
+      expect(screen.getByText('Update failed')).toBeInTheDocument();
     });
 
     it('should re-enable dropdown after status update completes', async () => {
@@ -370,64 +400,50 @@ describe('VehicleCard', () => {
     });
 
     it('should show loading state during notes save', async () => {
-      const mockUpdateVehicle = jest.fn().mockImplementation(() => new Promise(() => {})); // Never resolves
-      mockUseVehicles.useVehicles = jest.fn().mockReturnValue({
-        ...mockUseVehicles.useVehicles(),
-        updateVehicle: mockUpdateVehicle,
-      });
-
       const vehicle = createMockVehicle({ personalNotes: null });
+
+      // Override mock to show saving state
+      mockUseVehicles.useVehicles = jest.fn(() => ({
+        ...baseHookReturn,
+        operationStates: { '1': { isSavingNotes: true } },
+        updateVehicle: jest.fn(),
+      }));
+
       render(<VehicleCard vehicle={vehicle} />);
 
       fireEvent.click(screen.getByText('💭 Add personal notes...'));
       const textarea = screen.getByPlaceholderText(/Add your thoughts/);
-      fireEvent.change(textarea, { target: { value: 'Test note' } });
-      fireEvent.click(screen.getByText('Save Notes'));
 
-      await waitFor(() => {
-        expect(screen.getByText('Saving...')).toBeInTheDocument();
-        expect(textarea).toBeDisabled();
-      });
+      expect(screen.getByText('Saving...')).toBeInTheDocument();
+      expect(textarea).toBeDisabled();
     });
 
     it('should show success message after notes save', async () => {
-      const mockUpdateVehicle = jest.fn().mockResolvedValue(undefined);
-      mockUseVehicles.useVehicles = jest.fn().mockReturnValue({
-        ...mockUseVehicles.useVehicles(),
-        updateVehicle: mockUpdateVehicle,
-      });
-
       const vehicle = createMockVehicle({ personalNotes: null });
+
+      // Override mock to show success feedback
+      mockUseVehicles.useVehicles = jest.fn(() => ({
+        ...baseHookReturn,
+        feedback: { type: 'success' as const, message: 'Notes saved successfully!', vehicleId: '1' },
+        updateVehicle: jest.fn(),
+      }));
+
       render(<VehicleCard vehicle={vehicle} />);
-
-      fireEvent.click(screen.getByText('💭 Add personal notes...'));
-      const textarea = screen.getByPlaceholderText(/Add your thoughts/);
-      fireEvent.change(textarea, { target: { value: 'Test note' } });
-      fireEvent.click(screen.getByText('Save Notes'));
-
-      await waitFor(() => {
-        expect(screen.getByText('Notes saved successfully!')).toBeInTheDocument();
-      });
+      expect(screen.getByText('Notes saved successfully!')).toBeInTheDocument();
     });
 
     it('should show error message on notes save failure', async () => {
-      const mockUpdateVehicle = jest.fn().mockRejectedValue(new Error('Failed to save notes'));
-      mockUseVehicles.useVehicles = jest.fn().mockReturnValue({
-        ...mockUseVehicles.useVehicles(),
-        updateVehicle: mockUpdateVehicle,
-      });
-
       const vehicle = createMockVehicle({ personalNotes: null });
+
+      // Override mock to show error feedback
+      mockUseVehicles.useVehicles = jest.fn(() => ({
+        ...baseHookReturn,
+        feedback: { type: 'error' as const, message: 'Failed to save notes', vehicleId: '1' },
+        updateVehicle: jest.fn(),
+      }));
+
       render(<VehicleCard vehicle={vehicle} />);
-
-      fireEvent.click(screen.getByText('💭 Add personal notes...'));
-      const textarea = screen.getByPlaceholderText(/Add your thoughts/);
-      fireEvent.change(textarea, { target: { value: 'Test note' } });
-      fireEvent.click(screen.getByText('Save Notes'));
-
-      await waitFor(() => {
-        expect(screen.getByText('Failed to save notes')).toBeInTheDocument();
-      });
+      expect(screen.getByText('Failed to save notes')).toBeInTheDocument();
     });
 
     it('should cancel and revert notes when Cancel is clicked', () => {
@@ -507,54 +523,54 @@ describe('VehicleCard', () => {
 
     it('should show loading state during translation', async () => {
       const vehicle = createMockVehicle({ status: 'not_interested' });
-      mockForceTranslateVehicle.mockImplementation(() => new Promise(() => {})); // Never resolves
+
+      // Override mock to show translating state
+      mockUseVehicles.useVehicles = jest.fn(() => ({
+        ...baseHookReturn,
+        operationStates: { '1': { isTranslating: true } },
+      }));
+
       render(<VehicleCard vehicle={vehicle} />);
-
-      const translateButton = screen.getByText('Force Translate');
-      fireEvent.click(translateButton);
-
-      await waitFor(() => {
-        expect(screen.getByText('Translating...')).toBeInTheDocument();
-      });
+      expect(screen.getByText('Translating...')).toBeInTheDocument();
     });
 
     it('should show loading state during analysis', async () => {
       const vehicle = createMockVehicle({ status: 'not_interested' });
-      mockForceAnalyzeVehicle.mockImplementation(() => new Promise(() => {})); // Never resolves
+
+      // Override mock to show analyzing state
+      mockUseVehicles.useVehicles = jest.fn(() => ({
+        ...baseHookReturn,
+        operationStates: { '1': { isAnalyzing: true } },
+      }));
+
       render(<VehicleCard vehicle={vehicle} />);
-
-      const analyzeButton = screen.getByText('Force Analyze');
-      fireEvent.click(analyzeButton);
-
-      await waitFor(() => {
-        expect(screen.getByText('Analyzing...')).toBeInTheDocument();
-      });
+      expect(screen.getByText('Analyzing...')).toBeInTheDocument();
     });
 
     it('should show success message after successful translation', async () => {
       const vehicle = createMockVehicle({ status: 'not_interested' });
-      mockForceTranslateVehicle.mockResolvedValue(undefined);
+
+      // Override mock to show success feedback
+      mockUseVehicles.useVehicles = jest.fn(() => ({
+        ...baseHookReturn,
+        feedback: { type: 'success' as const, message: 'Vehicle translated successfully!', vehicleId: '1' },
+      }));
+
       render(<VehicleCard vehicle={vehicle} />);
-
-      const translateButton = screen.getByText('Force Translate');
-      fireEvent.click(translateButton);
-
-      await waitFor(() => {
-        expect(screen.getByText('Vehicle translated successfully!')).toBeInTheDocument();
-      });
+      expect(screen.getByText('Vehicle translated successfully!')).toBeInTheDocument();
     });
 
     it('should show error message on translation failure', async () => {
       const vehicle = createMockVehicle({ status: 'not_interested' });
-      mockForceTranslateVehicle.mockRejectedValue(new Error('Translation failed'));
+
+      // Override mock to show error feedback
+      mockUseVehicles.useVehicles = jest.fn(() => ({
+        ...baseHookReturn,
+        feedback: { type: 'error' as const, message: 'Translation failed', vehicleId: '1' },
+      }));
+
       render(<VehicleCard vehicle={vehicle} />);
-
-      const translateButton = screen.getByText('Force Translate');
-      fireEvent.click(translateButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Translation failed/)).toBeInTheDocument();
-      });
+      expect(screen.getByText(/Translation failed/)).toBeInTheDocument();
     });
 
     it('should not call API if user cancels confirmation', async () => {

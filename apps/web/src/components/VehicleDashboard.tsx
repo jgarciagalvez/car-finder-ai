@@ -5,15 +5,33 @@ import { VehicleCard } from './VehicleCard';
 import { useRef, useEffect, useCallback } from 'react';
 
 export function VehicleDashboard() {
-  const { vehicles, allVehicles, loading, error, clearError, statusFilter, hasMore, loadMoreVehicles } = useVehicles();
+  const {
+    vehicles,
+    filteredVehicles,
+    allVehicles,
+    loading,
+    error,
+    clearError,
+    statusFilter,
+    sortBy,
+    vehiclesToRender,
+    loadMoreForRendering,
+    setVehiclesToRender
+  } = useVehicles();
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
-  // Infinite scroll with Intersection Observer
+  // Reset vehiclesToRender when sort or filter changes (AC #6)
+  // This resets render count to 50 without changing scroll position
+  useEffect(() => {
+    setVehiclesToRender(50);
+  }, [sortBy, statusFilter, setVehiclesToRender]);
+
+  // Progressive rendering: Load more for display when scrolling near bottom
   const handleLoadMore = useCallback(() => {
-    if (hasMore && !loading) {
-      loadMoreVehicles();
+    if (vehiclesToRender < filteredVehicles.length && !loading) {
+      loadMoreForRendering();
     }
-  }, [hasMore, loading, loadMoreVehicles]);
+  }, [vehiclesToRender, filteredVehicles.length, loading, loadMoreForRendering]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -103,27 +121,23 @@ export function VehicleDashboard() {
         <VehicleCard key={vehicle.id} vehicle={vehicle} />
       ))}
 
-      {/* Infinite scroll sentinel element */}
-      {hasMore && (
+      {/* Progressive rendering sentinel element */}
+      {vehiclesToRender < filteredVehicles.length && (
         <div ref={loadMoreRef} className="flex items-center justify-center py-8">
-          {loading ? (
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="mt-2 text-sm text-gray-600">Loading more vehicles...</p>
-            </div>
-          ) : (
-            <div className="text-sm text-gray-500">Scroll to load more</div>
-          )}
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-2 text-sm text-gray-600">Rendering more vehicles...</p>
+          </div>
         </div>
       )}
 
       {/* End of results indicator */}
-      {!hasMore && allVehicles.length > 0 && (
+      {vehiclesToRender >= filteredVehicles.length && allVehicles.length > 0 && (
         <div className="text-center py-8 text-sm text-gray-500 border-t border-gray-200">
           {statusFilter && statusFilter.length > 0 ? (
-            <>Showing {vehicles.length} of {allVehicles.length} vehicles</>
+            <>Showing {filteredVehicles.length} of {allVehicles.length} vehicles</>
           ) : (
-            <>All vehicles loaded ({allVehicles.length} total)</>
+            <>All {filteredVehicles.length} vehicles displayed</>
           )}
         </div>
       )}

@@ -48,6 +48,7 @@ export default function DashboardPage() {
         vehicleCount={vehicles.length}
         lastUpdated={`Today at ${lastUpdated.split(', ')[1]}`}
         onRefresh={handleRefresh}
+        onScrapeNew={handleScrapeNew}
         onSettings={handleSettings}
       />
 
@@ -57,8 +58,6 @@ export default function DashboardPage() {
         <SearchAndFilters
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          onScrapeNew={handleScrapeNew}
-          onRefresh={handleRefresh}
           vehicleCount={vehicles.length}
           totalCount={allVehicles.length}
           sortBy={sortBy}

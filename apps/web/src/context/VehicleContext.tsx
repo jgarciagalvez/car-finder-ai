@@ -1,8 +1,21 @@
 'use client';
 
-import React, { createContext, useContext, useReducer, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, useRef, ReactNode } from 'react';
 import { Vehicle, VehicleStatus } from '@car-finder/types';
 import { SortOption } from '@/lib/utils';
+
+export interface OperationState {
+  isTranslating?: boolean;
+  isAnalyzing?: boolean;
+  isUpdatingStatus?: boolean;
+  isSavingNotes?: boolean;
+}
+
+export interface FeedbackState {
+  type: 'success' | 'error' | null;
+  message: string | null;
+  vehicleId?: string;
+}
 
 interface VehicleState {
   vehicles: Vehicle[];
@@ -13,6 +26,9 @@ interface VehicleState {
   hasMore: boolean;
   total: number;
   statusFilter: VehicleStatus[] | null;
+  operationStates: Record<string, OperationState>;
+  vehiclesToRender: number;
+  feedback: FeedbackState;
 }
 
 type VehicleAction =
@@ -24,7 +40,12 @@ type VehicleAction =
   | { type: 'UPDATE_VEHICLE'; payload: Vehicle }
   | { type: 'CLEAR_ERROR' }
   | { type: 'SET_SORT_BY'; payload: SortOption }
-  | { type: 'SET_STATUS_FILTER'; payload: VehicleStatus[] | null };
+  | { type: 'SET_STATUS_FILTER'; payload: VehicleStatus[] | null }
+  | { type: 'SET_OPERATION_STATE'; payload: { vehicleId: string; operation: keyof OperationState; isLoading: boolean } }
+  | { type: 'CLEAR_OPERATION_STATE'; payload: { vehicleId: string; operation: keyof OperationState } }
+  | { type: 'SET_VEHICLES_TO_RENDER'; payload: number }
+  | { type: 'SET_FEEDBACK'; payload: { type: 'success' | 'error'; message: string; vehicleId?: string } }
+  | { type: 'CLEAR_FEEDBACK' };
 
 interface VehicleContextType {
   state: VehicleState;
@@ -37,6 +58,11 @@ interface VehicleContextType {
   clearError: () => void;
   setSortBy: (_sortBy: SortOption) => void;
   setStatusFilter: (_statusFilter: VehicleStatus[] | null) => void;
+  setOperationState: (_vehicleId: string, _operation: keyof OperationState, _isLoading: boolean) => void;
+  clearOperationState: (_vehicleId: string, _operation: keyof OperationState) => void;
+  setVehiclesToRender: (_count: number) => void;
+  setFeedback: (_type: 'success' | 'error', _message: string, _vehicleId?: string) => void;
+  clearFeedback: () => void;
 }
 
 const VehicleContext = createContext<VehicleContextType | undefined>(undefined);
@@ -50,6 +76,12 @@ const initialState: VehicleState = {
   hasMore: false,
   total: 0,
   statusFilter: null,
+  operationStates: {},
+  vehiclesToRender: 50,
+  feedback: {
+    type: null,
+    message: null,
+  },
 };
 
 function vehicleReducer(state: VehicleState, action: VehicleAction): VehicleState {
@@ -80,6 +112,47 @@ function vehicleReducer(state: VehicleState, action: VehicleAction): VehicleStat
       return { ...state, sortBy: action.payload };
     case 'SET_STATUS_FILTER':
       return { ...state, statusFilter: action.payload };
+    case 'SET_OPERATION_STATE':
+      return {
+        ...state,
+        operationStates: {
+          ...state.operationStates,
+          [action.payload.vehicleId]: {
+            ...state.operationStates[action.payload.vehicleId],
+            [action.payload.operation]: action.payload.isLoading,
+          },
+        },
+      };
+    case 'CLEAR_OPERATION_STATE':
+      return {
+        ...state,
+        operationStates: {
+          ...state.operationStates,
+          [action.payload.vehicleId]: {
+            ...state.operationStates[action.payload.vehicleId],
+            [action.payload.operation]: undefined,
+          },
+        },
+      };
+    case 'SET_VEHICLES_TO_RENDER':
+      return { ...state, vehiclesToRender: action.payload };
+    case 'SET_FEEDBACK':
+      return {
+        ...state,
+        feedback: {
+          type: action.payload.type,
+          message: action.payload.message,
+          vehicleId: action.payload.vehicleId,
+        },
+      };
+    case 'CLEAR_FEEDBACK':
+      return {
+        ...state,
+        feedback: {
+          type: null,
+          message: null,
+        },
+      };
     default:
       return state;
   }
@@ -87,6 +160,7 @@ function vehicleReducer(state: VehicleState, action: VehicleAction): VehicleStat
 
 export function VehicleProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(vehicleReducer, initialState);
+  const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const setLoading = useCallback((loading: boolean) => {
     dispatch({ type: 'SET_LOADING', payload: loading });
@@ -124,6 +198,43 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_STATUS_FILTER', payload: statusFilter });
   }, []);
 
+  const setOperationState = useCallback((vehicleId: string, operation: keyof OperationState, isLoading: boolean) => {
+    dispatch({ type: 'SET_OPERATION_STATE', payload: { vehicleId, operation, isLoading } });
+  }, []);
+
+  const clearOperationState = useCallback((vehicleId: string, operation: keyof OperationState) => {
+    dispatch({ type: 'CLEAR_OPERATION_STATE', payload: { vehicleId, operation } });
+  }, []);
+
+  const setVehiclesToRender = useCallback((count: number) => {
+    dispatch({ type: 'SET_VEHICLES_TO_RENDER', payload: count });
+  }, []);
+
+  const clearFeedback = useCallback(() => {
+    if (feedbackTimeoutRef.current) {
+      clearTimeout(feedbackTimeoutRef.current);
+      feedbackTimeoutRef.current = null;
+    }
+    dispatch({ type: 'CLEAR_FEEDBACK' });
+  }, []);
+
+  const setFeedback = useCallback((type: 'success' | 'error', message: string, vehicleId?: string) => {
+    // Clear previous timeout
+    if (feedbackTimeoutRef.current) {
+      clearTimeout(feedbackTimeoutRef.current);
+    }
+
+    // Set new feedback
+    dispatch({ type: 'SET_FEEDBACK', payload: { type, message, vehicleId } });
+
+    // Auto-clear after timeout (3s for success, 5s for error)
+    const timeoutDuration = type === 'success' ? 3000 : 5000;
+    feedbackTimeoutRef.current = setTimeout(() => {
+      dispatch({ type: 'CLEAR_FEEDBACK' });
+      feedbackTimeoutRef.current = null;
+    }, timeoutDuration);
+  }, []);
+
   const value: VehicleContextType = {
     state,
     setLoading,
@@ -135,6 +246,11 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
     clearError,
     setSortBy,
     setStatusFilter,
+    setOperationState,
+    clearOperationState,
+    setVehiclesToRender,
+    setFeedback,
+    clearFeedback,
   };
 
   return (

@@ -40,17 +40,36 @@ interface VehicleCardProps {
 }
 
 export function VehicleCard({ vehicle }: VehicleCardProps) {
+  // Local state (essential per-card UI state only - AC: 1)
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [isTranslating, setIsTranslating] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-  const [isSavingNotes, setIsSavingNotes] = useState(false);
-  const [notes, setNotes] = useState(vehicle.personalNotes || '');
-  const [isNotesExpanded, setIsNotesExpanded] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
-  const { forceTranslateVehicle, forceAnalyzeVehicle, updateVehicle } = useVehicles();
+  const [isNotesExpanded, setIsNotesExpanded] = useState(false);
+  const [notes, setNotes] = useState(vehicle.personalNotes || '');
+
+  // Access centralized state from context
+  const {
+    forceTranslateVehicle,
+    forceAnalyzeVehicle,
+    updateVehicle,
+    operationStates,
+    setOperationState,
+    feedback,
+    setFeedback,
+    clearFeedback,
+  } = useVehicles();
+
+  // Derive operation states for this vehicle (AC: 2)
+  const vehicleOps = operationStates[vehicle.id] || {};
+  const isTranslating = vehicleOps.isTranslating || false;
+  const isAnalyzing = vehicleOps.isAnalyzing || false;
+  const isUpdatingStatus = vehicleOps.isUpdatingStatus || false;
+  const isSavingNotes = vehicleOps.isSavingNotes || false;
+
+  // Derive feedback message for this vehicle (AC: 3)
+  const showFeedback = feedback.vehicleId === vehicle.id;
+  const actionError = showFeedback && feedback.type === 'error' ? feedback.message : null;
+  const actionSuccess = showFeedback && feedback.type === 'success' ? feedback.message : null;
+
   const photos = vehicle.photos.length > 0 ? vehicle.photos : [];
 
   const nextImage = (e: MouseEvent) => {
@@ -80,17 +99,14 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
     if (!confirm('Force re-translate this vehicle? This will use AI credits.')) return;
 
     try {
-      setIsTranslating(true);
-      setActionError(null);
-      setActionSuccess(null);
+      setOperationState(vehicle.id, 'isTranslating', true);
+      clearFeedback();
       await forceTranslateVehicle(vehicle.id);
-      setActionSuccess('Vehicle translated successfully!');
-      setTimeout(() => setActionSuccess(null), 3000);
+      setFeedback('success', 'Vehicle translated successfully!', vehicle.id);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'Translation failed');
-      setTimeout(() => setActionError(null), 5000);
+      setFeedback('error', error instanceof Error ? error.message : 'Translation failed', vehicle.id);
     } finally {
-      setIsTranslating(false);
+      setOperationState(vehicle.id, 'isTranslating', false);
     }
   };
 
@@ -101,17 +117,14 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
     if (!confirm('Force re-analyze this vehicle? This will use AI credits.')) return;
 
     try {
-      setIsAnalyzing(true);
-      setActionError(null);
-      setActionSuccess(null);
+      setOperationState(vehicle.id, 'isAnalyzing', true);
+      clearFeedback();
       await forceAnalyzeVehicle(vehicle.id);
-      setActionSuccess('Vehicle analyzed successfully!');
-      setTimeout(() => setActionSuccess(null), 3000);
+      setFeedback('success', 'Vehicle analyzed successfully!', vehicle.id);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'Analysis failed');
-      setTimeout(() => setActionError(null), 5000);
+      setFeedback('error', error instanceof Error ? error.message : 'Analysis failed', vehicle.id);
     } finally {
-      setIsAnalyzing(false);
+      setOperationState(vehicle.id, 'isAnalyzing', false);
     }
   };
 
@@ -122,17 +135,14 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
     const newStatus = e.target.value;
 
     try {
-      setIsUpdatingStatus(true);
-      setActionError(null);
-      setActionSuccess(null);
+      setOperationState(vehicle.id, 'isUpdatingStatus', true);
+      clearFeedback();
       await updateVehicle(vehicle.id, { status: newStatus });
-      setActionSuccess('Status updated successfully!');
-      setTimeout(() => setActionSuccess(null), 2000);
+      setFeedback('success', 'Status updated successfully!', vehicle.id);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'Status update failed');
-      setTimeout(() => setActionError(null), 5000);
+      setFeedback('error', error instanceof Error ? error.message : 'Status update failed', vehicle.id);
     } finally {
-      setIsUpdatingStatus(false);
+      setOperationState(vehicle.id, 'isUpdatingStatus', false);
     }
   };
 
@@ -141,18 +151,15 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
     e.stopPropagation();
 
     try {
-      setIsSavingNotes(true);
-      setActionError(null);
-      setActionSuccess(null);
+      setOperationState(vehicle.id, 'isSavingNotes', true);
+      clearFeedback();
       await updateVehicle(vehicle.id, { personalNotes: notes || '' });
-      setActionSuccess('Notes saved successfully!');
-      setTimeout(() => setActionSuccess(null), 2000);
+      setFeedback('success', 'Notes saved successfully!', vehicle.id);
       setIsNotesExpanded(false);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'Failed to save notes');
-      setTimeout(() => setActionError(null), 5000);
+      setFeedback('error', error instanceof Error ? error.message : 'Failed to save notes', vehicle.id);
     } finally {
-      setIsSavingNotes(false);
+      setOperationState(vehicle.id, 'isSavingNotes', false);
     }
   };
 

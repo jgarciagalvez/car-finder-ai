@@ -14,14 +14,30 @@ import { Vehicle } from '@car-finder/types';
 import { sortVehicles } from '@/lib/utils';
 
 export function useVehicles() {
-  const { state, setLoading, setVehicles, appendVehicles, setError, clearError, setSortBy, setStatusFilter, updateVehicle: updateVehicleInContext } = useVehicleContext();
+  const {
+    state,
+    setLoading,
+    setVehicles,
+    appendVehicles,
+    setError,
+    clearError,
+    setSortBy,
+    setStatusFilter,
+    updateVehicle: updateVehicleInContext,
+    setOperationState,
+    clearOperationState,
+    setVehiclesToRender,
+    setFeedback,
+    clearFeedback,
+  } = useVehicleContext();
 
   const loadVehicles = useCallback(async () => {
     try {
       setLoading(true);
       clearError();
-      const response = await fetchVehicles({ offset: 0, limit: 50 });
-      setVehicles(response.vehicles, response.pagination.hasMore, response.pagination.total);
+      // Fetch ALL vehicles (no limit - use 0 to indicate unlimited)
+      const response = await fetchVehicles({ offset: 0, limit: 0 });
+      setVehicles(response.vehicles, false, response.pagination.total);
     } catch (error) {
       if (error instanceof ApiError) {
         setError(`Failed to load vehicles: ${error.message}`);
@@ -32,26 +48,6 @@ export function useVehicles() {
       setLoading(false);
     }
   }, [setLoading, setVehicles, setError, clearError]);
-
-  const loadMoreVehicles = useCallback(async () => {
-    if (!state.hasMore || state.loading) return;
-
-    try {
-      setLoading(true);
-      clearError();
-      const currentOffset = state.vehicles.length;
-      const response = await fetchVehicles({ offset: currentOffset, limit: 50 });
-      appendVehicles(response.vehicles, response.pagination.hasMore, response.pagination.total);
-    } catch (error) {
-      if (error instanceof ApiError) {
-        setError(`Failed to load more vehicles: ${error.message}`);
-      } else {
-        setError('Failed to load more vehicles: Unknown error occurred');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [state.hasMore, state.loading, state.vehicles.length, setLoading, appendVehicles, setError, clearError]);
 
   const loadVehicleById = useCallback(async (id: string): Promise<Vehicle | null> => {
     try {
@@ -148,9 +144,22 @@ export function useVehicles() {
     return sorted;
   }, [state.vehicles, state.sortBy, state.statusFilter]);
 
+  // Progressive rendering: Slice filtered vehicles based on render count
+  const visibleVehicles = useMemo(() => {
+    return filteredVehicles.slice(0, state.vehiclesToRender);
+  }, [filteredVehicles, state.vehiclesToRender]);
+
+  // Progressive rendering: Load more vehicles for display (not from API)
+  const loadMoreForRendering = useCallback(() => {
+    if (state.vehiclesToRender < filteredVehicles.length) {
+      setVehiclesToRender(Math.min(state.vehiclesToRender + 50, filteredVehicles.length));
+    }
+  }, [state.vehiclesToRender, filteredVehicles.length, setVehiclesToRender]);
+
   return {
-    vehicles: filteredVehicles,
-    allVehicles: state.vehicles, // Expose unfiltered count
+    vehicles: visibleVehicles, // Visible vehicles for rendering
+    filteredVehicles, // All filtered vehicles (for debugging/info)
+    allVehicles: state.vehicles, // All unfiltered vehicles
     loading: state.loading,
     error: state.error,
     selectedVehicle: state.selectedVehicle,
@@ -158,8 +167,10 @@ export function useVehicles() {
     statusFilter: state.statusFilter,
     hasMore: state.hasMore,
     total: state.total,
+    vehiclesToRender: state.vehiclesToRender,
     loadVehicles,
-    loadMoreVehicles,
+    loadMoreForRendering, // Progressive rendering
+    setVehiclesToRender, // Direct access for manual reset
     loadVehicleById,
     updateVehicle,
     clearError,
@@ -167,6 +178,13 @@ export function useVehicles() {
     setStatusFilter,
     forceTranslateVehicle,
     forceAnalyzeVehicle,
+    // New methods for centralized state management
+    operationStates: state.operationStates,
+    setOperationState,
+    clearOperationState,
+    feedback: state.feedback,
+    setFeedback,
+    clearFeedback,
     refetch: loadVehicles, // Alias for refetching data
   };
 }

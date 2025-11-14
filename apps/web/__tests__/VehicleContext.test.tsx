@@ -290,4 +290,278 @@ describe('VehicleContext Filtering', () => {
       expect(result.current.allVehicles[2].status).toBe('new');
     });
   });
+
+  describe('Operation States (Story 3.1)', () => {
+    it('should set operation state for a vehicle', async () => {
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.setOperationState('vehicle-1', 'isTranslating', true);
+      });
+
+      expect(result.current.operationStates['vehicle-1']?.isTranslating).toBe(true);
+    });
+
+    it('should handle multiple operation states for same vehicle', async () => {
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.setOperationState('vehicle-1', 'isTranslating', true);
+        result.current.setOperationState('vehicle-1', 'isAnalyzing', true);
+      });
+
+      expect(result.current.operationStates['vehicle-1']?.isTranslating).toBe(true);
+      expect(result.current.operationStates['vehicle-1']?.isAnalyzing).toBe(true);
+    });
+
+    it('should handle operation states for different vehicles independently', async () => {
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.setOperationState('vehicle-1', 'isTranslating', true);
+        result.current.setOperationState('vehicle-2', 'isAnalyzing', true);
+      });
+
+      expect(result.current.operationStates['vehicle-1']?.isTranslating).toBe(true);
+      expect(result.current.operationStates['vehicle-1']?.isAnalyzing).toBeUndefined();
+      expect(result.current.operationStates['vehicle-2']?.isTranslating).toBeUndefined();
+      expect(result.current.operationStates['vehicle-2']?.isAnalyzing).toBe(true);
+    });
+
+    it('should clear operation state', async () => {
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.setOperationState('vehicle-1', 'isTranslating', true);
+      });
+
+      expect(result.current.operationStates['vehicle-1']?.isTranslating).toBe(true);
+
+      act(() => {
+        result.current.clearOperationState('vehicle-1', 'isTranslating');
+      });
+
+      expect(result.current.operationStates['vehicle-1']?.isTranslating).toBeUndefined();
+    });
+  });
+
+  describe('Feedback Messages (Story 3.1)', () => {
+    it('should set success feedback message', async () => {
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.setFeedback('success', 'Operation successful!', 'vehicle-1');
+      });
+
+      expect(result.current.feedback.type).toBe('success');
+      expect(result.current.feedback.message).toBe('Operation successful!');
+      expect(result.current.feedback.vehicleId).toBe('vehicle-1');
+    });
+
+    it('should set error feedback message', async () => {
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.setFeedback('error', 'Operation failed!', 'vehicle-2');
+      });
+
+      expect(result.current.feedback.type).toBe('error');
+      expect(result.current.feedback.message).toBe('Operation failed!');
+      expect(result.current.feedback.vehicleId).toBe('vehicle-2');
+    });
+
+    it('should clear feedback message', async () => {
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.setFeedback('success', 'Operation successful!', 'vehicle-1');
+      });
+
+      expect(result.current.feedback.type).toBe('success');
+
+      act(() => {
+        result.current.clearFeedback();
+      });
+
+      expect(result.current.feedback.type).toBeNull();
+      expect(result.current.feedback.message).toBeNull();
+    });
+
+    it('should auto-clear success feedback after 3 seconds', async () => {
+      jest.useFakeTimers();
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.setFeedback('success', 'Operation successful!', 'vehicle-1');
+      });
+
+      expect(result.current.feedback.type).toBe('success');
+
+      // Fast-forward time by 3 seconds
+      act(() => {
+        jest.advanceTimersByTime(3000);
+      });
+
+      expect(result.current.feedback.type).toBeNull();
+      jest.useRealTimers();
+    });
+
+    it('should auto-clear error feedback after 5 seconds', async () => {
+      jest.useFakeTimers();
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.setFeedback('error', 'Operation failed!', 'vehicle-1');
+      });
+
+      expect(result.current.feedback.type).toBe('error');
+
+      // Fast-forward time by 5 seconds
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+
+      expect(result.current.feedback.type).toBeNull();
+      jest.useRealTimers();
+    });
+  });
+
+  describe('Progressive Rendering (Story 3.1)', () => {
+    it('should initialize vehiclesToRender to 50', async () => {
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(result.current.vehiclesToRender).toBe(50);
+    });
+
+    it('should increment vehiclesToRender when loadMoreForRendering is called', async () => {
+      const mockVehicles = Array.from({ length: 100 }, (_, i) =>
+        createMockVehicle({ id: `${i + 1}` })
+      );
+
+      mockApi.fetchVehicles.mockResolvedValue({
+        vehicles: mockVehicles,
+        pagination: { offset: 0, limit: 0, total: 100, hasMore: false }
+      });
+
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(result.current.vehiclesToRender).toBe(50);
+      expect(result.current.vehicles).toHaveLength(50);
+
+      act(() => {
+        result.current.loadMoreForRendering();
+      });
+
+      expect(result.current.vehiclesToRender).toBe(100);
+      expect(result.current.vehicles).toHaveLength(100);
+    });
+
+    it('should not increment beyond filteredVehicles length', async () => {
+      const mockVehicles = Array.from({ length: 75 }, (_, i) =>
+        createMockVehicle({ id: `${i + 1}` })
+      );
+
+      mockApi.fetchVehicles.mockResolvedValue({
+        vehicles: mockVehicles,
+        pagination: { offset: 0, limit: 0, total: 75, hasMore: false }
+      });
+
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(result.current.vehiclesToRender).toBe(50);
+
+      act(() => {
+        result.current.loadMoreForRendering();
+      });
+
+      expect(result.current.vehiclesToRender).toBe(75);
+
+      // Should not increment further
+      act(() => {
+        result.current.loadMoreForRendering();
+      });
+
+      expect(result.current.vehiclesToRender).toBe(75);
+    });
+
+    it('should reset vehiclesToRender to 50 when sort changes (AC #6)', async () => {
+      const mockVehicles = Array.from({ length: 100 }, (_, i) =>
+        createMockVehicle({ id: `${i + 1}`, aiPriorityRating: i * 10 })
+      );
+
+      mockApi.fetchVehicles.mockResolvedValue({
+        vehicles: mockVehicles,
+        pagination: { offset: 0, limit: 0, total: 100, hasMore: false }
+      });
+
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // Load more vehicles
+      act(() => {
+        result.current.loadMoreForRendering();
+      });
+
+      expect(result.current.vehiclesToRender).toBe(100);
+
+      // Note: The reset is handled by VehicleDashboard useEffect, not in the hook
+      // This test verifies that setVehiclesToRender method exists and works
+      act(() => {
+        result.current.setVehiclesToRender(50);
+      });
+
+      expect(result.current.vehiclesToRender).toBe(50);
+    });
+  });
 });

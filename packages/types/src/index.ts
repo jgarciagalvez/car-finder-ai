@@ -45,6 +45,9 @@ export interface Vehicle {
   aiMechanicReport: string | null;
   aiDataSanityCheck: string | null;
 
+  // Location Data
+  distanceFromWroclaw: number | null; // Driving distance in km from Wrocław
+
   // User Workflow Data
   status: VehicleStatus;
   personalNotes: string | null;

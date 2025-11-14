@@ -5,6 +5,7 @@ import * as path from 'path';
 import { ServiceRegistry, IScraperService, IParserService, IVehicleRepository, WorkspaceUtils } from '@car-finder/services';
 import { SearchResult, ParseResult } from '../services/ParserService';
 import { Vehicle, VehicleSource, SellerType } from '@car-finder/types';
+import { DistanceCalculationService } from '../services/DistanceCalculationService';
 
 // Load environment variables from the workspace root
 WorkspaceUtils.loadEnvFromRoot();
@@ -62,12 +63,14 @@ export class IngestionPipeline {
   private scraperService!: IScraperService;
   private parserService!: IParserService;
   private vehicleRepository!: IVehicleRepository;
+  private distanceService: DistanceCalculationService;
   private config: IngestionConfig;
   private stats: IngestionStats;
   private processedUrls: Set<string> = new Set();
 
   constructor() {
     // Services will be initialized in run() method using ServiceRegistry
+    this.distanceService = new DistanceCalculationService();
     this.config = this.loadConfiguration();
     this.stats = {
       totalSearchUrls: 0,
@@ -285,6 +288,28 @@ export class IngestionPipeline {
   }
 
   /**
+   * Calculate distance from Wrocław for a vehicle based on seller location
+   */
+  private async calculateDistance(location: string | null | undefined): Promise<number | null> {
+    if (!location) {
+      return null;
+    }
+
+    try {
+      // Extract city from location (format: "City" or "City, Region")
+      const city = location.split(',')[0].trim();
+      if (!city) {
+        return null;
+      }
+
+      return await this.distanceService.calculateDistanceFromWroclaw(city);
+    } catch (error) {
+      console.warn(`  ⚠️  Failed to calculate distance for location: ${location}`);
+      return null;
+    }
+  }
+
+  /**
    * Process and save a single vehicle
    */
   private async processAndSaveVehicle(vehicleData: ExtendedVehicleData, source: VehicleSource): Promise<void> {
@@ -312,20 +337,23 @@ export class IngestionPipeline {
         ...(vehicleData.transmission && { transmission: vehicleData.transmission })
       };
 
+      // Calculate distance from Wrocław
+      const distanceFromWroclaw = await this.calculateDistance(vehicleData.sellerLocation);
+
       const vehicle: Vehicle = {
         id: uuidv4(),
         source,
         sourceId: vehicleData.sourceId || '',
         sourceUrl: vehicleData.sourceUrl || '',
         sourceCreatedAt,
-        
+
         // Raw scraped data
         sourceTitle: vehicleData.sourceTitle || 'Unknown Vehicle',
         sourceDescriptionHtml: vehicleData.sourceDescriptionHtml || '',
         sourceParameters,
         sourceEquipment: vehicleData.sourceEquipment || {},
         sourcePhotos: vehicleData.sourcePhotos || [],
-        
+
         // Processed & normalized data
         title: vehicleData.sourceTitle || 'Unknown Vehicle', // Use sourceTitle as initial title
         description: '', // Leave empty - will be translated by analyze script
@@ -342,7 +370,7 @@ export class IngestionPipeline {
           memberSince: vehicleData.memberSince || null
         },
         photos: vehicleData.sourcePhotos || [], // Use sourcePhotos as initial photos
-        
+
         // AI generated data (initially null)
         personalFitScore: null,
         marketValueScore: null,
@@ -350,11 +378,14 @@ export class IngestionPipeline {
         aiPrioritySummary: null,
         aiMechanicReport: null,
         aiDataSanityCheck: null,
-        
+
+        // Location data
+        distanceFromWroclaw,
+
         // User workflow data
         status: 'new',
         personalNotes: null,
-        
+
         // Timestamps
         scrapedAt: now,
         createdAt: now,
@@ -439,7 +470,7 @@ export class IngestionPipeline {
 
         // Transform parsed data to Vehicle interface
         const vehicleData = parseResult.data as Partial<Vehicle>;
-        const vehicle = this.transformToVehicle(vehicleData, url, source);
+        const vehicle = await this.transformToVehicleAsync(vehicleData, url, source);
 
         // Save to database
         await this.vehicleRepository.insertVehicle(vehicle);
@@ -469,12 +500,15 @@ export class IngestionPipeline {
   /**
    * Transform parsed vehicle data to complete Vehicle interface
    */
-  private transformToVehicle(vehicleData: Partial<Vehicle>, url: string, source: VehicleSource): Vehicle {
+  private async transformToVehicleAsync(vehicleData: Partial<Vehicle>, url: string, source: VehicleSource): Promise<Vehicle> {
     const now = new Date();
-    
+
     // Convert PLN to EUR using configured rate
     const pricePln = vehicleData.pricePln || 0;
     const priceEur = Math.round(pricePln * this.config.currencyConversion.plnToEurRate);
+
+    // Calculate distance from Wrocław
+    const distanceFromWroclaw = await this.calculateDistance(vehicleData.sellerInfo?.location);
 
     return {
       // Generate unique ID
@@ -515,6 +549,9 @@ export class IngestionPipeline {
       aiPrioritySummary: null,
       aiMechanicReport: null,
       aiDataSanityCheck: null,
+
+      // Location data
+      distanceFromWroclaw,
 
       // User workflow data
       status: 'new',

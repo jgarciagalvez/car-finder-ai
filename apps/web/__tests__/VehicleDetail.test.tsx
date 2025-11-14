@@ -56,6 +56,7 @@ describe('VehicleDetail Component', () => {
     aiPrioritySummary: 'Good value for money. Low mileage for the year.',
     aiMechanicReport: '## Inspection Report\n\n**Overall Condition**: Good\n\n- Engine: No issues\n- Transmission: Smooth operation\n- Suspension: Normal wear',
     aiDataSanityCheck: 'All data appears consistent',
+    distanceFromWroclaw: null,
     status: 'new',
     personalNotes: null,
     scrapedAt: new Date('2023-01-15'),

@@ -1,5 +1,5 @@
 import { DatabaseService } from './database';
-import { VehicleRepository } from './repositories/vehicleRepository';
+import { VehicleRepository } from './repositories/VehicleRepository';
 import { sql } from 'kysely';
 import path from 'path';
 import fs from 'fs';

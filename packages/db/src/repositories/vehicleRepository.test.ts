@@ -2,7 +2,7 @@
  * VehicleRepository Unit Tests
  */
 
-import { VehicleRepository } from './vehicleRepository';
+import { VehicleRepository } from './VehicleRepository';
 import { Vehicle as VehicleType } from '@car-finder/types';
 import { Kysely } from 'kysely';
 import { Database as DatabaseSchema } from '../schema';
@@ -79,6 +79,7 @@ describe('VehicleRepository', () => {
       aiPrioritySummary: null,
       aiMechanicReport: null,
       aiDataSanityCheck: null,
+      distanceFromWroclaw: null,
       status: 'new',
       personalNotes: null,
       scrapedAt: new Date('2024-01-01'),

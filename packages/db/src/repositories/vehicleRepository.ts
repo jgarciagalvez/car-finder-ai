@@ -45,7 +45,10 @@ export class VehicleRepository {
         aiPrioritySummary: vehicle.aiPrioritySummary,
         aiMechanicReport: vehicle.aiMechanicReport,
         aiDataSanityCheck: vehicle.aiDataSanityCheck,
-        
+
+        // Location data
+        distanceFromWroclaw: vehicle.distanceFromWroclaw,
+
         // User workflow data
         status: vehicle.status,
         personalNotes: vehicle.personalNotes,
@@ -121,6 +124,7 @@ export class VehicleRepository {
       if (updates.aiPrioritySummary !== undefined) dbUpdates.aiPrioritySummary = updates.aiPrioritySummary;
       if (updates.aiMechanicReport !== undefined) dbUpdates.aiMechanicReport = updates.aiMechanicReport;
       if (updates.aiDataSanityCheck !== undefined) dbUpdates.aiDataSanityCheck = updates.aiDataSanityCheck;
+      if (updates.distanceFromWroclaw !== undefined) dbUpdates.distanceFromWroclaw = updates.distanceFromWroclaw;
 
       if (Object.keys(dbUpdates).length === 0) {
         console.log('⚠️ No valid updates provided for vehicle:', id);
@@ -540,7 +544,10 @@ export class VehicleRepository {
       aiPrioritySummary: dbVehicle.aiPrioritySummary,
       aiMechanicReport: dbVehicle.aiMechanicReport,
       aiDataSanityCheck: dbVehicle.aiDataSanityCheck,
-      
+
+      // Location data
+      distanceFromWroclaw: dbVehicle.distanceFromWroclaw,
+
       // User workflow data
       status: dbVehicle.status,
       personalNotes: dbVehicle.personalNotes,

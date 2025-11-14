@@ -41,6 +41,7 @@ describe('Sorting Functions', () => {
     aiPrioritySummary: 'Good deal',
     aiMechanicReport: 'No issues',
     aiDataSanityCheck: 'OK',
+    distanceFromWroclaw: null,
     status: 'new',
     personalNotes: null,
     scrapedAt: new Date(),
@@ -179,6 +180,58 @@ describe('Sorting Functions', () => {
       expect(sorted[0].personalFitScore).toBe(90);
       expect(sorted[1].personalFitScore).toBe(70);
       expect(sorted[2].personalFitScore).toBe(null);
+    });
+
+    it('should sort by distance ascending (closest first)', () => {
+      const vehicles = [
+        createMockVehicle({ id: '1', distanceFromWroclaw: 150 }),
+        createMockVehicle({ id: '2', distanceFromWroclaw: 50 }),
+        createMockVehicle({ id: '3', distanceFromWroclaw: 300 })
+      ];
+      const sorted = sortVehicles(vehicles, 'distance_asc');
+      expect(sorted[0].distanceFromWroclaw).toBe(50);
+      expect(sorted[1].distanceFromWroclaw).toBe(150);
+      expect(sorted[2].distanceFromWroclaw).toBe(300);
+    });
+
+    it('should sort by distance descending (farthest first)', () => {
+      const vehicles = [
+        createMockVehicle({ id: '1', distanceFromWroclaw: 150 }),
+        createMockVehicle({ id: '2', distanceFromWroclaw: 50 }),
+        createMockVehicle({ id: '3', distanceFromWroclaw: 300 })
+      ];
+      const sorted = sortVehicles(vehicles, 'distance_desc');
+      expect(sorted[0].distanceFromWroclaw).toBe(300);
+      expect(sorted[1].distanceFromWroclaw).toBe(150);
+      expect(sorted[2].distanceFromWroclaw).toBe(50);
+    });
+
+    it('should sort null distances to end when sorting distance ascending', () => {
+      const vehicles = [
+        createMockVehicle({ id: '1', distanceFromWroclaw: null }),
+        createMockVehicle({ id: '2', distanceFromWroclaw: 100 }),
+        createMockVehicle({ id: '3', distanceFromWroclaw: null }),
+        createMockVehicle({ id: '4', distanceFromWroclaw: 50 })
+      ];
+      const sorted = sortVehicles(vehicles, 'distance_asc');
+      expect(sorted[0].distanceFromWroclaw).toBe(50);
+      expect(sorted[1].distanceFromWroclaw).toBe(100);
+      expect(sorted[2].distanceFromWroclaw).toBe(null);
+      expect(sorted[3].distanceFromWroclaw).toBe(null);
+    });
+
+    it('should sort null distances to end when sorting distance descending', () => {
+      const vehicles = [
+        createMockVehicle({ id: '1', distanceFromWroclaw: null }),
+        createMockVehicle({ id: '2', distanceFromWroclaw: 100 }),
+        createMockVehicle({ id: '3', distanceFromWroclaw: null }),
+        createMockVehicle({ id: '4', distanceFromWroclaw: 50 })
+      ];
+      const sorted = sortVehicles(vehicles, 'distance_desc');
+      expect(sorted[0].distanceFromWroclaw).toBe(100);
+      expect(sorted[1].distanceFromWroclaw).toBe(50);
+      expect(sorted[2].distanceFromWroclaw).toBe(null);
+      expect(sorted[3].distanceFromWroclaw).toBe(null);
     });
 
     it('should handle empty array', () => {

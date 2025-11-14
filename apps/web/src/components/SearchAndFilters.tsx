@@ -2,6 +2,7 @@
 
 import { SortOption } from '@/lib/utils';
 import { VehicleStatus } from '@car-finder/types';
+import { DistanceFilter } from '@/context/VehicleContext';
 
 // Icons
 const SearchIcon = ({ className }: { className?: string }) => (
@@ -31,6 +32,8 @@ interface SearchAndFiltersProps {
   onSortChange?: (_sortBy: SortOption) => void;
   statusFilter?: VehicleStatus[] | null;
   onStatusFilterChange?: (_statusFilter: VehicleStatus[] | null) => void;
+  distanceFilter?: DistanceFilter;
+  onDistanceFilterChange?: (_distanceFilter: DistanceFilter) => void;
 }
 
 export function SearchAndFilters({
@@ -41,7 +44,9 @@ export function SearchAndFilters({
   sortBy = 'priority',
   onSortChange,
   statusFilter = null,
-  onStatusFilterChange
+  onStatusFilterChange,
+  distanceFilter = 'all',
+  onDistanceFilterChange
 }: SearchAndFiltersProps) {
   return (
     <div className="sticky top-0 z-10 bg-white shadow-sm border-b border-gray-200 py-3">
@@ -85,6 +90,8 @@ export function SearchAndFilters({
                 <option value="year_asc">Sort: Year (Oldest)</option>
                 <option value="mileage_asc">Sort: Mileage (Lowest)</option>
                 <option value="mileage_desc">Sort: Mileage (Highest)</option>
+                <option value="distance_asc">Sort: Distance (Closest)</option>
+                <option value="distance_desc">Sort: Distance (Farthest)</option>
                 <option value="personal_fit">Sort: Personal Fit</option>
               </select>
               <ChevronDownIcon className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
@@ -117,6 +124,26 @@ export function SearchAndFilters({
               {statusFilter && statusFilter.length > 0 && (
                 <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                   {statusFilter.length}
+                </span>
+              )}
+            </div>
+
+            {/* Distance Filter */}
+            <div className="relative">
+              <select
+                value={distanceFilter}
+                onChange={(e) => onDistanceFilterChange?.(e.target.value as DistanceFilter)}
+                className="appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              >
+                <option value="all">All Distances</option>
+                <option value="within-50">Within 50 km</option>
+                <option value="50-100">50-100 km</option>
+                <option value="100-plus">100+ km</option>
+              </select>
+              <ChevronDownIcon className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              {distanceFilter !== 'all' && (
+                <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  1
                 </span>
               )}
             </div>

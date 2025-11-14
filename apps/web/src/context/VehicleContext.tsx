@@ -17,6 +17,8 @@ export interface FeedbackState {
   vehicleId?: string;
 }
 
+export type DistanceFilter = 'all' | 'within-50' | '50-100' | '100-plus';
+
 interface VehicleState {
   vehicles: Vehicle[];
   loading: boolean;
@@ -26,6 +28,7 @@ interface VehicleState {
   hasMore: boolean;
   total: number;
   statusFilter: VehicleStatus[] | null;
+  distanceFilter: DistanceFilter;
   operationStates: Record<string, OperationState>;
   vehiclesToRender: number;
   feedback: FeedbackState;
@@ -41,6 +44,7 @@ type VehicleAction =
   | { type: 'CLEAR_ERROR' }
   | { type: 'SET_SORT_BY'; payload: SortOption }
   | { type: 'SET_STATUS_FILTER'; payload: VehicleStatus[] | null }
+  | { type: 'SET_DISTANCE_FILTER'; payload: DistanceFilter }
   | { type: 'SET_OPERATION_STATE'; payload: { vehicleId: string; operation: keyof OperationState; isLoading: boolean } }
   | { type: 'CLEAR_OPERATION_STATE'; payload: { vehicleId: string; operation: keyof OperationState } }
   | { type: 'SET_VEHICLES_TO_RENDER'; payload: number }
@@ -58,6 +62,7 @@ interface VehicleContextType {
   clearError: () => void;
   setSortBy: (_sortBy: SortOption) => void;
   setStatusFilter: (_statusFilter: VehicleStatus[] | null) => void;
+  setDistanceFilter: (_distanceFilter: DistanceFilter) => void;
   setOperationState: (_vehicleId: string, _operation: keyof OperationState, _isLoading: boolean) => void;
   clearOperationState: (_vehicleId: string, _operation: keyof OperationState) => void;
   setVehiclesToRender: (_count: number) => void;
@@ -76,6 +81,7 @@ const initialState: VehicleState = {
   hasMore: false,
   total: 0,
   statusFilter: null,
+  distanceFilter: 'all',
   operationStates: {},
   vehiclesToRender: 50,
   feedback: {
@@ -112,6 +118,8 @@ function vehicleReducer(state: VehicleState, action: VehicleAction): VehicleStat
       return { ...state, sortBy: action.payload };
     case 'SET_STATUS_FILTER':
       return { ...state, statusFilter: action.payload };
+    case 'SET_DISTANCE_FILTER':
+      return { ...state, distanceFilter: action.payload };
     case 'SET_OPERATION_STATE':
       return {
         ...state,
@@ -160,7 +168,7 @@ function vehicleReducer(state: VehicleState, action: VehicleAction): VehicleStat
 
 export function VehicleProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(vehicleReducer, initialState);
-  const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setLoading = useCallback((loading: boolean) => {
     dispatch({ type: 'SET_LOADING', payload: loading });
@@ -196,6 +204,10 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
 
   const setStatusFilter = useCallback((statusFilter: VehicleStatus[] | null) => {
     dispatch({ type: 'SET_STATUS_FILTER', payload: statusFilter });
+  }, []);
+
+  const setDistanceFilter = useCallback((distanceFilter: DistanceFilter) => {
+    dispatch({ type: 'SET_DISTANCE_FILTER', payload: distanceFilter });
   }, []);
 
   const setOperationState = useCallback((vehicleId: string, operation: keyof OperationState, isLoading: boolean) => {
@@ -246,6 +258,7 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
     clearError,
     setSortBy,
     setStatusFilter,
+    setDistanceFilter,
     setOperationState,
     clearOperationState,
     setVehiclesToRender,

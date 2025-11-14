@@ -267,7 +267,20 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
             {vehicle.sellerInfo.location && (
               <div className="flex justify-between">
                 <span className="text-gray-600">Location</span>
-                <span className="text-gray-900 font-medium">{vehicle.sellerInfo.location}</span>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(vehicle.sellerInfo.location.split(',')[0].trim() + ', Poland')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline font-medium"
+                >
+                  {vehicle.sellerInfo.location}
+                </a>
+              </div>
+            )}
+            {vehicle.distanceFromWroclaw !== null && (
+              <div className="flex justify-between">
+                <span className="text-gray-600">Distance from Wrocław</span>
+                <span className="text-gray-900 font-medium">{Math.round(vehicle.distanceFromWroclaw)} km</span>
               </div>
             )}
             {vehicle.sellerInfo.memberSince && (
@@ -277,6 +290,25 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
               </div>
             )}
           </div>
+
+          {/* Google Maps Embed */}
+          {vehicle.sellerInfo.location && process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY && (
+            <div className="mt-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Location Map</h3>
+              <div className="w-full h-96 rounded-lg overflow-hidden">
+                <iframe
+                  width="100%"
+                  height="100%"
+                  frameBorder="0"
+                  style={{ border: 0 }}
+                  src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&q=${encodeURIComponent(vehicle.sellerInfo.location.split(',')[0].trim() + ', Poland')}`}
+                  allowFullScreen
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              </div>
+            </div>
+          )}
         </section>
       )}
 

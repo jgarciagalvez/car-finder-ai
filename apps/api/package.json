@@ -14,6 +14,8 @@
     "ingest": "tsx src/scripts/ingest.ts",
     "translate": "tsx src/scripts/translate.ts",
     "analyze": "tsx src/scripts/analyze.ts",
+    "migrate-add-distance": "tsx src/scripts/migrate-add-distance.ts",
+    "backfill-distances": "tsx src/scripts/backfill-distances.ts",
     "full-pipeline": "tsx src/scripts/ingest.ts && tsx src/scripts/translate.ts && tsx src/scripts/analyze.ts"
   },
   "dependencies": {
@@ -24,6 +26,7 @@
     "cheerio": "~1.0.0",
     "cors": "^2.8.5",
     "express": "^4.18.0",
+    "p-limit": "^4.0.0",
     "puppeteer": "~22.0.0",
     "uuid": "^9.0.0"
   },

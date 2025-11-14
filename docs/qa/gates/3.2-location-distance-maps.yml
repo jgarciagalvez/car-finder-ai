@@ -1,0 +1,57 @@
+# Quality Gate Decision
+schema: 1
+story: "3.2"
+story_title: "Location - Distance Calculation + Maps Integration"
+gate: PASS
+status_reason: "All critical issues resolved. Comprehensive test coverage added, documentation complete, implementation follows best practices."
+reviewer: "Quinn (Test Architect)"
+updated: "2025-11-14T12:00:00Z"
+
+waiver: { active: false }
+
+top_issues: []  # All issues resolved in follow-up review
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 1 }
+  recommendations:
+    must_fix: []  # All critical issues resolved
+    monitor:
+      - "Consider adding integration tests for backfill script post-MVP (TEST-002)"
+      - "Consider adding error boundary for Google Maps iframe (PERF-001)"
+
+evidence:
+  tests_reviewed: 24  # Initial 8 + 16 DistanceCalculationService tests
+  risks_identified: 5  # Initial review
+  risks_resolved: 4    # TEST-001, TEST-003, DOC-001 resolved
+  trace:
+    ac_covered: [1, 2, 3, 4]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "API key not exposed to client (backend-only Nominatim). Frontend uses NEXT_PUBLIC_ prefix correctly for Google Maps embed. No sensitive data exposure."
+  performance:
+    status: PASS
+    notes: "Haversine calculation is O(1). Database index on distanceFromWroclaw ensures fast sorting. Two-level caching (geocode + distance) minimizes API calls. Rate limiting respects Nominatim 1 req/sec limit. All performance tests pass."
+  reliability:
+    status: PASS
+    notes: "Comprehensive test coverage now verifies all error paths. 16 tests cover API failures, network errors, malformed responses, caching, and rate limiting. All critical error handling paths verified."
+  maintainability:
+    status: PASS
+    notes: "Code is well-structured with clear separation of concerns. Service layer pattern used correctly. Good documentation in comments and .env.example. TypeScript types are explicit and correct. Test coverage excellent."
+
+recommendations:
+  immediate: []  # All critical recommendations addressed
+  completed:
+    - action: "✅ RESOLVED: Added comprehensive unit tests for DistanceCalculationService (16 tests, all pass)"
+      refs: ["apps/api/src/__tests__/DistanceCalculationService.test.ts"]
+    - action: "✅ RESOLVED: Documented NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in .env.example with setup instructions"
+      refs: [".env.example:22-27"]
+    - action: "✅ RESOLVED: Added distance sorting tests to utils.test.ts (4 tests covering asc/desc and null handling)"
+      refs: ["apps/web/__tests__/utils.test.ts:185-234"]
+  future:
+    - action: "Consider adding integration tests for backfill-distances.ts script (low priority for MVP)"
+      refs: ["apps/api/src/scripts/backfill-distances.ts"]
+    - action: "Consider error boundary for Google Maps iframe (low priority - current graceful degradation is acceptable)"
+      refs: ["apps/web/src/components/VehicleDetail.tsx:294-311"]

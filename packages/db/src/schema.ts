@@ -38,7 +38,10 @@ export interface VehicleTable {
   aiPrioritySummary: string | null;
   aiMechanicReport: string | null;
   aiDataSanityCheck: string | null;
-  
+
+  // Location data (nullable)
+  distanceFromWroclaw: number | null;
+
   // User workflow data
   status: 'new' | 'to_contact' | 'contacted' | 'to_visit' | 'visited' | 'not_interested' | 'deleted';
   personalNotes: string | null;
@@ -97,7 +100,10 @@ export const CREATE_VEHICLES_TABLE = `
     aiPrioritySummary TEXT,
     aiMechanicReport TEXT,
     aiDataSanityCheck TEXT,
-    
+
+    -- Location data (nullable)
+    distanceFromWroclaw REAL,
+
     -- User workflow data
     status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'to_contact', 'contacted', 'to_visit', 'visited', 'not_interested', 'deleted')),
     personalNotes TEXT,
@@ -116,6 +122,7 @@ export const CREATE_INDEXES = [
   'CREATE INDEX IF NOT EXISTS idx_vehicles_created_at ON vehicles(createdAt)',
   'CREATE INDEX IF NOT EXISTS idx_vehicles_source ON vehicles(source)',
   'CREATE INDEX IF NOT EXISTS idx_vehicles_price_eur ON vehicles(priceEur)',
+  'CREATE INDEX IF NOT EXISTS idx_vehicles_distance ON vehicles(distanceFromWroclaw)',
 ];
 
 // Trigger for auto-updating updatedAt timestamp

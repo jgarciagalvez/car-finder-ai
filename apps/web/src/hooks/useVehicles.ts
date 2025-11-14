@@ -18,11 +18,12 @@ export function useVehicles() {
     state,
     setLoading,
     setVehicles,
-    appendVehicles,
+    appendVehicles: _appendVehicles,
     setError,
     clearError,
     setSortBy,
     setStatusFilter,
+    setDistanceFilter,
     updateVehicle: updateVehicleInContext,
     setOperationState,
     clearOperationState,
@@ -134,15 +135,33 @@ export function useVehicles() {
   // Apply sorting and filtering
   const filteredVehicles = useMemo(() => {
     // First sort the vehicles
-    const sorted = sortVehicles(state.vehicles, state.sortBy);
+    let result = sortVehicles(state.vehicles, state.sortBy);
 
-    // Then apply status filter if active
+    // Apply status filter if active
     if (state.statusFilter && state.statusFilter.length > 0) {
-      return sorted.filter(v => state.statusFilter!.includes(v.status));
+      result = result.filter(v => state.statusFilter!.includes(v.status));
     }
 
-    return sorted;
-  }, [state.vehicles, state.sortBy, state.statusFilter]);
+    // Apply distance filter if active
+    if (state.distanceFilter !== 'all') {
+      result = result.filter(v => {
+        if (v.distanceFromWroclaw === null) return false; // Exclude null distances
+
+        switch (state.distanceFilter) {
+          case 'within-50':
+            return v.distanceFromWroclaw <= 50;
+          case '50-100':
+            return v.distanceFromWroclaw > 50 && v.distanceFromWroclaw <= 100;
+          case '100-plus':
+            return v.distanceFromWroclaw > 100;
+          default:
+            return true;
+        }
+      });
+    }
+
+    return result;
+  }, [state.vehicles, state.sortBy, state.statusFilter, state.distanceFilter]);
 
   // Progressive rendering: Slice filtered vehicles based on render count
   const visibleVehicles = useMemo(() => {
@@ -165,6 +184,7 @@ export function useVehicles() {
     selectedVehicle: state.selectedVehicle,
     sortBy: state.sortBy,
     statusFilter: state.statusFilter,
+    distanceFilter: state.distanceFilter,
     hasMore: state.hasMore,
     total: state.total,
     vehiclesToRender: state.vehiclesToRender,
@@ -176,6 +196,7 @@ export function useVehicles() {
     clearError,
     setSortBy,
     setStatusFilter,
+    setDistanceFilter,
     forceTranslateVehicle,
     forceAnalyzeVehicle,
     // New methods for centralized state management

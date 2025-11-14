@@ -68,6 +68,7 @@ describe('Vehicle Detail Page', () => {
     aiPrioritySummary: 'Good value',
     aiMechanicReport: '## Report',
     aiDataSanityCheck: 'Consistent',
+    distanceFromWroclaw: null,
     status: 'new',
     personalNotes: null,
     scrapedAt: new Date('2023-01-15'),

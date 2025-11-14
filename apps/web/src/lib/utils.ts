@@ -10,7 +10,9 @@ export type SortOption =
   | 'year_asc'
   | 'mileage_asc'
   | 'mileage_desc'
-  | 'personal_fit';
+  | 'personal_fit'
+  | 'distance_asc'
+  | 'distance_desc';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -152,6 +154,16 @@ export function sortVehicles(vehicles: Vehicle[], sortBy: SortOption): Vehicle[]
         return b.mileage - a.mileage;
       case 'personal_fit':
         return (b.personalFitScore ?? 0) - (a.personalFitScore ?? 0);
+      case 'distance_asc':
+        // Sort null distances to end
+        if (a.distanceFromWroclaw === null) return 1;
+        if (b.distanceFromWroclaw === null) return -1;
+        return a.distanceFromWroclaw - b.distanceFromWroclaw;
+      case 'distance_desc':
+        // Sort null distances to end
+        if (a.distanceFromWroclaw === null) return 1;
+        if (b.distanceFromWroclaw === null) return -1;
+        return b.distanceFromWroclaw - a.distanceFromWroclaw;
       default:
         return 0;
     }

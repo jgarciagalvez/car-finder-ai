@@ -34,7 +34,7 @@ interface HeaderProps {
   onSettings?: () => void;
 }
 
-export function Header({ vehicleCount = 0, lastUpdated, onRefresh, onScrapeNew, onSettings }: HeaderProps) {
+export function Header({ vehicleCount: _vehicleCount = 0, lastUpdated, onRefresh, onScrapeNew, onSettings }: HeaderProps) {
   return (
     <header className="bg-blue-600 text-white shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

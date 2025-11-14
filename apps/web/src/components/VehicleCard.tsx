@@ -289,7 +289,24 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
             </div>
             <div className="flex items-center gap-1">
               <span>📍</span>
-              <span>{vehicle.sellerInfo?.location || 'N/A'}</span>
+              {vehicle.sellerInfo?.location ? (
+                <>
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(vehicle.sellerInfo.location.split(',')[0].trim() + ', Poland')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {vehicle.sellerInfo.location.split(',')[0].trim()}
+                  </a>
+                  {vehicle.distanceFromWroclaw !== null && (
+                    <span className="text-gray-500"> • {Math.round(vehicle.distanceFromWroclaw)} km</span>
+                  )}
+                </>
+              ) : (
+                <span>N/A</span>
+              )}
             </div>
             <div className="flex items-center gap-1">
               <span>👤</span>

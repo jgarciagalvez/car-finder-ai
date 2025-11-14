@@ -14,10 +14,12 @@
  */
 
 import { WorkspaceUtils } from '@car-finder/services';
-import { createClient } from '@libsql/client';
-import { Kysely } from 'kysely';
-import { LibsqlDialect } from 'kysely-libsql';
 import path from 'path';
+
+// These imports are only used at runtime, not during compilation
+const createClient = require('@libsql/client').createClient;
+const Kysely = require('kysely').Kysely;
+const LibsqlDialect = require('kysely-libsql').LibsqlDialect;
 
 // Load environment variables from the workspace root
 WorkspaceUtils.loadEnvFromRoot();

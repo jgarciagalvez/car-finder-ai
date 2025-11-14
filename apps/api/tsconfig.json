@@ -20,7 +20,9 @@
     "node_modules",
     "dist",
     "**/*.test.ts",
-    "**/*.spec.ts"
+    "**/*.spec.ts",
+    "src/scripts/migrate-add-distance.ts",
+    "src/scripts/backfill-distances.ts"
   ],
   "references": [
     {

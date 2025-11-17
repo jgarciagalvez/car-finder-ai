@@ -93,6 +93,7 @@ temp/
 data/vehicles.db
 data/vehicles_old.db
 data/vehicles copy.db
+data/vehicles.test.db
 data/exports/
 
 # Analysis run logs (runtime operational data)

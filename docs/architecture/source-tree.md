@@ -29,7 +29,9 @@ car-finder-ai/
 │   │   ├── __tests__/           # Integration tests
 │   │   ├── dist/                # Compiled output (gitignored)
 │   │   ├── package.json
-│   │   └── tsconfig.json
+│   │   ├── tsconfig.json
+│   │   ├── jest.config.js       # Jest test configuration
+│   │   └── .eslintrc.js         # ESLint configuration
 │   │
 │   └── web/                     # Next.js frontend
 │       ├── src/
@@ -63,7 +65,11 @@ car-finder-ai/
 │       ├── .next/               # Build output (gitignored)
 │       ├── package.json
 │       ├── tsconfig.json
-│       └── next.config.js
+│       ├── tailwind.config.ts   # Tailwind CSS configuration (TypeScript)
+│       ├── postcss.config.js    # PostCSS configuration
+│       ├── jest.config.js       # Jest test configuration
+│       ├── .eslintrc.js         # ESLint configuration
+│       └── next.config.js       # Next.js configuration
 │
 ├── packages/
 │   ├── types/                   # Shared TypeScript types
@@ -83,7 +89,9 @@ car-finder-ai/
 │   │   ├── __tests__/
 │   │   ├── dist/
 │   │   ├── package.json
-│   │   └── tsconfig.json
+│   │   ├── tsconfig.json
+│   │   ├── jest.config.js       # Jest test configuration
+│   │   └── .eslintrc.js         # ESLint configuration
 │   │
 │   ├── services/                # Service abstraction layer
 │   │   ├── src/
@@ -94,7 +102,8 @@ car-finder-ai/
 │   │   ├── __tests__/
 │   │   ├── dist/
 │   │   ├── package.json
-│   │   └── tsconfig.json
+│   │   ├── tsconfig.json
+│   │   └── jest.config.js       # Jest test configuration
 │   │
 │   └── ai/                      # AI provider abstraction
 │       ├── src/
@@ -116,7 +125,8 @@ car-finder-ai/
 │       ├── __tests__/
 │       ├── dist/
 │       ├── package.json
-│       └── tsconfig.json
+│       ├── tsconfig.json
+│       └── jest.config.js       # Jest test configuration
 │
 ├── docs/                        # Documentation
 │   ├── architecture.md          # This file
@@ -135,6 +145,7 @@ car-finder-ai/
 ├── .env                         # Environment config (gitignored)
 ├── .env.example                 # Environment template
 ├── .gitignore
+├── .eslintrc.js                 # Root ESLint configuration
 ├── package.json                 # Root workspace config
 ├── pnpm-workspace.yaml          # pnpm workspace definition
 ├── pnpm-lock.yaml

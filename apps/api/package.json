@@ -16,6 +16,7 @@
     "analyze": "tsx src/scripts/analyze.ts",
     "migrate-add-distance": "tsx src/scripts/migrate-add-distance.ts",
     "backfill-distances": "tsx src/scripts/backfill-distances.ts",
+    "migrate-statuses": "tsx src/scripts/migrate-statuses.ts",
     "full-pipeline": "tsx src/scripts/ingest.ts && tsx src/scripts/translate.ts && tsx src/scripts/analyze.ts"
   },
   "dependencies": {
@@ -23,6 +24,7 @@
     "@car-finder/db": "workspace:*",
     "@car-finder/services": "workspace:*",
     "@car-finder/ai": "workspace:*",
+    "@libsql/client": "^0.15.15",
     "cheerio": "~1.0.0",
     "cors": "^2.8.5",
     "express": "^4.18.0",

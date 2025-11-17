@@ -44,6 +44,9 @@ importers:
       '@car-finder/types':
         specifier: workspace:*
         version: link:../../packages/types
+      '@libsql/client':
+        specifier: ^0.15.15
+        version: 0.15.15
       cheerio:
         specifier: ~1.0.0
         version: 1.0.0

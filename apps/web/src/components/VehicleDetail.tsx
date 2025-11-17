@@ -520,11 +520,14 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
             >
               <option value="new">New</option>
+              <option value="processed">Processed</option>
+              <option value="skipped">Skipped</option>
               <option value="to_contact">To Contact</option>
               <option value="contacted">Contacted</option>
               <option value="to_visit">To Visit</option>
               <option value="visited">Visited</option>
               <option value="not_interested">Not Interested</option>
+              <option value="deleted">Deleted</option>
             </select>
           </div>
 

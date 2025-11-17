@@ -72,6 +72,7 @@ describe('Vehicle Detail Page', () => {
     distanceFromWroclaw: null,
     status: 'new',
     personalNotes: null,
+    isRemovedFromSource: false,
     scrapedAt: new Date('2023-01-15'),
     createdAt: new Date('2023-01-15'),
     updatedAt: new Date('2023-01-16'),
@@ -79,6 +80,7 @@ describe('Vehicle Detail Page', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    document.title = 'Car Finder AI'; // Reset title
   });
 
   it('should render loading state initially', () => {
@@ -244,5 +246,55 @@ describe('Vehicle Detail Page', () => {
     // Check for loading spinner (animate-spin class)
     const spinner = screen.getByText(/Loading vehicle details/i).previousElementSibling;
     expect(spinner).toHaveClass('animate-spin');
+  });
+
+  // Page title tests
+  describe('Page Title Management', () => {
+    it('should set loading title during fetch', () => {
+      mockFetchVehicleById.mockImplementation(() => new Promise(() => {})); // Never resolves
+
+      render(<VehicleDetailPage params={{ id: '123' }} />);
+
+      expect(document.title).toBe('Loading... | Car Finder AI');
+    });
+
+    it('should set vehicle title after successful fetch', async () => {
+      mockFetchVehicleById.mockResolvedValueOnce(mockVehicle);
+
+      render(<VehicleDetailPage params={{ id: '123' }} />);
+
+      await waitFor(() => {
+        expect(document.title).toBe('BMW X5 2020 | Car Finder AI');
+      });
+    });
+
+    it('should set not found title on fetch error', async () => {
+      const error = new Error('Vehicle not found');
+      mockFetchVehicleById.mockRejectedValueOnce(error);
+
+      render(<VehicleDetailPage params={{ id: '999' }} />);
+
+      await waitFor(() => {
+        expect(document.title).toBe('Vehicle Not Found | Car Finder AI');
+      });
+    });
+
+    it('should update title when vehicle changes', async () => {
+      const updatedVehicle = { ...mockVehicle, title: 'Audi A4 2.0 TDI' };
+      mockFetchVehicleById.mockResolvedValueOnce(mockVehicle);
+
+      const { rerender } = render(<VehicleDetailPage params={{ id: '123' }} />);
+
+      await waitFor(() => {
+        expect(document.title).toBe('BMW X5 2020 | Car Finder AI');
+      });
+
+      mockFetchVehicleById.mockResolvedValueOnce(updatedVehicle);
+      rerender(<VehicleDetailPage params={{ id: '456' }} />);
+
+      await waitFor(() => {
+        expect(document.title).toBe('Audi A4 2.0 TDI | Car Finder AI');
+      });
+    });
   });
 });

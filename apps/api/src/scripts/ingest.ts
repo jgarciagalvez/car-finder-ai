@@ -386,6 +386,7 @@ export class IngestionPipeline {
         // User workflow data
         status: 'new',
         personalNotes: null,
+        isRemovedFromSource: false,
 
         // Timestamps
         scrapedAt: now,
@@ -558,6 +559,7 @@ export class IngestionPipeline {
       // User workflow data
       status: 'new',
       personalNotes: null,
+      isRemovedFromSource: false,
 
       // Timestamps
       scrapedAt: now,

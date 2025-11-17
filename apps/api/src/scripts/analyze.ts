@@ -629,6 +629,13 @@ export class VehicleAnalyzer {
 
       // Mark vehicle as completed in run log
       this.runLog.vehiclesCompleted++;
+
+      // Update status from 'new' to 'processed' after successful analysis
+      // Only update if current status is 'new' (don't overwrite user changes)
+      if (vehicle.status === 'new' && analysis.aiPriorityRating !== undefined) {
+        await this.vehicleRepository.updateVehicle(vehicle.id, { status: 'processed' });
+        if (!quiet) console.log('  ✓ Status updated to "processed"');
+      }
     }
   }
 

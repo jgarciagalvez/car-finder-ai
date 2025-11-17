@@ -158,34 +158,36 @@
 
 **Context:**
 - Need to differentiate between vehicles that are "processed" (AI analysis done) vs "skipped" (user chose not to analyze)
-- "new" status should be system-only, not user-facing
-- "removed_from_source" represents vehicles no longer on Otomoto, but should NOT interfere with user's workflow status
+- "new" status represents scraped-but-not-analyzed vehicles (visible in UI for pipeline visibility)
+- `isRemovedFromSource` boolean flag (NOT a status) represents vehicles no longer on Otomoto, separate from workflow status
 
 **Acceptance Criteria:**
 1. **Type Definition Update:**
    - Update VehicleStatus type in `packages/types/src/index.ts`:
      ```typescript
-     type VehicleStatus = 'new' | 'processed' | 'skipped' | 'to_contact' | 'contacted' | 'to_visit' | 'visited' | 'not_interested' | 'deleted' | 'removed_from_source'
+     type VehicleStatus = 'new' | 'processed' | 'skipped' | 'to_contact' | 'contacted' | 'to_visit' | 'visited' | 'not_interested' | 'deleted'
      ```
+   - Add `isRemovedFromSource: boolean` field to Vehicle interface (NOT a status value)
 
 2. **New Status Behaviors:**
-   - `new`: System-only status, assigned when vehicle is scraped, NOT visible in UI dropdown
+   - `new`: Assigned when vehicle is scraped, visible in UI for pipeline visibility
    - `processed`: User-facing status, indicates AI analysis is complete
    - `skipped`: User-facing status, indicates user chose not to analyze
-   - `removed_from_source`: System status, indicates vehicle no longer exists on Otomoto
+   - `isRemovedFromSource`: Boolean flag, NOT a status (used by Story 3.7)
 
 3. **Database Schema:**
-   - Add new field: `isRemovedFromSource: boolean` (default: false)
+   - Add new field: `isRemovedFromSource INTEGER DEFAULT 0` (SQLite boolean)
    - Add database migration for new statuses and field
    - Update existing "new" vehicles to "processed" if they have AI analysis
 
 4. **UI Changes:**
-   - Remove "new" from status dropdown options in dashboard and detail page
+   - Keep "new" visible in status dropdowns for pipeline visibility (scraped-but-not-analyzed vehicles)
    - Add "processed" and "skipped" to status dropdown
-   - Status dropdown in `apps/web/src/components/VehicleCard.tsx` reflects new options
+   - Status dropdown order: New, Processed, Skipped, To Contact, Contacted, To Visit, Visited, Not Interested, Deleted
+   - Consistent status options in `VehicleCard.tsx`, `VehicleDetail.tsx`, and `SearchAndFilters.tsx`
 
 5. **User Workflow:**
-   - Vehicle scraped → status = "new" (system-only)
+   - Vehicle scraped → status = "new" (visible in UI)
    - AI processes vehicle → status changes to "processed"
    - User can manually set status to "skipped" if choosing not to analyze
    - User workflow continues: `to_contact → contacted → to_visit → visited → not_interested → deleted`
@@ -225,66 +227,68 @@
 
 ---
 
-### **Story 3.7: Existence Check - Manual Verification**
+### **Story 3.7: Existence Check - Auto-Verification on Detail Page**
 
-**As a** user, **I want** to manually check if vehicles are still available on Otomoto, **so that** I can identify removed listings and avoid wasting time on unavailable vehicles.
+**As a** user, **I want** vehicles to automatically check if they're still available on Otomoto when I view their details, **so that** I can identify removed listings without manual effort.
 
 **Context:**
 - Vehicles may be removed from Otomoto after scraping (sold, expired, etc.)
-- User wants to verify availability without re-scraping
-- Field `isRemovedFromSource` should NOT interfere with user's workflow status (separate concern)
-- No scheduled/cron jobs - manual verification only
+- Auto-verification on detail page visit (background, non-blocking)
+- 4-hour cache to avoid excessive requests (check only if last check >4 hours ago)
+- Skip fresh vehicles (scraped <4 hours ago)
+- Field `isRemovedFromSource` is a flag, NOT a status (doesn't auto-change workflow status)
+- One-time cleanup script for existing ~500 vehicles (auto-marks as 'deleted')
+- **Flag-based approach**: Visual warning badge, user decides on status changes
 
 **Acceptance Criteria:**
-1. **Database Field:**
+1. **Database Fields:**
    - Field `isRemovedFromSource: boolean` exists (added in Story 3.5)
-   - Default value is `false` for all vehicles
+   - New field `lastExistenceCheck: Date | null` tracks when vehicle was last verified
+   - Default values: `isRemovedFromSource = false`, `lastExistenceCheck = null`
 
-2. **Manual Check - Dashboard:**
-   - Dashboard header includes "Check All Vehicles" button
-   - When clicked, checks all vehicles where `isRemovedFromSource = false` AND status != 'deleted'
-   - Button shows loading state during check (e.g., "Checking... (5/120)")
-   - On completion, shows summary (e.g., "Checked 120 vehicles. 3 are no longer available.")
-   - Updates `isRemovedFromSource = true` for vehicles that return 404/410
+2. **Auto-Check on Detail Page Visit:**
+   - When user opens vehicle detail page, system checks if verification needed
+   - Check triggers if: `lastExistenceCheck` is null OR >4 hours old
+   - Check skipped if: vehicle was scraped <4 hours ago (fresh data)
+   - Check runs in background (non-blocking page load)
+   - On completion, updates `isRemovedFromSource` and `lastExistenceCheck`
+   - If vehicle removed, shows toast notification: "This vehicle has been removed from Otomoto"
 
-3. **Manual Check - Individual Vehicle:**
-   - Detail page includes "Check if removed" button
-   - When clicked, verifies current vehicle's availability
-   - Button shows loading state during check
-   - Updates `isRemovedFromSource` field based on result
-   - Shows success/failure message
+3. **Visual Warning Badge:**
+   - Vehicles with `isRemovedFromSource = true` display badge: `⚠️ Removed from Source`
+   - Badge visible in both dashboard cards and detail view header
+   - Badge styled with orange/yellow warning colors, noticeable but not obstructive
+   - Vehicles remain visible in dashboard (NOT auto-hidden or auto-deleted)
+   - User manually decides to mark as "deleted" status or keep in list
 
-4. **Visual Indicator:**
-   - Vehicles with `isRemovedFromSource = true` display prominent badge/banner
-   - Badge visible in both dashboard and detail view
-   - Example text: "⚠️ No longer available on Otomoto"
-   - Badge styled to be noticeable but not obstructive
+4. **No Auto-Deletion (UI):**
+   - Flagging as removed does NOT automatically change vehicle status
+   - User maintains full control over status decisions
+   - Flagged vehicles can still be contacted, visited, etc.
+   - User can mark vehicle as 'deleted' to hide from dashboard (uses Story 3.4 filter)
 
 5. **API Implementation:**
    - Create new API endpoint: `POST /api/vehicles/:id/check-existence`
    - Endpoint makes HEAD request to vehicle's `sourceUrl`
-   - Returns 404/410 → sets `isRemovedFromSource = true`
-   - Returns 200 → sets `isRemovedFromSource = false`
-   - Handles errors gracefully (network issues, timeouts)
+   - Returns 404/410 → sets `isRemovedFromSource = true`, updates `lastExistenceCheck`
+   - Returns 200 → sets `isRemovedFromSource = false`, updates `lastExistenceCheck`
+   - Handles errors gracefully (network issues, timeouts) - does not update fields on error
 
-6. **Batch Check Implementation:**
-   - Create API endpoint: `POST /api/vehicles/check-all-existence`
-   - Processes vehicles in batches to avoid rate limiting
-   - Includes appropriate delays between requests
-   - Returns progress updates (if using streaming/polling)
-   - Logs results for monitoring
-
-7. **Performance Considerations:**
-   - Current vehicle count: ~200-300
-   - Check all operation should complete reasonably fast
-   - Include delay between requests to respect Otomoto rate limits
-   - Provide clear progress feedback to user
+6. **One-Time Cleanup Script:**
+   - Standalone script (`scripts/check-all-existence.js`) to check existing ~500 vehicles
+   - Runs sequentially with 1.5s delays between requests to respect rate limits
+   - Vehicles returning 404/410 are auto-marked as `status = 'deleted'` AND `isRemovedFromSource = true`
+   - Logs progress and summary (e.g., "Checked 500 vehicles. 15 marked as deleted.")
+   - Script is deleted after successful execution (one-time use)
 
 **Technical Notes:**
-- Files to modify: `packages/types/src/index.ts`, vehicle repository, create new API routes
+- Files to modify: `packages/types/src/index.ts`, vehicle repository, create new API endpoint
+- New file: `packages/db/src/migrations/add-last-existence-check.ts`
+- New file: `scripts/check-all-existence.js` (temporary, delete after use)
 - Use HEAD request instead of GET to minimize bandwidth
-- Handle redirects appropriately (may indicate vehicle moved, not removed)
-- Consider Otomoto's rate limiting policies
+- Handle redirects appropriately (follow redirects, check final status)
+- 4-hour cache prevents excessive requests while keeping data fresh
+- One-time script provides clean slate for existing vehicles
 
 ---
 
@@ -297,14 +301,16 @@
 - Location features integrated (distance calculation, maps)
 - Advanced sorting capabilities (compound/stacked sorting)
 - Clear status differentiation (processed/skipped workflow)
-- Vehicle availability verification (manual check system)
+- Vehicle availability verification (auto-check on detail page visit)
 - Improved UX (two-tier hiding for not_interested/deleted, inline placeholder feedback, dynamic page titles)
 
 **Database Changes Required:**
 - New field: `distanceFromWroclaw: number | null`
 - New field: `isRemovedFromSource: boolean`
-- New statuses: `processed`, `skipped`, `removed_from_source`
+- New field: `lastExistenceCheck: Date | null`
+- New statuses: `processed`, `skipped`
 - Migration to backfill distance and update existing "new" vehicles
+- Migration to add `lastExistenceCheck` field
 
 **Dependencies:**
 - Story 3.1 (Performance fix) should be completed first (CRITICAL)

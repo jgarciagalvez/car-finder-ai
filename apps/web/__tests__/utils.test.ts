@@ -46,6 +46,7 @@ describe('Sorting Functions', () => {
     distanceFromWroclaw: null,
     status: 'new',
     personalNotes: null,
+    isRemovedFromSource: false,
     scrapedAt: new Date(),
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -505,6 +506,8 @@ describe('Sorting Functions', () => {
     describe('getStatusColor', () => {
       it('should return correct colors for all statuses', () => {
         expect(getStatusColor('new')).toBe('bg-blue-100 text-blue-800');
+        expect(getStatusColor('processed')).toBe('bg-green-100 text-green-800');
+        expect(getStatusColor('skipped')).toBe('bg-gray-100 text-gray-800');
         expect(getStatusColor('to_contact')).toBe('bg-yellow-100 text-yellow-800');
         expect(getStatusColor('contacted')).toBe('bg-orange-100 text-orange-800');
         expect(getStatusColor('to_visit')).toBe('bg-purple-100 text-purple-800');
@@ -518,6 +521,8 @@ describe('Sorting Functions', () => {
     describe('getStatusLabel', () => {
       it('should return correct labels for all statuses', () => {
         expect(getStatusLabel('new')).toBe('New');
+        expect(getStatusLabel('processed')).toBe('Processed');
+        expect(getStatusLabel('skipped')).toBe('Skipped');
         expect(getStatusLabel('to_contact')).toBe('To Contact');
         expect(getStatusLabel('contacted')).toBe('Contacted');
         expect(getStatusLabel('to_visit')).toBe('To Visit');

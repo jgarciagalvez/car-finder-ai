@@ -46,9 +46,10 @@ CREATE TABLE IF NOT EXISTS vehicles (
   aiDataSanityCheck TEXT,
   
   -- User workflow data
-  status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'to_contact', 'contacted', 'to_visit', 'visited', 'deleted')),
+  status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'processed', 'skipped', 'to_contact', 'contacted', 'to_visit', 'visited', 'not_interested', 'deleted')),
   personalNotes TEXT,
-  
+  isRemovedFromSource INTEGER DEFAULT 0, -- SQLite uses 0/1 for boolean (added in Story 3.5)
+
   -- Timestamps
   scrapedAt TEXT NOT NULL,
   createdAt TEXT NOT NULL DEFAULT (datetime('now')),
@@ -99,6 +100,10 @@ This trigger automatically maintains the `updatedAt` timestamp whenever any fiel
 4. **Nullable AI Fields**: All AI-generated columns allow NULL to support the two-phase workflow (scrape first, analyze later).
 
 5. **Source URL Uniqueness**: The `UNIQUE` constraint on `sourceUrl` prevents duplicate scraping of the same listing.
+
+6. **Application-Level Status Validation**: New statuses ('processed', 'skipped') added in Story 3.5 are validated at the TypeScript level rather than modifying the SQLite CHECK constraint (which cannot be altered in-place). The VehicleTable type union ensures type safety at compile time.
+
+7. **Boolean as INTEGER**: SQLite uses INTEGER (0/1) for boolean fields. The `isRemovedFromSource` field stores 0 (false) or 1 (true) and is converted to boolean at the repository layer.
 
 ## Post-MVP Considerations
 

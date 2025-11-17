@@ -41,6 +41,7 @@ router.get('/', async (req: Request, res: Response) => {
       distanceFromWroclaw: vehicle.distanceFromWroclaw,
       status: vehicle.status,
       personalNotes: vehicle.personalNotes,
+      isRemovedFromSource: vehicle.isRemovedFromSource,
       createdAt: vehicle.createdAt.toISOString(),
       updatedAt: vehicle.updatedAt.toISOString(),
     }));
@@ -101,6 +102,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       distanceFromWroclaw: vehicle.distanceFromWroclaw,
       status: vehicle.status,
       personalNotes: vehicle.personalNotes,
+      isRemovedFromSource: vehicle.isRemovedFromSource,
       createdAt: vehicle.createdAt.toISOString(),
       updatedAt: vehicle.updatedAt.toISOString(),
     };
@@ -129,7 +131,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
       });
     }
 
-    if (status && !['new', 'to_contact', 'contacted', 'to_visit', 'visited', 'not_interested', 'deleted'].includes(status)) {
+    if (status && !['new', 'processed', 'skipped', 'to_contact', 'contacted', 'to_visit', 'visited', 'not_interested', 'deleted'].includes(status)) {
       return res.status(400).json({
         error: 'Bad request',
         message: 'Invalid status value'
@@ -195,6 +197,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
       distanceFromWroclaw: updatedVehicle.distanceFromWroclaw,
       status: updatedVehicle.status,
       personalNotes: updatedVehicle.personalNotes,
+      isRemovedFromSource: updatedVehicle.isRemovedFromSource,
       createdAt: updatedVehicle.createdAt.toISOString(),
       updatedAt: updatedVehicle.updatedAt.toISOString(),
     };

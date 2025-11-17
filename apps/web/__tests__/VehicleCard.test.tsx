@@ -110,6 +110,7 @@ const createMockVehicle = (overrides: Partial<Vehicle> = {}): Vehicle => ({
   distanceFromWroclaw: null,
   status: 'new',
   personalNotes: null,
+  isRemovedFromSource: false,
   scrapedAt: new Date(),
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -258,6 +259,8 @@ describe('VehicleCard', () => {
       const vehicle = createMockVehicle();
       render(<VehicleCard vehicle={vehicle} />);
       expect(screen.getByRole('option', { name: 'New' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Processed' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Skipped' })).toBeInTheDocument();
       expect(screen.getByRole('option', { name: 'To Contact' })).toBeInTheDocument();
       expect(screen.getByRole('option', { name: 'Contacted' })).toBeInTheDocument();
       expect(screen.getByRole('option', { name: 'To Visit' })).toBeInTheDocument();

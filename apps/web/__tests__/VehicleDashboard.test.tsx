@@ -67,6 +67,7 @@ const createMockVehicle = (overrides: Partial<Vehicle> = {}): Vehicle => ({
   distanceFromWroclaw: null,
   status: 'new',
   personalNotes: null,
+  isRemovedFromSource: false,
   scrapedAt: new Date(),
   createdAt: new Date(),
   updatedAt: new Date(),

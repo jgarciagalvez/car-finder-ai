@@ -9,7 +9,7 @@ This interface will be placed in the shared `packages/types` directory within ou
 
 ```typescript
 export type VehicleSource = 'otomoto' | 'olx';
-export type VehicleStatus = 'new' | 'to_contact' | 'contacted' | 'to_visit' | 'visited' | 'not_interested' | 'deleted';
+export type VehicleStatus = 'new' | 'processed' | 'skipped' | 'to_contact' | 'contacted' | 'to_visit' | 'visited' | 'not_interested' | 'deleted';
 export type SellerType = 'private' | 'company' | null;
 
 export interface SellerInfo {
@@ -61,15 +61,26 @@ export interface Vehicle {
   // User Workflow Data
   status: VehicleStatus;
   personalNotes: string | null;
+  isRemovedFromSource: boolean; // Default: false, indicates if listing removed from source
 
   // Our Timestamps
   scrapedAt: Date;
-  createdAt: Date; 
+  createdAt: Date;
   updatedAt: Date;
 }
 ```
 **Status Field Notes:**
+- `'new'`: System-only status, assigned when vehicle is scraped, NOT visible in UI dropdown
+- `'processed'`: User-facing status, indicates AI analysis is complete (set automatically after successful analysis)
+- `'skipped'`: User-facing status, indicates user chose not to analyze the vehicle
+- `'to_contact'` → `'contacted'` → `'to_visit'` → `'visited'`: User evaluation workflow
 - `'not_interested'`: Vehicle automatically filtered out during translation due to missing required features (see Story 2.4c). Can be manually re-translated via UI action button with force flag.
+- `'deleted'`: User marked vehicle as deleted
+
+**isRemovedFromSource Field:**
+- Boolean flag independent of status (to be used by Story 3.7 existence check feature)
+- Default: false
+- Indicates if the vehicle listing has been removed from the source website
 
 **Relationships:**
 For the scope of the MVP, the Vehicle model is a self-contained entity. It has no direct relationships with other data models.

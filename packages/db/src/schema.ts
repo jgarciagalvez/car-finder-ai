@@ -44,9 +44,10 @@ export interface VehicleTable {
   distanceFromWroclaw: number | null;
 
   // User workflow data
-  status: 'new' | 'to_contact' | 'contacted' | 'to_visit' | 'visited' | 'not_interested' | 'deleted';
+  status: 'new' | 'processed' | 'skipped' | 'to_contact' | 'contacted' | 'to_visit' | 'visited' | 'not_interested' | 'deleted';
   personalNotes: string | null;
-  
+  isRemovedFromSource: number | null; // SQLite uses 0/1 for boolean, default 0
+
   // Timestamps
   scrapedAt: string; // ISO date string
   createdAt: Generated<string>; // Auto-generated ISO date string
@@ -107,9 +108,10 @@ export const CREATE_VEHICLES_TABLE = `
     distanceFromWroclaw REAL,
 
     -- User workflow data
-    status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'to_contact', 'contacted', 'to_visit', 'visited', 'not_interested', 'deleted')),
+    status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'processed', 'skipped', 'to_contact', 'contacted', 'to_visit', 'visited', 'not_interested', 'deleted')),
     personalNotes TEXT,
-    
+    isRemovedFromSource INTEGER DEFAULT 0,
+
     -- Timestamps
     scrapedAt TEXT NOT NULL,
     createdAt TEXT NOT NULL DEFAULT (datetime('now')),

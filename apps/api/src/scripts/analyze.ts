@@ -26,6 +26,7 @@ import { DatabaseService, VehicleRepository } from '@car-finder/db';
 import { Vehicle } from '@car-finder/types';
 import { AIError, RateLimitError, ValidationError } from '@car-finder/ai';
 import { WorkspaceUtils } from '@car-finder/services';
+import pLimit from 'p-limit';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -50,18 +51,21 @@ interface AnalysisOptions {
   vehicleId?: string;
   limit?: number;
   skipMechanicReport?: boolean;
+  includeFullReport?: boolean;
   skipSanityCheck?: boolean;
   skipPriorityRating?: boolean;
   resume?: boolean;
   retryFailed?: string;
   showLogs?: boolean;
   force?: boolean;
+  concurrency?: number;
 }
 
 interface AnalysisRunLog {
   runId: string;
   startTime: Date;
   endTime?: Date;
+  concurrency: number;
   vehiclesProcessed: number;
   vehiclesCompleted: number;
   vehiclesFailed: number;
@@ -135,7 +139,8 @@ export function getRequiredAnalysisSteps(vehicle: Vehicle, force: boolean = fals
     steps.push('fit_score');
   }
 
-  if (!vehicle.aiMechanicReport) {
+  // Check for mechanic summary (new default) instead of full report
+  if (!vehicle.virtualMechanicSummary) {
     steps.push('mechanic_report');
   }
 
@@ -211,6 +216,7 @@ export class VehicleAnalyzer {
     this.runLog = {
       runId: crypto.randomUUID(),
       startTime: new Date(),
+      concurrency: 3, // Default, will be updated in run()
       vehiclesProcessed: 0,
       vehiclesCompleted: 0,
       vehiclesFailed: 0,
@@ -252,30 +258,63 @@ export class VehicleAnalyzer {
       }
 
       this.stats.totalVehicles = vehicles.length;
-      console.log(`📊 Found ${vehicles.length} vehicle(s) to analyze\n`);
+      const concurrency = options.concurrency || 3;
 
-      // Process vehicles with rate limiting (15 RPM = 4 seconds per vehicle)
-      for (let i = 0; i < vehicles.length; i++) {
-        const vehicle = vehicles[i];
-        console.log(`\n[${i + 1}/${vehicles.length}] Analyzing vehicle ${vehicle.id}...`);
+      // Store concurrency in run log
+      this.runLog.concurrency = concurrency;
 
-        try {
-          await this.analyzeVehicle(vehicle, options);
-          this.stats.analyzed++;
-          console.log(`✅ Analysis complete for ${vehicle.id}`);
-        } catch (error) {
-          this.stats.failed++;
-          this.runLog.vehiclesFailed++;
-          const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-          this.stats.errors.push({ vehicleId: vehicle.id, error: errorMsg });
-          console.error(`❌ Failed to analyze ${vehicle.id}: ${errorMsg}`);
+      console.log(`📊 Found ${vehicles.length} vehicle(s) to analyze`);
+      console.log(`🚀 Starting concurrent analysis with concurrency=${concurrency}\n`);
 
-          // Continue processing remaining vehicles
-          continue;
-        }
+      // Calculate expected throughput for user info
+      const expectedRPM = Math.floor((concurrency * 4) / 4); // 4 API calls per vehicle / 4 second delay
+      console.log(`⚡ Rate limit: ~${expectedRPM * 4} API calls per batch, ${expectedRPM} vehicles/batch`);
+      console.log(`⏱️  Estimated time: ~${Math.ceil(vehicles.length / concurrency * 4 / 60)} minutes for ${vehicles.length} vehicles\n`);
 
-        // Rate limiting: 15 RPM = 4 seconds between requests
-        if (i < vehicles.length - 1) {
+      // Create concurrency limiter
+      const limit = pLimit(concurrency);
+
+      // Process vehicles in batches
+      const batchSize = concurrency;
+      const totalBatches = Math.ceil(vehicles.length / batchSize);
+
+      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+        const batchStart = batchIndex * batchSize;
+        const batchEnd = Math.min(batchStart + batchSize, vehicles.length);
+        const batch = vehicles.slice(batchStart, batchEnd);
+
+        console.log(`\nBatch ${batchIndex + 1}/${totalBatches}: Processing vehicles ${batchStart + 1}-${batchEnd} of ${vehicles.length}`);
+        console.log(`  Starting: ${batch.map(v => v.id.substring(0, 8)).join(', ')}...`);
+
+        // Process batch concurrently using p-limit
+        const batchPromises = batch.map((vehicle, index) =>
+          limit(async () => {
+            const globalIndex = batchStart + index;
+
+            try {
+              // Use quiet mode when concurrency > 1 to avoid log interleaving
+              const quietMode = concurrency > 1;
+              await this.analyzeVehicle(vehicle, options, quietMode);
+              this.stats.analyzed++;
+              console.log(`  ✅ ${vehicle.id.substring(0, 8)} complete [${globalIndex + 1}/${vehicles.length}]`);
+            } catch (error) {
+              this.stats.failed++;
+              this.runLog.vehiclesFailed++;
+              const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+              this.stats.errors.push({ vehicleId: vehicle.id, error: errorMsg });
+              console.error(`  ❌ ${vehicle.id.substring(0, 8)} failed: ${errorMsg}`);
+              // Don't re-throw - allow other vehicles in batch to continue
+            }
+          })
+        );
+
+        // Wait for all vehicles in batch to complete
+        await Promise.all(batchPromises);
+
+        console.log(`Batch ${batchIndex + 1} complete. [Completed: ${this.stats.analyzed}/${vehicles.length} vehicles, Failed: ${this.stats.failed}]`);
+
+        // Rate limiting: 4-second delay between batches (not within batch)
+        if (batchIndex < totalBatches - 1) {
           console.log('⏳ Waiting 4 seconds (rate limit)...');
           await this.delay(4000);
         }
@@ -331,7 +370,8 @@ export class VehicleAnalyzer {
         console.log(`   🌐 Translation: ${vehicle.description ? '✓ Present' : '✗ Missing'}`);
         console.log(`   📊 Personal Fit Score: ${vehicle.personalFitScore ?? 'N/A'}`);
         console.log(`   ⭐ AI Priority Rating: ${vehicle.aiPriorityRating ?? 'N/A'}`);
-        console.log(`   🔧 Mechanic Report: ${vehicle.aiMechanicReport ? '✓ Present' : '✗ Missing'}`);
+        console.log(`   🔧 Mechanic Summary: ${vehicle.virtualMechanicSummary ? '✓ Present' : '✗ Missing'}`);
+        console.log(`   📋 Full Mechanic Report: ${vehicle.aiMechanicReport ? '✓ Present' : '✗ Missing'}`);
         console.log(`   🔍 Data Sanity Check: ${vehicle.aiDataSanityCheck ? '✓ Present' : '✗ Missing'}`);
         console.log(`   💰 Market Value Score: ${vehicle.marketValueScore ?? 'N/A'}`);
         console.log(`\n💡 To force re-analysis, use: pnpm analyze --vehicle-id ${options.vehicleId} --force`);
@@ -367,10 +407,10 @@ export class VehicleAnalyzer {
   /**
    * Analyze a single vehicle
    */
-  private async analyzeVehicle(vehicle: Vehicle, options: AnalysisOptions): Promise<void> {
+  private async analyzeVehicle(vehicle: Vehicle, options: AnalysisOptions, quiet: boolean = false): Promise<void> {
     // Check if vehicle has been translated
     if (!vehicle.description || vehicle.description.trim() === '') {
-      console.log('  ⚠️  Vehicle missing translation - run translate.ts first');
+      if (!quiet) console.log('  ⚠️  Vehicle missing translation - run translate.ts first');
       this.stats.skipped++;
       return;
     }
@@ -380,11 +420,11 @@ export class VehicleAnalyzer {
 
     if (requiredSteps.length === 0) {
       this.stats.skipped++;
-      console.log('  ⏭️  No analysis needed (all steps complete)');
+      if (!quiet) console.log('  ⏭️  No analysis needed (all steps complete)');
       return;
     }
 
-    console.log(`  📋 Required steps: ${requiredSteps.join(', ')}`);
+    if (!quiet) console.log(`  📋 Required steps: ${requiredSteps.join(', ')}`);
     this.runLog.vehiclesProcessed++;
     const analysis: {
       personalFitScore?: number;
@@ -392,15 +432,16 @@ export class VehicleAnalyzer {
       aiPriorityRating?: number;
       aiPrioritySummary?: string;
       aiMechanicReport?: string;
+      virtualMechanicSummary?: string;
       aiDataSanityCheck?: string;
     } = {};
 
     // 1. Generate Data Sanity Check (should be first to detect issues)
     if (requiredSteps.includes('sanity_check') && !options.skipSanityCheck) {
       try {
-        console.log('  🔍 Generating Data Sanity Check...');
+        if (!quiet) console.log('  🔍 Generating Data Sanity Check...');
         analysis.aiDataSanityCheck = await this.aiService.generateDataSanityCheck(vehicle);
-        console.log('  ✓ Data Sanity Check complete');
+        if (!quiet) console.log('  ✓ Data Sanity Check complete');
       } catch (error) {
         const err = error as Error;
         console.error('  ❌ Failed to generate sanity check:', err.message);
@@ -419,19 +460,19 @@ export class VehicleAnalyzer {
 
         throw err; // Re-throw to skip remaining steps
       }
-    } else if (!options.skipSanityCheck) {
+    } else if (!options.skipSanityCheck && !quiet) {
       console.log('  ⏭️  Skipping sanity check (already complete)');
     }
 
     // 2. Generate Personal Fit Score (if not already present)
     if (requiredSteps.includes('fit_score')) {
       try {
-        console.log('  💯 Generating Personal Fit Score...');
+        if (!quiet) console.log('  💯 Generating Personal Fit Score...');
         analysis.personalFitScore = await this.aiService.generatePersonalFitScore(
           vehicle,
           this.userCriteria
         );
-        console.log(`  ✓ Personal Fit Score: ${analysis.personalFitScore}/10`);
+        if (!quiet) console.log(`  ✓ Personal Fit Score: ${analysis.personalFitScore}/10`);
       } catch (error) {
         const err = error as Error;
         console.error('  ❌ Failed to generate fit score:', err.message);
@@ -450,19 +491,19 @@ export class VehicleAnalyzer {
 
         throw err; // Re-throw to skip remaining steps
       }
-    } else {
+    } else if (!quiet) {
       console.log('  ⏭️  Skipping fit score (already complete)');
     }
 
-    // 3. Generate Virtual Mechanic's Report
+    // 3. Generate Virtual Mechanic's Summary (concise 3-5 bullet points)
     if (requiredSteps.includes('mechanic_report') && !options.skipMechanicReport) {
       try {
-        console.log('  🔧 Generating Virtual Mechanic\'s Report...');
-        analysis.aiMechanicReport = await this.aiService.generateMechanicReport(vehicle);
-        console.log('  ✓ Mechanic Report complete');
+        if (!quiet) console.log('  🔧 Generating Virtual Mechanic\'s Summary...');
+        analysis.virtualMechanicSummary = await this.aiService.generateMechanicSummary(vehicle);
+        if (!quiet) console.log('  ✓ Mechanic Summary complete');
       } catch (error) {
         const err = error as Error;
-        console.error('  ❌ Failed to generate mechanic report:', err.message);
+        console.error('  ❌ Failed to generate mechanic summary:', err.message);
 
         // Log failure to run log
         this.runLog.failures.push({
@@ -478,20 +519,47 @@ export class VehicleAnalyzer {
 
         throw err; // Re-throw to skip remaining steps
       }
-    } else if (!options.skipMechanicReport) {
-      console.log('  ⏭️  Skipping mechanic report (already complete)');
+    } else if (!options.skipMechanicReport && !quiet) {
+      console.log('  ⏭️  Skipping mechanic summary (already complete)');
+    }
+
+    // 3b. Optionally generate Full Detailed Mechanic Report (if --include-full-report flag)
+    if (options.includeFullReport && !options.skipMechanicReport && !vehicle.aiMechanicReport) {
+      try {
+        if (!quiet) console.log('  📋 Generating Full Detailed Mechanic Report...');
+        analysis.aiMechanicReport = await this.aiService.generateMechanicReport(vehicle);
+        if (!quiet) console.log('  ✓ Full Mechanic Report complete');
+      } catch (error) {
+        const err = error as Error;
+        console.error('  ❌ Failed to generate full mechanic report:', err.message);
+
+        // Log failure to run log
+        this.runLog.failures.push({
+          vehicleId: vehicle.id,
+          vehicleTitle: vehicle.title,
+          vehicleUrl: vehicle.sourceUrl,
+          step: 'mechanic_report',
+          error: err.message,
+          errorType: getErrorType(err),
+          timestamp: new Date(),
+          retryable: isRetryableError(err),
+        });
+
+        // Don't re-throw - full report is optional, continue with other steps
+        if (!quiet) console.log('  ⚠️  Continuing without full report...');
+      }
     }
 
     // 4. Calculate Market Value Score (before Priority Rating so AI can use it)
     if (requiredSteps.includes('market_value')) {
       try {
-        console.log('  💰 Calculating Market Value Score...');
+        if (!quiet) console.log('  💰 Calculating Market Value Score...');
         const marketValue = await this.marketValueService.calculateMarketValue(vehicle);
         if (marketValue !== null) {
           analysis.marketValueScore = marketValue;
-          console.log(`  ✓ Market Value: ${marketValue}`);
+          if (!quiet) console.log(`  ✓ Market Value: ${marketValue}`);
         } else {
-          console.log('  ⚠️  Market Value: No comparables found (insufficient data)');
+          if (!quiet) console.log('  ⚠️  Market Value: No comparables found (insufficient data)');
         }
       } catch (error) {
         const err = error as Error;
@@ -511,14 +579,14 @@ export class VehicleAnalyzer {
 
         throw err; // Re-throw to skip remaining steps
       }
-    } else {
+    } else if (!quiet) {
       console.log('  ⏭️  Skipping market value (already complete)');
     }
 
     // 5. Generate Priority Rating (should be last since it uses other scores)
     if (requiredSteps.includes('priority_rating') && !options.skipPriorityRating) {
       try {
-        console.log('  ⭐ Generating Priority Rating...');
+        if (!quiet) console.log('  ⭐ Generating Priority Rating...');
         // Update vehicle with new analysis before generating priority rating
         const updatedVehicle: Vehicle = {
           ...vehicle,
@@ -530,7 +598,7 @@ export class VehicleAnalyzer {
         const priorityResult = await this.aiService.generatePriorityRating(updatedVehicle);
         analysis.aiPriorityRating = priorityResult.rating;
         analysis.aiPrioritySummary = priorityResult.summary;
-        console.log(`  ✓ Priority Rating: ${analysis.aiPriorityRating}/10`);
+        if (!quiet) console.log(`  ✓ Priority Rating: ${analysis.aiPriorityRating}/10`);
       } catch (error) {
         const err = error as Error;
         console.error('  ❌ Failed to generate priority rating:', err.message);
@@ -549,15 +617,15 @@ export class VehicleAnalyzer {
 
         throw err; // Re-throw to skip remaining steps
       }
-    } else if (!options.skipPriorityRating) {
+    } else if (!options.skipPriorityRating && !quiet) {
       console.log('  ⏭️  Skipping priority rating (already complete)');
     }
 
     // Save analysis to database
     if (Object.keys(analysis).length > 0) {
-      console.log('  💾 Saving analysis to database...');
+      if (!quiet) console.log('  💾 Saving analysis to database...');
       await this.vehicleRepository.updateVehicleAnalysis(vehicle.id, analysis);
-      console.log('  ✓ Saved successfully');
+      if (!quiet) console.log('  ✓ Saved successfully');
 
       // Mark vehicle as completed in run log
       this.runLog.vehiclesCompleted++;
@@ -634,15 +702,23 @@ export class VehicleAnalyzer {
       ? (this.stats.endTime.getTime() - this.stats.startTime.getTime()) / 1000
       : 0;
 
+    // Calculate throughput
+    const vehiclesPerHour = duration > 0 ? (this.stats.analyzed / duration) * 3600 : 0;
+    const totalApiCalls = this.stats.analyzed * 4; // 4 API calls per vehicle (sanity, fit, mechanic, priority)
+    const averageRPM = duration > 0 ? (totalApiCalls / (duration / 60)) : 0;
+
     console.log('\n' + '='.repeat(60));
     console.log('📊 Analysis Summary');
     console.log('='.repeat(60));
     console.log(`Run ID:            ${this.runLog.runId}`);
+    console.log(`Concurrency:       ${this.runLog.concurrency} vehicles/batch`);
     console.log(`Total Vehicles:    ${this.stats.totalVehicles}`);
     console.log(`✅ Completed:      ${this.runLog.vehiclesCompleted}`);
     console.log(`❌ Failed:         ${this.runLog.vehiclesFailed}`);
     console.log(`⏭️  Skipped:        ${this.stats.skipped}`);
-    console.log(`⏱️  Duration:       ${duration.toFixed(2)}s`);
+    console.log(`⏱️  Duration:       ${duration.toFixed(2)}s (${(duration / 60).toFixed(1)} min)`);
+    console.log(`⚡ Throughput:      ${vehiclesPerHour.toFixed(1)} vehicles/hour`);
+    console.log(`📞 API Calls:       ${totalApiCalls} total, ${averageRPM.toFixed(1)} RPM average`);
 
     if (this.runLog.summary && this.runLog.failures.length > 0) {
       console.log(`\n📉 Failure Breakdown:`);
@@ -674,6 +750,7 @@ function parseArgs(): AnalysisOptions {
   const args = process.argv.slice(2);
   const options: AnalysisOptions = {
     resume: true, // Default to enabled
+    concurrency: 3, // Default concurrency level
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -685,8 +762,31 @@ function parseArgs(): AnalysisOptions {
     } else if (arg === '--limit' && i + 1 < args.length) {
       options.limit = parseInt(args[i + 1], 10);
       i++;
+    } else if (arg === '--concurrency' && i + 1 < args.length) {
+      const concurrency = parseInt(args[i + 1], 10);
+
+      // Validate concurrency value
+      if (isNaN(concurrency) || concurrency < 1) {
+        console.error('❌ Invalid --concurrency value. Must be a positive integer (>= 1).');
+        process.exit(1);
+      }
+
+      if (concurrency > 5) {
+        console.error('❌ Invalid --concurrency value. Maximum is 5 to respect rate limits.');
+        process.exit(1);
+      }
+
+      if (concurrency > 4) {
+        console.warn('⚠️  Warning: Concurrency > 4 may exceed 15 RPM rate limit.');
+        console.warn('   Recommended concurrency: 3-4 for optimal performance.');
+      }
+
+      options.concurrency = concurrency;
+      i++;
     } else if (arg === '--skip-mechanic-report') {
       options.skipMechanicReport = true;
+    } else if (arg === '--include-full-report') {
+      options.includeFullReport = true;
     } else if (arg === '--skip-sanity-check') {
       options.skipSanityCheck = true;
     } else if (arg === '--skip-priority-rating') {
@@ -706,6 +806,11 @@ function parseArgs(): AnalysisOptions {
       printHelp();
       process.exit(0);
     }
+  }
+
+  // Auto-adjust concurrency for single vehicle analysis
+  if (options.vehicleId) {
+    options.concurrency = 1;
   }
 
   return options;
@@ -728,23 +833,31 @@ Usage:
   pnpm analyze                                                   # Analyze all vehicles needing analysis (resume-aware)
   pnpm analyze --vehicle-id <id>                                 # Analyze specific vehicle
   pnpm analyze --limit 10                                        # Analyze only first 10 vehicles
+  pnpm analyze --concurrency 4                                   # Set concurrent processing level (default: 3)
   pnpm analyze --force                                           # Force re-analysis of all steps
-  pnpm analyze --skip-mechanic-report                            # Skip mechanic report generation
+  pnpm analyze --include-full-report                             # Generate both summary AND full detailed report
+  pnpm analyze --skip-mechanic-report                            # Skip ALL mechanic reports (summary + full)
   pnpm analyze --skip-sanity-check                               # Skip sanity check generation
   pnpm analyze --skip-priority-rating                            # Skip priority rating generation
   pnpm analyze --show-logs                                       # List available analysis run logs
   pnpm analyze --help                                            # Show this help message
 
 Flags:
-  --force       Re-analyze all steps even if already complete
+  --concurrency <n>          Number of vehicles to process concurrently (1-5, default: 3)
+                             Recommended: 3-4 for optimal performance within 15 RPM rate limit
+  --force                    Re-analyze all steps even if already complete
+  --include-full-report      Generate BOTH concise summary AND full detailed mechanic report
+                             (by default, only concise 3-5 bullet point summary is generated)
 
 Environment Variables:
   GEMINI_API_KEY       Required. Your Gemini API key for AI analysis
   DATABASE_PATH        Optional. Path to database file (default: <root>/data/vehicles.db)
 
 Examples:
-  pnpm analyze                                                   # Analyze all translated vehicles
+  pnpm analyze                                                   # Analyze all translated vehicles (concurrency: 3)
   pnpm analyze --limit 5                                         # Analyze first 5 vehicles needing analysis
+  pnpm analyze --concurrency 4 --limit 20                        # Analyze 20 vehicles with concurrency of 4
+  pnpm analyze --concurrency 1                                   # Sequential processing (original behavior)
   pnpm analyze --vehicle-id abc123                               # Analyze specific vehicle
   pnpm analyze --force --vehicle-id abc123                       # Force re-analyze all steps
   pnpm analyze --show-logs                                       # View previous run logs

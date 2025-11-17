@@ -5,6 +5,13 @@
 import { getRequiredAnalysisSteps } from '../analyze';
 import { Vehicle } from '@car-finder/types';
 
+// Mock p-limit before importing analyze.ts
+jest.mock('p-limit', () => {
+  return jest.fn(() => {
+    return jest.fn((fn: any) => fn());
+  });
+});
+
 // Mock dependencies
 jest.mock('@car-finder/services', () => ({
   WorkspaceUtils: {
@@ -33,14 +40,16 @@ describe('analyze.ts', () => {
       priceEur: 11500,
       year: 2015,
       mileage: 150000,
-      sellerInfo: { name: 'Test Seller', phone: '123456789' },
+      sellerInfo: { name: 'Test Seller', id: 'seller-123', type: 'private', location: 'Warsaw', memberSince: '2020' },
       photos: [],
       personalFitScore: null,
       marketValueScore: null,
       aiPriorityRating: null,
       aiPrioritySummary: null,
       aiMechanicReport: null,
+      virtualMechanicSummary: null,
       aiDataSanityCheck: null,
+      distanceFromWroclaw: null,
       status: 'new',
       personalNotes: null,
       scrapedAt: new Date(),
@@ -71,7 +80,7 @@ describe('analyze.ts', () => {
       const vehicle = createMockVehicle({
         aiDataSanityCheck: 'Complete',
         personalFitScore: 8,
-        aiMechanicReport: 'Report complete',
+        virtualMechanicSummary: '- Concise summary',
         marketValueScore: 'good-deal',
         aiPriorityRating: 9,
       });
@@ -101,7 +110,7 @@ describe('analyze.ts', () => {
       const vehicle = createMockVehicle({
         aiDataSanityCheck: 'Complete',
         personalFitScore: 8,
-        aiMechanicReport: 'Report complete',
+        virtualMechanicSummary: '- Concise summary',
         marketValueScore: 'good-deal',
         aiPriorityRating: 9,
       });

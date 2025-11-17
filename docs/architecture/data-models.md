@@ -40,8 +40,12 @@ export interface Vehicle {
   features: string[]; // Normalised, e.g., ["comfort_air_conditioning"]
   pricePln: number;
   priceEur: number;
-  year: number; 
+  year: number;
   mileage: number;
+
+  // Location Data (added in Story 3.2)
+  distanceFromWroclaw: number | null; // Distance in km from Wrocław (user's location)
+
   sellerInfo: SellerInfo;
   photos: string[]; // Cleaned photo URLs
 

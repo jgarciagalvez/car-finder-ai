@@ -29,7 +29,10 @@ CREATE TABLE IF NOT EXISTS vehicles (
   priceEur REAL NOT NULL,
   year INTEGER NOT NULL,
   mileage INTEGER NOT NULL,
-  
+
+  -- Location data (added in Story 3.2)
+  distanceFromWroclaw REAL, -- Distance in km from Wrocław (nullable)
+
   -- Seller information
   sellerInfo TEXT NOT NULL DEFAULT '{}',
   photos TEXT NOT NULL DEFAULT '[]',
@@ -61,6 +64,7 @@ CREATE INDEX IF NOT EXISTS idx_vehicles_status ON vehicles(status);
 CREATE INDEX IF NOT EXISTS idx_vehicles_created_at ON vehicles(createdAt);
 CREATE INDEX IF NOT EXISTS idx_vehicles_source ON vehicles(source);
 CREATE INDEX IF NOT EXISTS idx_vehicles_price_eur ON vehicles(priceEur);
+CREATE INDEX IF NOT EXISTS idx_vehicles_distance ON vehicles(distanceFromWroclaw);
 ```
 
 **Index Rationale:**
@@ -69,6 +73,7 @@ CREATE INDEX IF NOT EXISTS idx_vehicles_price_eur ON vehicles(priceEur);
 - `idx_vehicles_created_at`: Enables efficient "newest first" sorting
 - `idx_vehicles_source`: Supports filtering by source site (Otomoto vs OLX)
 - `idx_vehicles_price_eur`: Accelerates price-based sorting and filtering
+- `idx_vehicles_distance`: Enables efficient distance-based sorting (added in Story 3.2)
 
 ## Auto-Update Trigger
 

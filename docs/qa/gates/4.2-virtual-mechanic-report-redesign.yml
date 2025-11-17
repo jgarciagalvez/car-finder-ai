@@ -1,0 +1,75 @@
+# <!-- Powered by BMAD Core -->
+# Quality Gate Decision for Story 4.2
+
+schema: 1
+story: "4.2"
+story_title: "Virtual Mechanic Report Redesign"
+gate: PASS
+status_reason: "All acceptance criteria met. Critical API bug fixed during review. Comprehensive test coverage (235/235 pass). Excellent code quality with security and performance optimizations."
+reviewer: "Quinn (Test Architect)"
+updated: "2025-11-17T00:00:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 95  # Minor deduction for pre-existing unrelated test failures and optional deferred tasks
+
+expires: "2025-12-01T00:00:00Z"
+
+evidence:
+  tests_reviewed: 235
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]  # All 7 ACs fully implemented
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "ReactMarkdown provides XSS protection. Input validation limits summary to 2000 chars. Type safety maintained."
+  performance:
+    status: PASS
+    notes: "Concise summary reduces AI token usage. Collapsible full report improves render performance. Default summary-only generation speeds batch processing."
+  reliability:
+    status: PASS
+    notes: "Comprehensive error handling in save operations. Graceful fallbacks for missing data. All edge cases handled."
+  maintainability:
+    status: PASS
+    notes: "Clean separation of concerns. Code follows established patterns. Well-documented with inline comments and prompt README updates."
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor:
+      - "Pre-existing PromptLoader test failures in @car-finder/ai package should be addressed separately"
+      - "Migration script for existing data marked as optional - consider implementing if production has existing mechanic reports"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Implement on-demand full report generation via AI Assistant (deferred optional task)"
+      refs: ["apps/api/src/scripts/analyze.ts", "packages/ai/src/prompts/mechanic-report.md"]
+    - action: "Create migration script to backfill summaries from existing full reports"
+      refs: ["packages/db/src/scripts/"]
+    - action: "Fix pre-existing PromptLoader test suite failures"
+      refs: ["packages/ai/src/utils/PromptLoader.test.ts"]
+
+bugs_fixed_during_review:
+  - id: "BUG-001"
+    severity: "high"
+    description: "PATCH /api/vehicles/:id missing virtualMechanicSummary in response transformer"
+    file: "apps/api/src/routes/vehicles.ts"
+    line: 194
+    impact: "Frontend would not receive updated summary after save"
+
+test_fixes_applied:
+  - file: "apps/api/src/scripts/__tests__/analyze-concurrent-integration.test.ts"
+    reason: "Mock vehicle missing virtualMechanicSummary field and incorrect sellerInfo type"
+  - file: "apps/api/src/scripts/analyze.test.ts"
+    reason: "Tests expecting generateMechanicReport instead of new generateMechanicSummary"
+  - file: "apps/api/src/scripts/__tests__/analyze.test.ts"
+    reason: "Resume logic tests checking wrong field for analysis completeness"
+  - file: "apps/api/src/scripts/__tests__/analyze-resume.test.ts"
+    reason: "Test assertions not updated for new summary field"

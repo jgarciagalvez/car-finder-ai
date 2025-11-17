@@ -55,6 +55,7 @@ describe('VehicleDetail Component', () => {
     aiPriorityRating: 8,
     aiPrioritySummary: 'Good value for money. Low mileage for the year.',
     aiMechanicReport: '## Inspection Report\n\n**Overall Condition**: Good\n\n- Engine: No issues\n- Transmission: Smooth operation\n- Suspension: Normal wear',
+    virtualMechanicSummary: '- **BMW X5 (N55 engine)** has good reliability reputation\n- Main concern: **Oil consumption** at higher mileage\n- At 50k km, expect routine maintenance only',
     aiDataSanityCheck: 'All data appears consistent',
     distanceFromWroclaw: null,
     status: 'new',

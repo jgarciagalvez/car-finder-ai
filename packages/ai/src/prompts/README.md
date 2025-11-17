@@ -8,7 +8,8 @@ Each prompt file defines a specific AI analysis task:
 
 - **personal-fit-score.md** - Analyzes how well a vehicle fits user criteria (0-10 score)
 - **priority-rating.md** - Synthesizes all data into an overall priority rating (0-10)
-- **mechanic-report.md** - Provides model-specific mechanical insights and inspection points
+- **mechanic-summary.md** - Generates concise 3-5 bullet point summary of key mechanical concerns (NEW in Story 4.2)
+- **mechanic-report.md** - Provides full detailed model-specific mechanical insights and inspection points
 - **sanity-check.md** - Flags inconsistencies between structured data and descriptions
 
 ## Prompt Template Format

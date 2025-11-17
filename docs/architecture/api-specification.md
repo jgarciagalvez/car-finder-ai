@@ -196,6 +196,10 @@ components:
           type: "integer"
         mileage:
           type: "integer"
+        distanceFromWroclaw:
+          type: "number"
+          nullable: true
+          description: "Distance in kilometers from Wrocław, Poland (user's location)"
         photos:
           type: "array"
           items:

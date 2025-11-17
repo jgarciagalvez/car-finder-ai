@@ -37,6 +37,7 @@ router.get('/', async (req: Request, res: Response) => {
       aiPriorityRating: vehicle.aiPriorityRating,
       aiPrioritySummary: vehicle.aiPrioritySummary,
       aiMechanicReport: vehicle.aiMechanicReport,
+      virtualMechanicSummary: vehicle.virtualMechanicSummary,
       distanceFromWroclaw: vehicle.distanceFromWroclaw,
       status: vehicle.status,
       personalNotes: vehicle.personalNotes,
@@ -96,6 +97,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       aiPriorityRating: vehicle.aiPriorityRating,
       aiPrioritySummary: vehicle.aiPrioritySummary,
       aiMechanicReport: vehicle.aiMechanicReport,
+      virtualMechanicSummary: vehicle.virtualMechanicSummary,
       distanceFromWroclaw: vehicle.distanceFromWroclaw,
       status: vehicle.status,
       personalNotes: vehicle.personalNotes,
@@ -113,17 +115,17 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-// PATCH /api/vehicles/:id - Update vehicle status or notes
+// PATCH /api/vehicles/:id - Update vehicle status, notes, or AI reports
 router.patch('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { status, personalNotes } = req.body;
+    const { status, personalNotes, virtualMechanicSummary, aiMechanicReport } = req.body;
 
     // Validate input
-    if (!status && personalNotes === undefined) {
+    if (!status && personalNotes === undefined && virtualMechanicSummary === undefined && aiMechanicReport === undefined) {
       return res.status(400).json({
         error: 'Bad request',
-        message: 'Either status or personalNotes must be provided'
+        message: 'At least one field must be provided: status, personalNotes, virtualMechanicSummary, or aiMechanicReport'
       });
     }
 
@@ -134,8 +136,16 @@ router.patch('/:id', async (req: Request, res: Response) => {
       });
     }
 
+    // Validate text field lengths
+    if (virtualMechanicSummary && typeof virtualMechanicSummary === 'string' && virtualMechanicSummary.length > 2000) {
+      return res.status(400).json({
+        error: 'Bad request',
+        message: 'virtualMechanicSummary must be 2000 characters or less'
+      });
+    }
+
     const vehicleRepository = await ServiceRegistry.getVehicleRepository();
-    
+
     // Check if vehicle exists
     const existingVehicle = await vehicleRepository.findVehicleById(id);
     if (!existingVehicle) {
@@ -149,6 +159,8 @@ router.patch('/:id', async (req: Request, res: Response) => {
     const updates: Partial<Vehicle> = {};
     if (status) updates.status = status as any;
     if (personalNotes !== undefined) updates.personalNotes = personalNotes;
+    if (virtualMechanicSummary !== undefined) updates.virtualMechanicSummary = virtualMechanicSummary;
+    if (aiMechanicReport !== undefined) updates.aiMechanicReport = aiMechanicReport;
 
     await vehicleRepository.updateVehicle(id, updates);
     
@@ -179,6 +191,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
       aiPriorityRating: updatedVehicle.aiPriorityRating,
       aiPrioritySummary: updatedVehicle.aiPrioritySummary,
       aiMechanicReport: updatedVehicle.aiMechanicReport,
+      virtualMechanicSummary: updatedVehicle.virtualMechanicSummary,
       distanceFromWroclaw: updatedVehicle.distanceFromWroclaw,
       status: updatedVehicle.status,
       personalNotes: updatedVehicle.personalNotes,
@@ -297,6 +310,7 @@ router.post('/:id/analyze', async (req: Request, res: Response) => {
         aiPriorityRating: updatedVehicle.aiPriorityRating,
         aiPrioritySummary: updatedVehicle.aiPrioritySummary,
         aiMechanicReport: updatedVehicle.aiMechanicReport,
+        virtualMechanicSummary: updatedVehicle.virtualMechanicSummary,
         aiDataSanityCheck: updatedVehicle.aiDataSanityCheck,
       }
     });

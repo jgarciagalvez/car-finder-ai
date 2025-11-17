@@ -377,6 +377,7 @@ export class IngestionPipeline {
         aiPriorityRating: null,
         aiPrioritySummary: null,
         aiMechanicReport: null,
+        virtualMechanicSummary: null,
         aiDataSanityCheck: null,
 
         // Location data
@@ -548,6 +549,7 @@ export class IngestionPipeline {
       aiPriorityRating: null,
       aiPrioritySummary: null,
       aiMechanicReport: null,
+      virtualMechanicSummary: null,
       aiDataSanityCheck: null,
 
       // Location data

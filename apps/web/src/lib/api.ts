@@ -93,7 +93,7 @@ export async function fetchVehicleById(id: string): Promise<Vehicle> {
 
 export async function updateVehicle(
   id: string,
-  updates: { status?: string; personalNotes?: string }
+  updates: { status?: string; personalNotes?: string; virtualMechanicSummary?: string; aiMechanicReport?: string }
 ): Promise<Vehicle> {
   return apiRequest<Vehicle>(`/api/vehicles/${id}`, {
     method: 'PATCH',

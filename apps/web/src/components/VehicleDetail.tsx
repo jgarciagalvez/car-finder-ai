@@ -2,7 +2,7 @@
 
 import { Vehicle } from '@car-finder/types';
 import { useState } from 'react';
-import { updateVehicle } from '@/lib/api';
+import { updateVehicle, analyzeVehicle } from '@/lib/api';
 import ReactMarkdown from 'react-markdown';
 
 export interface VehicleDetailProps {
@@ -34,6 +34,20 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
   const [status, setStatus] = useState(vehicle.status);
   const [personalNotes, setPersonalNotes] = useState(vehicle.personalNotes || '');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Virtual Mechanic Summary state
+  const [virtualMechanicSummary, setVirtualMechanicSummary] = useState(vehicle.virtualMechanicSummary || '');
+  const [isEditingSummary, setIsEditingSummary] = useState(false);
+
+  // Full Mechanic Report state
+  const [aiMechanicReport, setAiMechanicReport] = useState(vehicle.aiMechanicReport || '');
+  const [isEditingFullReport, setIsEditingFullReport] = useState(false);
+  const [isFullReportExpanded, setIsFullReportExpanded] = useState(false);
+
+  // AI Analysis state
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [analyzeSuccess, setAnalyzeSuccess] = useState(false);
 
   const photos = vehicle.photos && vehicle.photos.length > 0 ? vehicle.photos : vehicle.sourcePhotos;
 
@@ -71,6 +85,77 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
       setPersonalNotes(vehicle.personalNotes || '');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveSummary = async () => {
+    if (virtualMechanicSummary === vehicle.virtualMechanicSummary) {
+      setIsEditingSummary(false);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const updated = await updateVehicle(vehicle.id, { virtualMechanicSummary });
+      onVehicleUpdate?.(updated);
+      setIsEditingSummary(false);
+    } catch (error) {
+      console.error('Failed to update mechanic summary:', error);
+      setVirtualMechanicSummary(vehicle.virtualMechanicSummary || '');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancelSummary = () => {
+    setVirtualMechanicSummary(vehicle.virtualMechanicSummary || '');
+    setIsEditingSummary(false);
+  };
+
+  const handleSaveFullReport = async () => {
+    if (aiMechanicReport === vehicle.aiMechanicReport) {
+      setIsEditingFullReport(false);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const updated = await updateVehicle(vehicle.id, { aiMechanicReport });
+      onVehicleUpdate?.(updated);
+      setIsEditingFullReport(false);
+    } catch (error) {
+      console.error('Failed to update full mechanic report:', error);
+      setAiMechanicReport(vehicle.aiMechanicReport || '');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancelFullReport = () => {
+    setAiMechanicReport(vehicle.aiMechanicReport || '');
+    setIsEditingFullReport(false);
+  };
+
+  const handleAnalyzeVehicle = async (force: boolean = false) => {
+    if (force && !confirm('Force re-analyze this vehicle? This will use AI credits.')) return;
+
+    setIsAnalyzing(true);
+    setAnalyzeError(null);
+    setAnalyzeSuccess(false);
+
+    try {
+      const updated = await analyzeVehicle(vehicle.id, force);
+      onVehicleUpdate?.(updated);
+      // Update local state with new values
+      setVirtualMechanicSummary(updated.virtualMechanicSummary || '');
+      setAiMechanicReport(updated.aiMechanicReport || '');
+      setAnalyzeSuccess(true);
+      setTimeout(() => setAnalyzeSuccess(false), 3000);
+    } catch (error) {
+      setAnalyzeError(error instanceof Error ? error.message : 'Analysis failed');
+      setTimeout(() => setAnalyzeError(null), 5000);
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -153,7 +238,7 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
       </section>
 
       {/* AI Analysis Section */}
-      {(vehicle.personalFitScore !== null || vehicle.aiPriorityRating !== null || vehicle.aiMechanicReport) && (
+      {(vehicle.personalFitScore !== null || vehicle.aiPriorityRating !== null || vehicle.aiMechanicReport || vehicle.virtualMechanicSummary) && (
         <section className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">AI Analysis</h2>
 
@@ -187,12 +272,118 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
             </div>
           )}
 
-          {vehicle.aiMechanicReport && (
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Virtual Mechanic&apos;s Report</h3>
-              <div className="prose prose-sm max-w-none">
-                <ReactMarkdown>{vehicle.aiMechanicReport}</ReactMarkdown>
+          {/* Virtual Mechanic Summary (Concise 3-5 bullet points) */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-semibold text-gray-900">Virtual Mechanic Summary</h3>
+              {(virtualMechanicSummary || vehicle.virtualMechanicSummary) && !isEditingSummary ? (
+                <button
+                  onClick={() => setIsEditingSummary(true)}
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  Edit
+                </button>
+              ) : null}
+            </div>
+            {isEditingSummary ? (
+              <div className="space-y-2">
+                <textarea
+                  value={virtualMechanicSummary}
+                  onChange={(e) => setVirtualMechanicSummary(e.target.value)}
+                  className="w-full border border-gray-300 rounded-md p-3 text-sm font-mono"
+                  rows={8}
+                  maxLength={2000}
+                  disabled={isSaving}
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveSummary}
+                    disabled={isSaving}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+                  >
+                    {isSaving ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={handleCancelSummary}
+                    disabled={isSaving}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 disabled:bg-gray-100"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
+            ) : (virtualMechanicSummary || vehicle.virtualMechanicSummary) ? (
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                <div className="prose prose-sm max-w-none prose-ul:my-2 prose-li:my-1 prose-p:my-2 prose-headings:my-3 prose-ul:pl-5 prose-li:marker:text-yellow-600">
+                  <ReactMarkdown>{virtualMechanicSummary || vehicle.virtualMechanicSummary}</ReactMarkdown>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gray-50 border-l-4 border-gray-300 p-4 rounded text-gray-500 italic">
+                Summary not generated for this vehicle. Run analysis to generate.
+              </div>
+            )}
+          </div>
+
+          {/* Full Detailed Mechanic Report (Collapsible) */}
+          {(aiMechanicReport || vehicle.aiMechanicReport) && (
+            <div className="mb-6">
+              <button
+                onClick={() => setIsFullReportExpanded(!isFullReportExpanded)}
+                className="flex items-center justify-between w-full text-left mb-2 hover:text-blue-600 transition-colors"
+              >
+                <h3 className="text-lg font-semibold text-gray-900">Full Detailed Report</h3>
+                <span className="text-gray-600">
+                  {isFullReportExpanded ? '▼' : '▶'}
+                </span>
+              </button>
+              {isFullReportExpanded && (
+                <div className="mt-2">
+                  <div className="flex items-center justify-end mb-2">
+                    {!isEditingFullReport ? (
+                      <button
+                        onClick={() => setIsEditingFullReport(true)}
+                        className="text-sm text-blue-600 hover:text-blue-800"
+                      >
+                        Edit
+                      </button>
+                    ) : null}
+                  </div>
+                  {isEditingFullReport ? (
+                    <div className="space-y-2">
+                      <textarea
+                        value={aiMechanicReport}
+                        onChange={(e) => setAiMechanicReport(e.target.value)}
+                        className="w-full border border-gray-300 rounded-md p-3 text-sm font-mono"
+                        rows={15}
+                        disabled={isSaving}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleSaveFullReport}
+                          disabled={isSaving}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+                        >
+                          {isSaving ? 'Saving...' : 'Save'}
+                        </button>
+                        <button
+                          onClick={handleCancelFullReport}
+                          disabled={isSaving}
+                          className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 disabled:bg-gray-100"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="border-l-4 border-gray-300 pl-4">
+                      <article className="prose prose-slate max-w-none">
+                        <ReactMarkdown>{aiMechanicReport || vehicle.aiMechanicReport}</ReactMarkdown>
+                      </article>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -335,6 +526,37 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
               <option value="visited">Visited</option>
               <option value="not_interested">Not Interested</option>
             </select>
+          </div>
+
+          {/* AI Analysis Actions */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              AI Analysis
+            </label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleAnalyzeVehicle(false)}
+                disabled={isAnalyzing}
+                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                title="Analyze missing data only"
+              >
+                {isAnalyzing ? 'Analyzing...' : 'Analyze'}
+              </button>
+              <button
+                onClick={() => handleAnalyzeVehicle(true)}
+                disabled={isAnalyzing}
+                className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                title="Force re-analyze all data (uses AI credits)"
+              >
+                {isAnalyzing ? 'Analyzing...' : 'Force Re-analyze'}
+              </button>
+            </div>
+            {analyzeError && (
+              <p className="mt-2 text-sm text-red-600">{analyzeError}</p>
+            )}
+            {analyzeSuccess && (
+              <p className="mt-2 text-sm text-green-600">Analysis completed successfully!</p>
+            )}
           </div>
 
           <div>

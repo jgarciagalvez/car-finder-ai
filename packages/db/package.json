@@ -10,10 +10,12 @@
     "dev": "tsx watch src/index.ts",
     "lint": "echo 'ESLint configured - TypeScript linting via type-check'",
     "type-check": "tsc --noEmit",
-    "test": "jest"
+    "test": "jest",
+    "migrate-add-summary": "tsx src/scripts/migrate-add-virtual-mechanic-summary.ts"
   },
   "dependencies": {
     "@car-finder/types": "workspace:*",
+    "@car-finder/services": "workspace:*",
     "@libsql/client": "^0.15.15",
     "kysely": "^0.27.0",
     "kysely-libsql": "^0.7.1"

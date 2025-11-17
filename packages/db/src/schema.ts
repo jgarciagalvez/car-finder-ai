@@ -37,6 +37,7 @@ export interface VehicleTable {
   aiPriorityRating: number | null;
   aiPrioritySummary: string | null;
   aiMechanicReport: string | null;
+  virtualMechanicSummary: string | null;
   aiDataSanityCheck: string | null;
 
   // Location data (nullable)
@@ -99,6 +100,7 @@ export const CREATE_VEHICLES_TABLE = `
     aiPriorityRating REAL,
     aiPrioritySummary TEXT,
     aiMechanicReport TEXT,
+    virtualMechanicSummary TEXT,
     aiDataSanityCheck TEXT,
 
     -- Location data (nullable)

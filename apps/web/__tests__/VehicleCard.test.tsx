@@ -105,6 +105,7 @@ const createMockVehicle = (overrides: Partial<Vehicle> = {}): Vehicle => ({
   aiPriorityRating: 90,
   aiPrioritySummary: 'Excellent condition with low mileage',
   aiMechanicReport: 'No major issues found',
+  virtualMechanicSummary: null,
   aiDataSanityCheck: 'All data looks good',
   distanceFromWroclaw: null,
   status: 'new',

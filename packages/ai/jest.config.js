@@ -6,6 +6,7 @@ module.exports = {
   // Module resolution for monorepo
   moduleNameMapper: {
     '^@car-finder/types$': '<rootDir>/../types/src',
+    '^@car-finder/services$': '<rootDir>/../services/src',
     '^@car-finder/ai$': '<rootDir>/src',
     '^@car-finder/ai/(.*)$': '<rootDir>/src/$1',
   },

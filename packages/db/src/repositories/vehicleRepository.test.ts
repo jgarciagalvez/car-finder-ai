@@ -78,6 +78,7 @@ describe('VehicleRepository', () => {
       aiPriorityRating: null,
       aiPrioritySummary: null,
       aiMechanicReport: null,
+      virtualMechanicSummary: null,
       aiDataSanityCheck: null,
       distanceFromWroclaw: null,
       status: 'new',

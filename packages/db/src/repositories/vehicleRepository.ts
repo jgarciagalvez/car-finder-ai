@@ -44,6 +44,7 @@ export class VehicleRepository {
         aiPriorityRating: vehicle.aiPriorityRating,
         aiPrioritySummary: vehicle.aiPrioritySummary,
         aiMechanicReport: vehicle.aiMechanicReport,
+        virtualMechanicSummary: vehicle.virtualMechanicSummary,
         aiDataSanityCheck: vehicle.aiDataSanityCheck,
 
         // Location data
@@ -401,6 +402,7 @@ export class VehicleRepository {
       aiPriorityRating?: number;
       aiPrioritySummary?: string;
       aiMechanicReport?: string;
+      virtualMechanicSummary?: string;
       aiDataSanityCheck?: string;
     }
   ): Promise<void> {
@@ -430,6 +432,9 @@ export class VehicleRepository {
       }
       if (analysis.aiMechanicReport !== undefined) {
         dbUpdates.aiMechanicReport = analysis.aiMechanicReport;
+      }
+      if (analysis.virtualMechanicSummary !== undefined) {
+        dbUpdates.virtualMechanicSummary = analysis.virtualMechanicSummary;
       }
       if (analysis.aiDataSanityCheck !== undefined) {
         dbUpdates.aiDataSanityCheck = analysis.aiDataSanityCheck;
@@ -543,6 +548,7 @@ export class VehicleRepository {
       aiPriorityRating: dbVehicle.aiPriorityRating,
       aiPrioritySummary: dbVehicle.aiPrioritySummary,
       aiMechanicReport: dbVehicle.aiMechanicReport,
+      virtualMechanicSummary: dbVehicle.virtualMechanicSummary,
       aiDataSanityCheck: dbVehicle.aiDataSanityCheck,
 
       // Location data

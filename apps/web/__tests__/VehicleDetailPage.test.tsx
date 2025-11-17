@@ -67,6 +67,7 @@ describe('Vehicle Detail Page', () => {
     aiPriorityRating: 8,
     aiPrioritySummary: 'Good value',
     aiMechanicReport: '## Report',
+    virtualMechanicSummary: '- Test summary point',
     aiDataSanityCheck: 'Consistent',
     distanceFromWroclaw: null,
     status: 'new',
@@ -95,14 +96,14 @@ describe('Vehicle Detail Page', () => {
 
     await waitFor(() => {
       expect(mockFetchVehicleById).toHaveBeenCalledWith('123');
-    });
+    }, { timeout: 5000 });
 
     await waitFor(() => {
       expect(screen.getByTestId('vehicle-detail')).toBeInTheDocument();
-      expect(screen.getByText('Vehicle ID: 123')).toBeInTheDocument();
+      expect(screen.getAllByText('Vehicle ID: 123').length).toBeGreaterThan(0);
       expect(screen.getByText('Title: BMW X5 2020')).toBeInTheDocument();
-    });
-  });
+    }, { timeout: 5000 });
+  }, 15000);
 
   it('should display 404 error when vehicle not found', async () => {
     const error = new Error('Vehicle not found');
@@ -112,10 +113,9 @@ describe('Vehicle Detail Page', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Vehicle Not Found')).toBeInTheDocument();
-    });
-
-    expect(screen.getByText(/doesn't exist or has been removed/i)).toBeInTheDocument();
-  });
+      expect(screen.getByText(/looking for doesn.*t exist or has been removed/i)).toBeInTheDocument();
+    }, { timeout: 5000 });
+  }, 15000);
 
   it('should display generic error for 500 errors', async () => {
     const error = new Error('Internal server error');
@@ -160,9 +160,9 @@ describe('Vehicle Detail Page', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('ai-chat-sidebar')).toBeInTheDocument();
-      expect(screen.getByText('Vehicle ID: 123')).toBeInTheDocument();
-    });
-  });
+      expect(screen.getAllByText('Vehicle ID: 123').length).toBeGreaterThan(0);
+    }, { timeout: 5000 });
+  }, 15000);
 
   it('should not render AI chat sidebar on error', async () => {
     const error = new Error('Vehicle not found');

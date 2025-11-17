@@ -56,13 +56,19 @@ describe('Vehicles API', () => {
         .get('/api/vehicles')
         .expect(200);
 
-      expect(response.body).toHaveLength(1);
-      expect(response.body[0]).toMatchObject({
+      expect(response.body.vehicles).toHaveLength(1);
+      expect(response.body.vehicles[0]).toMatchObject({
         id: 'test-id-1',
         title: 'Test Vehicle 1',
         source: 'otomoto',
         pricePln: 50000,
         priceEur: 12000,
+      });
+      expect(response.body.pagination).toMatchObject({
+        total: 1,
+        limit: 50,
+        offset: 0,
+        hasMore: false,
       });
     });
 
@@ -73,7 +79,13 @@ describe('Vehicles API', () => {
         .get('/api/vehicles')
         .expect(200);
 
-      expect(response.body).toEqual([]);
+      expect(response.body.vehicles).toEqual([]);
+      expect(response.body.pagination).toMatchObject({
+        total: 0,
+        limit: 50,
+        offset: 0,
+        hasMore: false,
+      });
     });
 
     it('should handle database errors', async () => {
@@ -177,6 +189,111 @@ describe('Vehicles API', () => {
 
       expect(response.body).toMatchObject({
         error: 'Vehicle not found',
+      });
+    });
+
+    it('should update virtualMechanicSummary', async () => {
+      const mockVehicle = {
+        id: 'test-id-1',
+        title: 'Test Vehicle',
+        source: 'otomoto',
+        status: 'new',
+        createdAt: new Date('2023-01-01'),
+        updatedAt: new Date('2023-01-01'),
+      };
+
+      await mockVehicleRepository.insertVehicle(MockVehicleRepository.createTestVehicle(mockVehicle));
+
+      const newSummary = '- Test bullet point 1\n- Test bullet point 2\n- Test bullet point 3';
+
+      const response = await request(app)
+        .patch('/api/vehicles/test-id-1')
+        .send({ virtualMechanicSummary: newSummary })
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        id: 'test-id-1',
+        virtualMechanicSummary: newSummary,
+      });
+    });
+
+    it('should update aiMechanicReport', async () => {
+      const mockVehicle = {
+        id: 'test-id-1',
+        title: 'Test Vehicle',
+        source: 'otomoto',
+        status: 'new',
+        createdAt: new Date('2023-01-01'),
+        updatedAt: new Date('2023-01-01'),
+      };
+
+      await mockVehicleRepository.insertVehicle(MockVehicleRepository.createTestVehicle(mockVehicle));
+
+      const newReport = '## Full Detailed Report\n\nThis is a test report.';
+
+      const response = await request(app)
+        .patch('/api/vehicles/test-id-1')
+        .send({ aiMechanicReport: newReport })
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        id: 'test-id-1',
+        aiMechanicReport: newReport,
+      });
+    });
+
+    it('should reject virtualMechanicSummary longer than 2000 characters', async () => {
+      const mockVehicle = {
+        id: 'test-id-1',
+        title: 'Test Vehicle',
+        source: 'otomoto',
+        status: 'new',
+        createdAt: new Date('2023-01-01'),
+        updatedAt: new Date('2023-01-01'),
+      };
+
+      await mockVehicleRepository.insertVehicle(MockVehicleRepository.createTestVehicle(mockVehicle));
+
+      const longSummary = 'x'.repeat(2001);
+
+      const response = await request(app)
+        .patch('/api/vehicles/test-id-1')
+        .send({ virtualMechanicSummary: longSummary })
+        .expect(400);
+
+      expect(response.body).toMatchObject({
+        error: 'Bad request',
+        message: 'virtualMechanicSummary must be 2000 characters or less',
+      });
+    });
+
+    it('should update both virtualMechanicSummary and aiMechanicReport', async () => {
+      const mockVehicle = {
+        id: 'test-id-1',
+        title: 'Test Vehicle',
+        source: 'otomoto',
+        status: 'new',
+        createdAt: new Date('2023-01-01'),
+        updatedAt: new Date('2023-01-01'),
+      };
+
+      await mockVehicleRepository.insertVehicle(MockVehicleRepository.createTestVehicle(mockVehicle));
+
+      const newSummary = '- Test bullet point';
+      const newReport = '## Full Report';
+
+      const response = await request(app)
+        .patch('/api/vehicles/test-id-1')
+        .send({
+          virtualMechanicSummary: newSummary,
+          aiMechanicReport: newReport,
+        })
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        id: 'test-id-1',
+        virtualMechanicSummary: newSummary,
+        aiMechanicReport: newReport,
       });
     });
   });

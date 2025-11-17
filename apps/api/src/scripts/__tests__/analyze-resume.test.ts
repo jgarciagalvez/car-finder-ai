@@ -6,6 +6,13 @@ import { getRequiredAnalysisSteps, isRetryableError, getErrorType } from '../ana
 import { Vehicle } from '@car-finder/types';
 import { AIError, RateLimitError, ValidationError } from '@car-finder/ai';
 
+// Mock p-limit before importing analyze.ts
+jest.mock('p-limit', () => {
+  return jest.fn(() => {
+    return jest.fn((fn: any) => fn());
+  });
+});
+
 describe('getRequiredAnalysisSteps', () => {
   // Helper to create minimal vehicle object
   const createVehicle = (overrides: Partial<Vehicle>): Vehicle => ({
@@ -26,14 +33,16 @@ describe('getRequiredAnalysisSteps', () => {
     priceEur: 12000,
     year: 2015,
     mileage: 150000,
-    sellerInfo: { name: 'Test Seller', phone: null, location: null },
+    sellerInfo: { name: 'Test Seller', id: null, type: null, location: null, memberSince: null },
     photos: [],
     personalFitScore: null,
     marketValueScore: null,
     aiPriorityRating: null,
     aiPrioritySummary: null,
     aiMechanicReport: null,
+    virtualMechanicSummary: null,
     aiDataSanityCheck: null,
+    distanceFromWroclaw: null,
     status: 'new',
     personalNotes: null,
     scrapedAt: new Date(),
@@ -95,7 +104,7 @@ describe('getRequiredAnalysisSteps', () => {
       features: ['AC'],
       aiDataSanityCheck: 'Looks good',
       personalFitScore: 8,
-      aiMechanicReport: 'Check tires',
+      virtualMechanicSummary: '- Check tires',
       marketValueScore: 'Good Deal',
       aiPriorityRating: null,
     });
@@ -111,7 +120,7 @@ describe('getRequiredAnalysisSteps', () => {
       features: ['AC'],
       aiDataSanityCheck: 'Looks good',
       personalFitScore: 8,
-      aiMechanicReport: 'Check tires',
+      virtualMechanicSummary: '- Check tires',
       marketValueScore: 'Good Deal',
       aiPriorityRating: 7,
     });

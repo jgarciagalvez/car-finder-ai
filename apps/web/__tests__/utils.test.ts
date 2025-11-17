@@ -40,6 +40,7 @@ describe('Sorting Functions', () => {
     aiPriorityRating: 85,
     aiPrioritySummary: 'Good deal',
     aiMechanicReport: 'No issues',
+    virtualMechanicSummary: null,
     aiDataSanityCheck: 'OK',
     distanceFromWroclaw: null,
     status: 'new',

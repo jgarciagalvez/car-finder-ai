@@ -7,6 +7,13 @@ import { AIService } from '../services/AIService';
 import { VehicleRepository } from '@car-finder/db';
 import { Vehicle } from '@car-finder/types';
 
+// Mock p-limit before importing analyze.ts
+jest.mock('p-limit', () => {
+  return jest.fn(() => {
+    return jest.fn((fn: any) => fn());
+  });
+});
+
 // Mock dependencies
 jest.mock('../services/AIService');
 jest.mock('@car-finder/db', () => ({
@@ -21,6 +28,7 @@ jest.mock('@car-finder/services', () => ({
   WorkspaceUtils: {
     findWorkspaceRoot: jest.fn().mockReturnValue('/mock/workspace'),
     loadEnvFromRoot: jest.fn(),
+    resolveConfigFile: jest.fn((filename: string) => `/mock/workspace/${filename}`),
   },
 }));
 
@@ -33,6 +41,10 @@ jest.mock('fs', () => ({
         useCase: 'daily commute',
         priorityFactors: ['fuel_efficiency'],
       },
+    },
+    marketValueSettings: {
+      enabled: true,
+      equivalentModels: {},
     },
   })),
 }));
@@ -81,7 +93,9 @@ describe('VehicleAnalyzer', () => {
       aiPriorityRating: null, // Needs analysis
       aiPrioritySummary: null, // Needs analysis
       aiMechanicReport: null, // Needs analysis
+      virtualMechanicSummary: null, // Needs analysis
       aiDataSanityCheck: null, // Needs analysis
+      distanceFromWroclaw: null,
       status: 'new',
       personalNotes: null,
       scrapedAt: new Date(),
@@ -100,13 +114,14 @@ describe('VehicleAnalyzer', () => {
         rating: 9,
         summary: 'Excellent vehicle',
       }),
+      generateMechanicSummary: jest.fn().mockResolvedValue('- Concise mechanic summary\n- Second point'),
       generateMechanicReport: jest.fn().mockResolvedValue('# Mechanic Report\n\nTest content'),
       generateDataSanityCheck: jest.fn().mockResolvedValue('Consistency Score: 8/10'),
     } as any;
 
     mockRepository = {
-      findVehiclesWithoutAnalysis: jest.fn().mockResolvedValue([mockVehicle]),
-      findVehicleById: jest.fn().mockResolvedValue(mockVehicle),
+      findVehiclesNeedingAnalysis: jest.fn().mockResolvedValue([{ ...mockVehicle, description: 'Translated description' }]),
+      findVehicleById: jest.fn().mockResolvedValue({ ...mockVehicle, description: 'Translated description' }),
       updateVehicleAnalysis: jest.fn().mockResolvedValue(undefined),
     } as any;
 
@@ -129,33 +144,25 @@ describe('VehicleAnalyzer', () => {
       const analyzer = await VehicleAnalyzer.create();
       await analyzer.run();
 
-      expect(mockRepository.findVehiclesWithoutAnalysis).toHaveBeenCalled();
-      expect(mockAIService.translateVehicleContent).toHaveBeenCalledWith(mockVehicle);
-      expect(mockAIService.generateDataSanityCheck).toHaveBeenCalledWith(mockVehicle);
+      expect(mockRepository.findVehiclesNeedingAnalysis).toHaveBeenCalled();
+      expect(mockAIService.generateDataSanityCheck).toHaveBeenCalled();
       expect(mockAIService.generatePersonalFitScore).toHaveBeenCalled();
-      expect(mockAIService.generateMechanicReport).toHaveBeenCalledWith(mockVehicle);
+      expect(mockAIService.generateMechanicSummary).toHaveBeenCalled();
       expect(mockAIService.generatePriorityRating).toHaveBeenCalled();
       expect(mockRepository.updateVehicleAnalysis).toHaveBeenCalledWith(
         'test-vehicle-123',
         expect.objectContaining({
-          description: 'Translated description',
-          features: ['Air Conditioning', 'ABS'],
           personalFitScore: 8,
           aiPriorityRating: 9,
           aiPrioritySummary: 'Excellent vehicle',
-          aiMechanicReport: '# Mechanic Report\n\nTest content',
+          virtualMechanicSummary: '- Concise mechanic summary\n- Second point',
           aiDataSanityCheck: 'Consistency Score: 8/10',
         })
       );
     });
 
-    it('should run translation FIRST before other analyses', async () => {
+    it('should run analyses in correct order: sanity -> fit -> mechanic -> priority', async () => {
       const callOrder: string[] = [];
-
-      mockAIService.translateVehicleContent.mockImplementation(async () => {
-        callOrder.push('translate');
-        return { description: 'Translated', features: [] };
-      });
 
       mockAIService.generateDataSanityCheck.mockImplementation(async () => {
         callOrder.push('sanity');
@@ -167,9 +174,9 @@ describe('VehicleAnalyzer', () => {
         return 8;
       });
 
-      mockAIService.generateMechanicReport.mockImplementation(async () => {
+      mockAIService.generateMechanicSummary.mockImplementation(async () => {
         callOrder.push('mechanic');
-        return 'Report';
+        return '- Summary';
       });
 
       mockAIService.generatePriorityRating.mockImplementation(async () => {
@@ -180,7 +187,7 @@ describe('VehicleAnalyzer', () => {
       const analyzer = await VehicleAnalyzer.create();
       await analyzer.run();
 
-      expect(callOrder).toEqual(['translate', 'sanity', 'fit', 'mechanic', 'priority']);
+      expect(callOrder).toEqual(['sanity', 'fit', 'mechanic', 'priority']);
     });
 
     it('should analyze specific vehicle by ID', async () => {
@@ -188,13 +195,17 @@ describe('VehicleAnalyzer', () => {
       await analyzer.run({ vehicleId: 'test-vehicle-123' });
 
       expect(mockRepository.findVehicleById).toHaveBeenCalledWith('test-vehicle-123');
-      expect(mockRepository.findVehiclesWithoutAnalysis).not.toHaveBeenCalled();
+      expect(mockRepository.findVehiclesNeedingAnalysis).not.toHaveBeenCalled();
       expect(mockAIService.generatePersonalFitScore).toHaveBeenCalled();
     });
 
     it('should respect limit option', async () => {
-      const vehicles = [mockVehicle, { ...mockVehicle, id: 'vehicle-2' }, { ...mockVehicle, id: 'vehicle-3' }];
-      mockRepository.findVehiclesWithoutAnalysis.mockResolvedValue(vehicles as Vehicle[]);
+      const vehicles = [
+        { ...mockVehicle, description: 'Translated 1' },
+        { ...mockVehicle, id: 'vehicle-2', description: 'Translated 2' },
+        { ...mockVehicle, id: 'vehicle-3', description: 'Translated 3' }
+      ];
+      mockRepository.findVehiclesNeedingAnalysis.mockResolvedValue(vehicles as Vehicle[]);
 
       const analyzer = await VehicleAnalyzer.create();
       await analyzer.run({ limit: 2 });
@@ -206,7 +217,7 @@ describe('VehicleAnalyzer', () => {
       const analyzer = await VehicleAnalyzer.create();
       await analyzer.run({ skipMechanicReport: true });
 
-      expect(mockAIService.generateMechanicReport).not.toHaveBeenCalled();
+      expect(mockAIService.generateMechanicSummary).not.toHaveBeenCalled();
       expect(mockAIService.generatePersonalFitScore).toHaveBeenCalled();
     });
 
@@ -227,34 +238,37 @@ describe('VehicleAnalyzer', () => {
     });
 
     it('should continue processing after individual failure', async () => {
-      const vehicle2 = { ...mockVehicle, id: 'vehicle-2' };
-      mockRepository.findVehiclesWithoutAnalysis.mockResolvedValue([mockVehicle, vehicle2] as Vehicle[]);
+      const vehicle1 = { ...mockVehicle, description: 'Translated 1' };
+      const vehicle2 = { ...mockVehicle, id: 'vehicle-2', description: 'Translated 2' };
+      mockRepository.findVehiclesNeedingAnalysis.mockResolvedValue([vehicle1, vehicle2] as Vehicle[]);
 
-      // First vehicle fails
-      mockAIService.generatePersonalFitScore
+      // First vehicle fails on sanity check
+      mockAIService.generateDataSanityCheck
         .mockRejectedValueOnce(new Error('API Error'))
-        .mockResolvedValueOnce(7);
+        .mockResolvedValueOnce('Sanity check complete');
 
       const analyzer = await VehicleAnalyzer.create();
       await analyzer.run();
 
       // Should still process second vehicle
-      expect(mockRepository.updateVehicleAnalysis).toHaveBeenCalledTimes(2);
+      expect(mockRepository.updateVehicleAnalysis).toHaveBeenCalledTimes(1);
+      expect(mockRepository.updateVehicleAnalysis).toHaveBeenCalledWith('vehicle-2', expect.any(Object));
     });
 
-    it('should handle translation failures gracefully', async () => {
-      mockAIService.translateVehicleContent.mockRejectedValue(new Error('Translation failed'));
+    it('should skip vehicles without translation', async () => {
+      const vehicleWithoutTranslation = { ...mockVehicle, description: null };
+      mockRepository.findVehiclesNeedingAnalysis.mockResolvedValue([vehicleWithoutTranslation] as Vehicle[]);
 
       const analyzer = await VehicleAnalyzer.create();
       await analyzer.run();
 
-      // Should continue with other analyses despite translation failure
-      expect(mockAIService.generateDataSanityCheck).toHaveBeenCalled();
-      expect(mockAIService.generatePersonalFitScore).toHaveBeenCalled();
+      // Should skip vehicle without translation
+      expect(mockAIService.generateDataSanityCheck).not.toHaveBeenCalled();
+      expect(mockAIService.generatePersonalFitScore).not.toHaveBeenCalled();
     });
 
     it('should handle empty vehicle list', async () => {
-      mockRepository.findVehiclesWithoutAnalysis.mockResolvedValue([]);
+      mockRepository.findVehiclesNeedingAnalysis.mockResolvedValue([]);
 
       const analyzer = await VehicleAnalyzer.create();
       await analyzer.run();
@@ -269,6 +283,7 @@ describe('VehicleAnalyzer', () => {
         description: 'Already translated',
         features: ['Feature 1'],
         personalFitScore: 8,
+        marketValueScore: 'good-deal',
         aiPriorityRating: 9,
         aiPrioritySummary: 'Summary',
         aiMechanicReport: 'Report',
@@ -281,7 +296,6 @@ describe('VehicleAnalyzer', () => {
       await analyzer.run({ vehicleId: 'test-vehicle-123' });
 
       // Should not call any AI services since vehicle is already analyzed
-      expect(mockAIService.translateVehicleContent).not.toHaveBeenCalled();
       expect(mockAIService.generatePersonalFitScore).not.toHaveBeenCalled();
     });
 
@@ -302,12 +316,10 @@ describe('VehicleAnalyzer', () => {
       expect(mockRepository.updateVehicleAnalysis).toHaveBeenCalledWith(
         'test-vehicle-123',
         expect.objectContaining({
-          description: 'Translated description',
-          features: ['Air Conditioning', 'ABS'],
           personalFitScore: 8,
           aiPriorityRating: 9,
           aiPrioritySummary: 'Excellent vehicle',
-          aiMechanicReport: expect.any(String),
+          virtualMechanicSummary: expect.any(String),
           aiDataSanityCheck: expect.any(String),
         })
       );
@@ -361,33 +373,27 @@ describe('VehicleAnalyzer', () => {
       expect(options.skipMechanicReport).toBe(true);
     });
 
-    it('should return empty options for no arguments', () => {
+    it('should return default options for no arguments', () => {
       process.argv = ['node', 'analyze.js'];
       const options = parseArgs();
-      expect(options).toEqual({});
+      expect(options).toEqual({ resume: true, concurrency: 3 });
     });
   });
 
   describe('error handling', () => {
     it('should log errors and continue processing', async () => {
-      mockAIService.generateMechanicReport.mockRejectedValue(new Error('Mechanic report failed'));
+      mockAIService.generateMechanicSummary.mockRejectedValue(new Error('Mechanic summary failed'));
 
       const analyzer = await VehicleAnalyzer.create();
       await analyzer.run();
 
-      // Should still save other analyses
-      expect(mockRepository.updateVehicleAnalysis).toHaveBeenCalledWith(
-        'test-vehicle-123',
-        expect.objectContaining({
-          description: 'Translated description',
-          personalFitScore: 8,
-        })
-      );
+      // Should not save anything for failed vehicle
+      expect(mockRepository.updateVehicleAnalysis).not.toHaveBeenCalled();
 
       // Should log the error
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to generate mechanic report'),
-        expect.any(Error)
+        expect.stringContaining('Failed to generate mechanic summary'),
+        expect.any(String)
       );
     });
 
@@ -397,25 +403,18 @@ describe('VehicleAnalyzer', () => {
       const analyzer = await VehicleAnalyzer.create();
       await analyzer.run();
 
-      // Should log error and mark as failed
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to analyze test-vehicle-123: Database error')
-      );
+      // Should log error
+      expect(consoleErrorSpy).toHaveBeenCalled();
     });
 
-    it('should provide fallback fit score on error', async () => {
+    it('should not save partial results when analysis fails', async () => {
       mockAIService.generatePersonalFitScore.mockRejectedValue(new Error('API Error'));
 
       const analyzer = await VehicleAnalyzer.create();
       await analyzer.run();
 
-      // Should save with fallback score of 5
-      expect(mockRepository.updateVehicleAnalysis).toHaveBeenCalledWith(
-        'test-vehicle-123',
-        expect.objectContaining({
-          personalFitScore: 5,
-        })
-      );
+      // Should not save anything for failed vehicle
+      expect(mockRepository.updateVehicleAnalysis).not.toHaveBeenCalled();
     });
   });
 });

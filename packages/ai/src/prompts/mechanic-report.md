@@ -28,7 +28,7 @@ Generate a Virtual Mechanic's Report that provides model-specific mechanical ins
 ## Instructions
 1. **Identify Model-Specific Issues**: Research common problems for this exact make/model/year/engine/transmission combination (e.g., "2017 Toyota Corolla, 1.8L 2ZR-FAE").
 2. **Consider Mileage Impact**: Evaluate which components typically need attention at this mileage level.
-3. **List Critical Inspection Points**: Provide 5-10 specific things to check during inspection (e.g., "Check for oil leaks around valve cover gasket").
+3. **List Critical Inspection Points**: Provide the top specific things to check during inspection (e.g., "Check for oil leaks around valve cover gasket").
 4. **Flag Known Red Flags**: Mention any model-specific issues that are deal-breakers or expensive to fix.
 5. **Assess Maintenance Expectations**: Describe what maintenance is typically due at this mileage.
 6. **Format as Markdown Report**: Structure the output as a readable markdown report with sections.

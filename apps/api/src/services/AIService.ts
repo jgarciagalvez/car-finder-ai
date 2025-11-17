@@ -306,7 +306,7 @@ export class AIService {
   }
 
   /**
-   * Generate Virtual Mechanic's Report
+   * Generate Virtual Mechanic's Report (Full Detailed Report)
    */
   async generateMechanicReport(vehicle: Vehicle): Promise<string> {
     try {
@@ -339,6 +339,43 @@ export class AIService {
         throw error;
       }
       throw new AIError(`Failed to generate Mechanic Report: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Generate Virtual Mechanic's Summary (Concise 3-5 bullet points)
+   */
+  async generateMechanicSummary(vehicle: Vehicle): Promise<string> {
+    try {
+      // Load prompt definition
+      const prompt = await PromptLoader.loadPrompt('mechanic-summary');
+
+      // Extract vehicle data for mechanic analysis
+      const vehicleData = this._extractVehicleData(vehicle);
+
+      // Build prompt
+      const fullPrompt = PromptLoader.buildPrompt(prompt, {
+        vehicle: vehicleData,
+      });
+
+      // Call AI provider
+      const response = await this.provider.generateStructured<{ summary: string }>(
+        fullPrompt,
+        prompt.outputFormat
+      );
+
+      // Validate response
+      if (!response.summary || response.summary.trim() === '') {
+        throw new ValidationError('Empty summary returned from AI provider');
+      }
+
+      return response.summary;
+    } catch (error) {
+      console.error(`Error generating Mechanic Summary for vehicle ${vehicle.id}:`, error);
+      if (error instanceof AIError || error instanceof RateLimitError || error instanceof ValidationError) {
+        throw error;
+      }
+      throw new AIError(`Failed to generate Mechanic Summary: ${(error as Error).message}`);
     }
   }
 

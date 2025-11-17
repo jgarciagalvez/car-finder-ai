@@ -43,6 +43,7 @@ export interface Vehicle {
   aiPriorityRating: number | null;
   aiPrioritySummary: string | null;
   aiMechanicReport: string | null;
+  virtualMechanicSummary: string | null; // Concise 3-5 bullet point summary
   aiDataSanityCheck: string | null;
 
   // Location Data
@@ -62,6 +63,8 @@ export interface Vehicle {
 export interface UpdateVehiclePayload {
   status?: VehicleStatus;
   personalNotes?: string;
+  virtualMechanicSummary?: string;
+  aiMechanicReport?: string;
 }
 
 export interface ChatMessage {

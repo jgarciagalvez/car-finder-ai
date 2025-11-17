@@ -93,6 +93,7 @@ export function SearchAndFilters({
                 <option value="distance_asc">Sort: Distance (Closest)</option>
                 <option value="distance_desc">Sort: Distance (Farthest)</option>
                 <option value="personal_fit">Sort: Personal Fit</option>
+                <option value="date_added_desc">Sort: Date Added (Newest)</option>
               </select>
               <ChevronDownIcon className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             </div>

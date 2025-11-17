@@ -1,6 +1,7 @@
 import { Vehicle } from '@car-finder/types';
 import {
   sortVehicles,
+  sortVehiclesCompound,
   SortOption,
   getScoreColor,
   getScoreTextColor,
@@ -238,6 +239,171 @@ describe('Sorting Functions', () => {
     it('should handle empty array', () => {
       const sorted = sortVehicles([], 'priority');
       expect(sorted).toEqual([]);
+    });
+
+    it('should sort by date added descending', () => {
+      const vehicles = [
+        createMockVehicle({ id: '1', createdAt: new Date('2024-01-15') }),
+        createMockVehicle({ id: '2', createdAt: new Date('2024-01-20') }),
+        createMockVehicle({ id: '3', createdAt: new Date('2024-01-10') })
+      ];
+      const sorted = sortVehicles(vehicles, 'date_added_desc');
+      expect(sorted[0].id).toBe('2'); // Newest
+      expect(sorted[1].id).toBe('1');
+      expect(sorted[2].id).toBe('3'); // Oldest
+    });
+  });
+
+  describe('sortVehiclesCompound', () => {
+    it('should handle empty stack', () => {
+      const vehicles = [
+        createMockVehicle({ id: '1' }),
+        createMockVehicle({ id: '2' })
+      ];
+      const sorted = sortVehiclesCompound(vehicles, []);
+      expect(sorted).toEqual(vehicles);
+    });
+
+    it('should handle empty vehicles array', () => {
+      const sorted = sortVehiclesCompound([], ['priority']);
+      expect(sorted).toEqual([]);
+    });
+
+    it('should handle single vehicle', () => {
+      const vehicles = [createMockVehicle({ id: '1' })];
+      const sorted = sortVehiclesCompound(vehicles, ['priority', 'price_asc']);
+      expect(sorted).toHaveLength(1);
+      expect(sorted[0].id).toBe('1');
+    });
+
+    it('should work with single sort (backward compatible)', () => {
+      const vehicles = [
+        createMockVehicle({ id: '1', priceEur: 15000 }),
+        createMockVehicle({ id: '2', priceEur: 10000 }),
+        createMockVehicle({ id: '3', priceEur: 20000 })
+      ];
+      const sorted = sortVehiclesCompound(vehicles, ['price_asc']);
+      expect(sorted[0].priceEur).toBe(10000);
+      expect(sorted[1].priceEur).toBe(15000);
+      expect(sorted[2].priceEur).toBe(20000);
+    });
+
+    it('should apply two-level sort: price then priority', () => {
+      // Stack: ['priority', 'price_asc'] means price_asc is primary, priority is tiebreaker
+      const vehicles = [
+        createMockVehicle({ id: '1', priceEur: 10000, aiPriorityRating: 70 }),
+        createMockVehicle({ id: '2', priceEur: 10000, aiPriorityRating: 90 }),
+        createMockVehicle({ id: '3', priceEur: 15000, aiPriorityRating: 85 }),
+        createMockVehicle({ id: '4', priceEur: 10000, aiPriorityRating: 80 })
+      ];
+      const sorted = sortVehiclesCompound(vehicles, ['priority', 'price_asc']);
+      // Primary sort: price_asc (10000, 10000, 10000, 15000)
+      // Tiebreaker: priority descending (90, 80, 70)
+      expect(sorted[0].id).toBe('2'); // 10000, priority 90
+      expect(sorted[1].id).toBe('4'); // 10000, priority 80
+      expect(sorted[2].id).toBe('1'); // 10000, priority 70
+      expect(sorted[3].id).toBe('3'); // 15000
+    });
+
+    it('should apply three-level sort: mileage, price, year', () => {
+      // Stack: ['mileage_asc', 'price_asc', 'year_desc'] means year_desc is primary
+      const vehicles = [
+        createMockVehicle({ id: '1', year: 2020, priceEur: 10000, mileage: 100000 }),
+        createMockVehicle({ id: '2', year: 2020, priceEur: 10000, mileage: 80000 }),
+        createMockVehicle({ id: '3', year: 2020, priceEur: 15000, mileage: 90000 }),
+        createMockVehicle({ id: '4', year: 2022, priceEur: 12000, mileage: 50000 })
+      ];
+      const sorted = sortVehiclesCompound(vehicles, ['mileage_asc', 'price_asc', 'year_desc']);
+      // Primary: year_desc (2022, 2020, 2020, 2020)
+      // Tiebreaker: price_asc (10000, 10000, 15000)
+      // Third level: mileage_asc (80000, 100000)
+      expect(sorted[0].id).toBe('4'); // 2022
+      expect(sorted[1].id).toBe('2'); // 2020, 10000, 80000
+      expect(sorted[2].id).toBe('1'); // 2020, 10000, 100000
+      expect(sorted[3].id).toBe('3'); // 2020, 15000
+    });
+
+    it('should not mutate the original array', () => {
+      const vehicles = [
+        createMockVehicle({ id: '1', priceEur: 15000 }),
+        createMockVehicle({ id: '2', priceEur: 10000 })
+      ];
+      const original = [...vehicles];
+      sortVehiclesCompound(vehicles, ['price_asc']);
+      expect(vehicles).toEqual(original);
+    });
+
+    it('should handle null distances in compound sort', () => {
+      const vehicles = [
+        createMockVehicle({ id: '1', distanceFromWroclaw: null, priceEur: 10000 }),
+        createMockVehicle({ id: '2', distanceFromWroclaw: 100, priceEur: 10000 }),
+        createMockVehicle({ id: '3', distanceFromWroclaw: 50, priceEur: 10000 }),
+        createMockVehicle({ id: '4', distanceFromWroclaw: null, priceEur: 10000 })
+      ];
+      const sorted = sortVehiclesCompound(vehicles, ['price_asc', 'distance_asc']);
+      // Primary: distance_asc (50, 100, null, null)
+      expect(sorted[0].id).toBe('3'); // 50km
+      expect(sorted[1].id).toBe('2'); // 100km
+      // Nulls at end
+      expect(sorted[2].distanceFromWroclaw).toBe(null);
+      expect(sorted[3].distanceFromWroclaw).toBe(null);
+    });
+
+    it('should handle unwanted statuses in priority sort', () => {
+      const vehicles = [
+        createMockVehicle({ id: '1', status: 'new', aiPriorityRating: 90, priceEur: 10000 }),
+        createMockVehicle({ id: '2', status: 'not_interested', aiPriorityRating: 95, priceEur: 10000 }),
+        createMockVehicle({ id: '3', status: 'new', aiPriorityRating: 85, priceEur: 10000 }),
+        createMockVehicle({ id: '4', status: 'deleted', aiPriorityRating: 100, priceEur: 10000 })
+      ];
+      const sorted = sortVehiclesCompound(vehicles, ['price_asc', 'priority']);
+      // Primary: priority (but unwanted pushed to end)
+      // All have same price, so priority is tiebreaker
+      expect(sorted[0].id).toBe('1'); // 90, new
+      expect(sorted[1].id).toBe('3'); // 85, new
+      // Unwanted statuses at end
+      const lastTwoStatuses = [sorted[2].status, sorted[3].status];
+      expect(lastTwoStatuses).toContain('not_interested');
+      expect(lastTwoStatuses).toContain('deleted');
+    });
+
+    it('should maintain stable order when all criteria are equal', () => {
+      const vehicles = [
+        createMockVehicle({ id: '1', priceEur: 10000, year: 2020, mileage: 100000 }),
+        createMockVehicle({ id: '2', priceEur: 10000, year: 2020, mileage: 100000 }),
+        createMockVehicle({ id: '3', priceEur: 10000, year: 2020, mileage: 100000 })
+      ];
+      const sorted = sortVehiclesCompound(vehicles, ['mileage_asc', 'year_desc', 'price_asc']);
+      // All equal, should maintain original order
+      expect(sorted[0].id).toBe('1');
+      expect(sorted[1].id).toBe('2');
+      expect(sorted[2].id).toBe('3');
+    });
+
+    it('should handle date_added_desc in compound sort', () => {
+      const vehicles = [
+        createMockVehicle({ id: '1', priceEur: 10000, createdAt: new Date('2024-01-15') }),
+        createMockVehicle({ id: '2', priceEur: 10000, createdAt: new Date('2024-01-20') }),
+        createMockVehicle({ id: '3', priceEur: 15000, createdAt: new Date('2024-01-10') })
+      ];
+      const sorted = sortVehiclesCompound(vehicles, ['price_asc', 'date_added_desc']);
+      // Primary: date_added_desc (20th, 15th, 10th)
+      expect(sorted[0].id).toBe('2'); // Newest
+      expect(sorted[1].id).toBe('1');
+      expect(sorted[2].id).toBe('3'); // Oldest
+    });
+
+    it('should handle null scores in compound sort', () => {
+      const vehicles = [
+        createMockVehicle({ id: '1', personalFitScore: null, priceEur: 10000 }),
+        createMockVehicle({ id: '2', personalFitScore: 80, priceEur: 10000 }),
+        createMockVehicle({ id: '3', personalFitScore: 90, priceEur: 10000 })
+      ];
+      const sorted = sortVehiclesCompound(vehicles, ['price_asc', 'personal_fit']);
+      // Primary: personal_fit (90, 80, null->0)
+      expect(sorted[0].id).toBe('3'); // 90
+      expect(sorted[1].id).toBe('2'); // 80
+      expect(sorted[2].id).toBe('1'); // null (treated as 0)
     });
   });
 

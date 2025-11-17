@@ -12,7 +12,8 @@ export type SortOption =
   | 'mileage_desc'
   | 'personal_fit'
   | 'distance_asc'
-  | 'distance_desc';
+  | 'distance_desc'
+  | 'date_added_desc';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -164,9 +165,75 @@ export function sortVehicles(vehicles: Vehicle[], sortBy: SortOption): Vehicle[]
         if (a.distanceFromWroclaw === null) return 1;
         if (b.distanceFromWroclaw === null) return -1;
         return b.distanceFromWroclaw - a.distanceFromWroclaw;
+      case 'date_added_desc':
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       default:
         return 0;
     }
+  });
+
+  return sorted;
+}
+
+// Helper function to compare two vehicles by a single sort option
+function compareVehicles(a: Vehicle, b: Vehicle, sortOption: SortOption): number {
+  // Handle unwanted statuses for priority sort only
+  if (sortOption === 'priority') {
+    const aUnwanted = a.status === 'not_interested' || a.status === 'deleted';
+    const bUnwanted = b.status === 'not_interested' || b.status === 'deleted';
+
+    if (aUnwanted && !bUnwanted) return 1;
+    if (!aUnwanted && bUnwanted) return -1;
+  }
+
+  switch (sortOption) {
+    case 'priority':
+      return (b.aiPriorityRating ?? b.personalFitScore ?? 0) -
+             (a.aiPriorityRating ?? a.personalFitScore ?? 0);
+    case 'price_asc':
+      return a.priceEur - b.priceEur;
+    case 'price_desc':
+      return b.priceEur - a.priceEur;
+    case 'year_desc':
+      return b.year - a.year;
+    case 'year_asc':
+      return a.year - b.year;
+    case 'mileage_asc':
+      return a.mileage - b.mileage;
+    case 'mileage_desc':
+      return b.mileage - a.mileage;
+    case 'personal_fit':
+      return (b.personalFitScore ?? 0) - (a.personalFitScore ?? 0);
+    case 'distance_asc':
+      if (a.distanceFromWroclaw === null) return 1;
+      if (b.distanceFromWroclaw === null) return -1;
+      return a.distanceFromWroclaw - b.distanceFromWroclaw;
+    case 'distance_desc':
+      if (a.distanceFromWroclaw === null) return 1;
+      if (b.distanceFromWroclaw === null) return -1;
+      return b.distanceFromWroclaw - a.distanceFromWroclaw;
+    case 'date_added_desc':
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    default:
+      return 0;
+  }
+}
+
+// Compound sorting with multiple sort criteria (last in stack = primary sort)
+export function sortVehiclesCompound(vehicles: Vehicle[], sortStack: SortOption[]): Vehicle[] {
+  if (sortStack.length === 0) return vehicles;
+
+  const sorted = [...vehicles];
+
+  sorted.sort((a, b) => {
+    // Apply sorts from end of stack (most recent = primary)
+    // Iterate backwards through stack for tiebreaking
+    for (let i = sortStack.length - 1; i >= 0; i--) {
+      const comparison = compareVehicles(a, b, sortStack[i]);
+      if (comparison !== 0) return comparison;
+      // If equal, continue to next sort in stack (tiebreaker)
+    }
+    return 0; // All sorts equal, maintain stable order
   });
 
   return sorted;

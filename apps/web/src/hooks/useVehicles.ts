@@ -11,7 +11,7 @@ import {
   ApiError
 } from '@/lib/api';
 import { Vehicle } from '@car-finder/types';
-import { sortVehicles } from '@/lib/utils';
+import { sortVehiclesCompound } from '@/lib/utils';
 
 export function useVehicles() {
   const {
@@ -134,8 +134,8 @@ export function useVehicles() {
 
   // Apply sorting and filtering
   const filteredVehicles = useMemo(() => {
-    // First sort the vehicles
-    let result = sortVehicles(state.vehicles, state.sortBy);
+    // First sort the vehicles using compound sorting with full stack
+    let result = sortVehiclesCompound(state.vehicles, state.sortStack);
 
     // Apply status filter if active
     if (state.statusFilter && state.statusFilter.length > 0) {
@@ -161,7 +161,7 @@ export function useVehicles() {
     }
 
     return result;
-  }, [state.vehicles, state.sortBy, state.statusFilter, state.distanceFilter]);
+  }, [state.vehicles, state.sortStack, state.statusFilter, state.distanceFilter]);
 
   // Progressive rendering: Slice filtered vehicles based on render count
   const visibleVehicles = useMemo(() => {
@@ -183,6 +183,7 @@ export function useVehicles() {
     error: state.error,
     selectedVehicle: state.selectedVehicle,
     sortBy: state.sortBy,
+    sortStack: state.sortStack, // Expose full sort stack
     statusFilter: state.statusFilter,
     distanceFilter: state.distanceFilter,
     hasMore: state.hasMore,

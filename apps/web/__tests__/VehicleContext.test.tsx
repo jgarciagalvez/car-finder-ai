@@ -464,6 +464,145 @@ describe('VehicleContext Filtering', () => {
     });
   });
 
+  describe('Compound Sorting (Story 3.3)', () => {
+    it('should initialize sortStack with priority', async () => {
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(result.current.sortStack).toEqual(['priority']);
+      expect(result.current.sortBy).toBe('priority');
+    });
+
+    it('should push new sort to stack when setSortBy is called', async () => {
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.setSortBy('price_asc');
+      });
+
+      expect(result.current.sortStack).toEqual(['priority', 'price_asc']);
+      expect(result.current.sortBy).toBe('price_asc');
+    });
+
+    it('should remove duplicates when pushing same sort option', async () => {
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.setSortBy('price_asc');
+      });
+
+      expect(result.current.sortStack).toEqual(['priority', 'price_asc']);
+
+      act(() => {
+        result.current.setSortBy('year_desc');
+      });
+
+      expect(result.current.sortStack).toEqual(['priority', 'price_asc', 'year_desc']);
+
+      // Now select price_asc again - should move to end
+      act(() => {
+        result.current.setSortBy('price_asc');
+      });
+
+      expect(result.current.sortStack).toEqual(['priority', 'year_desc', 'price_asc']);
+      expect(result.current.sortBy).toBe('price_asc');
+    });
+
+    it('should limit stack to 3 items', async () => {
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.setSortBy('price_asc');
+      });
+      act(() => {
+        result.current.setSortBy('year_desc');
+      });
+      act(() => {
+        result.current.setSortBy('mileage_asc');
+      });
+
+      // Stack should be limited to 3: ['year_desc', 'price_asc', 'mileage_asc']
+      // Actually: initial is ['priority'], then adds price_asc -> ['priority', 'price_asc']
+      // then year_desc -> ['priority', 'price_asc', 'year_desc']
+      // then mileage_asc -> ['price_asc', 'year_desc', 'mileage_asc'] (oldest removed)
+      expect(result.current.sortStack).toHaveLength(3);
+      expect(result.current.sortStack[2]).toBe('mileage_asc');
+    });
+
+    it('should apply compound sorting to filtered vehicles', async () => {
+      const mockVehicles = [
+        createMockVehicle({ id: '1', priceEur: 10000, aiPriorityRating: 70 }),
+        createMockVehicle({ id: '2', priceEur: 10000, aiPriorityRating: 90 }),
+        createMockVehicle({ id: '3', priceEur: 15000, aiPriorityRating: 85 }),
+        createMockVehicle({ id: '4', priceEur: 10000, aiPriorityRating: 80 })
+      ];
+
+      mockApi.fetchVehicles.mockResolvedValue({
+        vehicles: mockVehicles,
+        pagination: { offset: 0, limit: 50, total: 4, hasMore: false }
+      });
+
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // Apply compound sort: priority first (in stack), then price_asc
+      act(() => {
+        result.current.setSortBy('price_asc');
+      });
+
+      // Stack: ['priority', 'price_asc']
+      // Primary: price_asc, tiebreaker: priority
+      // Should sort by price first (10000, 10000, 10000, 15000)
+      // Then by priority for equal prices (90, 80, 70)
+      expect(result.current.vehicles[0].id).toBe('2'); // 10000, priority 90
+      expect(result.current.vehicles[1].id).toBe('4'); // 10000, priority 80
+      expect(result.current.vehicles[2].id).toBe('1'); // 10000, priority 70
+      expect(result.current.vehicles[3].id).toBe('3'); // 15000
+    });
+
+    it('should persist sort stack across renders', async () => {
+      const { result, rerender } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.setSortBy('price_asc');
+      });
+
+      act(() => {
+        result.current.setSortBy('year_desc');
+      });
+
+      expect(result.current.sortStack).toEqual(['priority', 'price_asc', 'year_desc']);
+
+      // Rerender should preserve state
+      rerender();
+
+      expect(result.current.sortStack).toEqual(['priority', 'price_asc', 'year_desc']);
+      expect(result.current.sortBy).toBe('year_desc');
+    });
+  });
+
   describe('Progressive Rendering (Story 3.1)', () => {
     it('should initialize vehiclesToRender to 50', async () => {
       const { result } = renderHook(() => useVehicles(), { wrapper });

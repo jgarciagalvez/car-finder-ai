@@ -25,6 +25,7 @@ interface VehicleState {
   error: string | null;
   selectedVehicle: Vehicle | null;
   sortBy: SortOption;
+  sortStack: SortOption[];
   hasMore: boolean;
   total: number;
   statusFilter: VehicleStatus[] | null;
@@ -43,6 +44,7 @@ type VehicleAction =
   | { type: 'UPDATE_VEHICLE'; payload: Vehicle }
   | { type: 'CLEAR_ERROR' }
   | { type: 'SET_SORT_BY'; payload: SortOption }
+  | { type: 'PUSH_SORT'; payload: SortOption }
   | { type: 'SET_STATUS_FILTER'; payload: VehicleStatus[] | null }
   | { type: 'SET_DISTANCE_FILTER'; payload: DistanceFilter }
   | { type: 'SET_OPERATION_STATE'; payload: { vehicleId: string; operation: keyof OperationState; isLoading: boolean } }
@@ -78,6 +80,7 @@ const initialState: VehicleState = {
   error: null,
   selectedVehicle: null,
   sortBy: 'priority',
+  sortStack: ['priority'],
   hasMore: false,
   total: 0,
   statusFilter: null,
@@ -116,6 +119,19 @@ function vehicleReducer(state: VehicleState, action: VehicleAction): VehicleStat
       return { ...state, error: null };
     case 'SET_SORT_BY':
       return { ...state, sortBy: action.payload };
+    case 'PUSH_SORT': {
+      // Remove duplicate if exists (prevent same sort stacking on itself)
+      const filteredStack = state.sortStack.filter(s => s !== action.payload);
+      // Add new sort to end (most recent = primary)
+      const newStack = [...filteredStack, action.payload];
+      // Limit stack size to 3 levels (prevent unbounded growth)
+      const trimmedStack = newStack.slice(-3);
+      return {
+        ...state,
+        sortStack: trimmedStack,
+        sortBy: action.payload, // Update sortBy for UI display
+      };
+    }
     case 'SET_STATUS_FILTER':
       return { ...state, statusFilter: action.payload };
     case 'SET_DISTANCE_FILTER':
@@ -199,7 +215,7 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setSortBy = useCallback((sortBy: SortOption) => {
-    dispatch({ type: 'SET_SORT_BY', payload: sortBy });
+    dispatch({ type: 'PUSH_SORT', payload: sortBy });
   }, []);
 
   const setStatusFilter = useCallback((statusFilter: VehicleStatus[] | null) => {

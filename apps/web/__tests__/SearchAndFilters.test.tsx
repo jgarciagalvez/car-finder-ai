@@ -84,7 +84,10 @@ describe('SearchAndFilters', () => {
       expect(screen.getByRole('option', { name: 'Sort: Year (Oldest)' })).toBeInTheDocument();
       expect(screen.getByRole('option', { name: 'Sort: Mileage (Lowest)' })).toBeInTheDocument();
       expect(screen.getByRole('option', { name: 'Sort: Mileage (Highest)' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Sort: Distance (Closest)' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Sort: Distance (Farthest)' })).toBeInTheDocument();
       expect(screen.getByRole('option', { name: 'Sort: Personal Fit' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Sort: Date Added (Newest)' })).toBeInTheDocument();
     });
 
     it('should call onSortChange when sort option is selected', () => {
@@ -111,7 +114,10 @@ describe('SearchAndFilters', () => {
         'year_asc',
         'mileage_asc',
         'mileage_desc',
-        'personal_fit'
+        'distance_asc',
+        'distance_desc',
+        'personal_fit',
+        'date_added_desc'
       ];
 
       sortOptions.forEach(option => {
@@ -120,6 +126,11 @@ describe('SearchAndFilters', () => {
       });
 
       expect(onSortChange).toHaveBeenCalledTimes(sortOptions.length);
+    });
+
+    it('should display Date Added sort option when selected', () => {
+      render(<SearchAndFilters {...defaultProps} sortBy="date_added_desc" />);
+      expect(screen.getByDisplayValue('Sort: Date Added (Newest)')).toBeInTheDocument();
     });
   });
 

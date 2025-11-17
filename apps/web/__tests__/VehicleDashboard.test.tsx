@@ -16,6 +16,27 @@ jest.mock('@/components/VehicleCard', () => ({
 
 const mockUseVehicles = useVehiclesHook as jest.Mocked<typeof useVehiclesHook>;
 
+// Base mock properties for useVehicles
+const baseMockUseVehicles = {
+  vehicles: [],
+  filteredVehicles: [],
+  allVehicles: [],
+  loading: false,
+  error: null,
+  sortBy: 'priority' as const,
+  statusFilter: null,
+  vehiclesToRender: 50,
+  loadMoreForRendering: jest.fn(),
+  setVehiclesToRender: jest.fn(),
+  clearError: jest.fn(),
+  forceTranslateVehicle: jest.fn(),
+  forceAnalyzeVehicle: jest.fn(),
+  showNotInterested: false,
+  recentlyHiddenVehicles: new Map(),
+  dismissedPlaceholders: new Set(),
+  dismissPlaceholder: jest.fn(),
+};
+
 const createMockVehicle = (overrides: Partial<Vehicle> = {}): Vehicle => ({
   id: '1',
   source: 'otomoto',
@@ -60,19 +81,8 @@ describe('VehicleDashboard', () => {
   describe('Loading State', () => {
     it('should display loading spinner when loading', () => {
       mockUseVehicles.useVehicles = jest.fn().mockReturnValue({
-        vehicles: [],
-        filteredVehicles: [],
-        allVehicles: [],
-        loading: true,
-        error: null,
-        sortBy: 'priority',
-        statusFilter: null,
-        vehiclesToRender: 50,
-        loadMoreForRendering: jest.fn(),
-        setVehiclesToRender: jest.fn(),
-        clearError: jest.fn(),
-        forceTranslateVehicle: jest.fn(),
-        forceAnalyzeVehicle: jest.fn()
+        ...baseMockUseVehicles,
+        loading: true
       });
 
       render(<VehicleDashboard />);
@@ -81,19 +91,8 @@ describe('VehicleDashboard', () => {
 
     it('should display spinner animation when loading', () => {
       mockUseVehicles.useVehicles = jest.fn().mockReturnValue({
-        vehicles: [],
-        filteredVehicles: [],
-        allVehicles: [],
-        loading: true,
-        error: null,
-        sortBy: 'priority',
-        statusFilter: null,
-        vehiclesToRender: 50,
-        loadMoreForRendering: jest.fn(),
-        setVehiclesToRender: jest.fn(),
-        clearError: jest.fn(),
-        forceTranslateVehicle: jest.fn(),
-        forceAnalyzeVehicle: jest.fn()
+        ...baseMockUseVehicles,
+        loading: true
       });
 
       render(<VehicleDashboard />);
@@ -105,19 +104,8 @@ describe('VehicleDashboard', () => {
   describe('Error State', () => {
     it('should display error message when there is an error', () => {
       mockUseVehicles.useVehicles = jest.fn().mockReturnValue({
-        vehicles: [],
-        filteredVehicles: [],
-        allVehicles: [],
-        loading: false,
-        error: 'Failed to load vehicles',
-        sortBy: 'priority',
-        statusFilter: null,
-        vehiclesToRender: 50,
-        loadMoreForRendering: jest.fn(),
-        setVehiclesToRender: jest.fn(),
-        clearError: jest.fn(),
-        forceTranslateVehicle: jest.fn(),
-        forceAnalyzeVehicle: jest.fn()
+        ...baseMockUseVehicles,
+        error: 'Failed to load vehicles'
       });
 
       render(<VehicleDashboard />);
@@ -128,19 +116,9 @@ describe('VehicleDashboard', () => {
     it('should have dismiss button on error', () => {
       const mockClearError = jest.fn();
       mockUseVehicles.useVehicles = jest.fn().mockReturnValue({
-        vehicles: [],
-        filteredVehicles: [],
-        allVehicles: [],
-        loading: false,
+        ...baseMockUseVehicles,
         error: 'Failed to load vehicles',
-        sortBy: 'priority',
-        statusFilter: null,
-        vehiclesToRender: 50,
-        loadMoreForRendering: jest.fn(),
-        setVehiclesToRender: jest.fn(),
-        clearError: mockClearError,
-        forceTranslateVehicle: jest.fn(),
-        forceAnalyzeVehicle: jest.fn()
+        clearError: mockClearError
       });
 
       render(<VehicleDashboard />);
@@ -152,19 +130,7 @@ describe('VehicleDashboard', () => {
   describe('Empty State', () => {
     it('should display empty state when no vehicles', () => {
       mockUseVehicles.useVehicles = jest.fn().mockReturnValue({
-        vehicles: [],
-        filteredVehicles: [],
-        allVehicles: [],
-        loading: false,
-        error: null,
-        sortBy: 'priority',
-        statusFilter: null,
-        vehiclesToRender: 50,
-        loadMoreForRendering: jest.fn(),
-        setVehiclesToRender: jest.fn(),
-        clearError: jest.fn(),
-        forceTranslateVehicle: jest.fn(),
-        forceAnalyzeVehicle: jest.fn()
+        ...baseMockUseVehicles
       });
 
       render(<VehicleDashboard />);
@@ -182,19 +148,10 @@ describe('VehicleDashboard', () => {
       ];
 
       mockUseVehicles.useVehicles = jest.fn().mockReturnValue({
+        ...baseMockUseVehicles,
         vehicles,
         filteredVehicles: vehicles,
-        allVehicles: vehicles,
-        loading: false,
-        error: null,
-        sortBy: 'priority',
-        statusFilter: null,
-        vehiclesToRender: 50,
-        loadMoreForRendering: jest.fn(),
-        setVehiclesToRender: jest.fn(),
-        clearError: jest.fn(),
-        forceTranslateVehicle: jest.fn(),
-        forceAnalyzeVehicle: jest.fn()
+        allVehicles: vehicles
       });
 
       render(<VehicleDashboard />);
@@ -209,19 +166,10 @@ describe('VehicleDashboard', () => {
       );
 
       mockUseVehicles.useVehicles = jest.fn().mockReturnValue({
+        ...baseMockUseVehicles,
         vehicles,
         filteredVehicles: vehicles,
-        allVehicles: vehicles,
-        loading: false,
-        error: null,
-        sortBy: 'priority',
-        statusFilter: null,
-        vehiclesToRender: 50,
-        loadMoreForRendering: jest.fn(),
-        setVehiclesToRender: jest.fn(),
-        clearError: jest.fn(),
-        forceTranslateVehicle: jest.fn(),
-        forceAnalyzeVehicle: jest.fn()
+        allVehicles: vehicles
       });
 
       render(<VehicleDashboard />);
@@ -241,19 +189,10 @@ describe('VehicleDashboard', () => {
       ];
 
       mockUseVehicles.useVehicles = jest.fn().mockReturnValue({
+        ...baseMockUseVehicles,
         vehicles,
         filteredVehicles: vehicles,
-        allVehicles: vehicles,
-        loading: false,
-        error: null,
-        sortBy: 'priority',
-        statusFilter: null,
-        vehiclesToRender: 50,
-        loadMoreForRendering: jest.fn(),
-        setVehiclesToRender: jest.fn(),
-        clearError: jest.fn(),
-        forceTranslateVehicle: jest.fn(),
-        forceAnalyzeVehicle: jest.fn()
+        allVehicles: vehicles
       });
 
       const { container } = render(<VehicleDashboard />);
@@ -274,19 +213,10 @@ describe('VehicleDashboard', () => {
       ];
 
       mockUseVehicles.useVehicles = jest.fn().mockReturnValue({
+        ...baseMockUseVehicles,
         vehicles,
         filteredVehicles: vehicles,
-        allVehicles: vehicles,
-        loading: false,
-        error: null,
-        sortBy: 'priority',
-        statusFilter: null,
-        vehiclesToRender: 50,
-        loadMoreForRendering: jest.fn(),
-        setVehiclesToRender: jest.fn(),
-        clearError: jest.fn(),
-        forceTranslateVehicle: jest.fn(),
-        forceAnalyzeVehicle: jest.fn()
+        allVehicles: vehicles
       });
 
       const { container } = render(<VehicleDashboard />);
@@ -307,19 +237,11 @@ describe('VehicleDashboard', () => {
       ];
 
       mockUseVehicles.useVehicles = jest.fn().mockReturnValue({
+        ...baseMockUseVehicles,
         vehicles,
         filteredVehicles: vehicles,
         allVehicles: vehicles,
-        loading: false,
-        error: null,
-        sortBy: 'price_asc',
-        statusFilter: null,
-        vehiclesToRender: 50,
-        loadMoreForRendering: jest.fn(),
-        setVehiclesToRender: jest.fn(),
-        clearError: jest.fn(),
-        forceTranslateVehicle: jest.fn(),
-        forceAnalyzeVehicle: jest.fn()
+        sortBy: 'price_asc'
       });
 
       const { container } = render(<VehicleDashboard />);
@@ -339,19 +261,11 @@ describe('VehicleDashboard', () => {
       ];
 
       mockUseVehicles.useVehicles = jest.fn().mockReturnValue({
+        ...baseMockUseVehicles,
         vehicles,
         filteredVehicles: vehicles,
         allVehicles: vehicles,
-        loading: false,
-        error: null,
-        sortBy: 'price_desc',
-        statusFilter: null,
-        vehiclesToRender: 50,
-        loadMoreForRendering: jest.fn(),
-        setVehiclesToRender: jest.fn(),
-        clearError: jest.fn(),
-        forceTranslateVehicle: jest.fn(),
-        forceAnalyzeVehicle: jest.fn()
+        sortBy: 'price_desc'
       });
 
       const { container } = render(<VehicleDashboard />);

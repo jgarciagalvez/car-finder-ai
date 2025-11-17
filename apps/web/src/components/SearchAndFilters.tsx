@@ -34,6 +34,9 @@ interface SearchAndFiltersProps {
   onStatusFilterChange?: (_statusFilter: VehicleStatus[] | null) => void;
   distanceFilter?: DistanceFilter;
   onDistanceFilterChange?: (_distanceFilter: DistanceFilter) => void;
+  showNotInterested?: boolean;
+  onShowNotInterestedChange?: (_show: boolean) => void;
+  notInterestedCount?: number;
 }
 
 export function SearchAndFilters({
@@ -46,7 +49,10 @@ export function SearchAndFilters({
   statusFilter = null,
   onStatusFilterChange,
   distanceFilter = 'all',
-  onDistanceFilterChange
+  onDistanceFilterChange,
+  showNotInterested = false,
+  onShowNotInterestedChange,
+  notInterestedCount = 0
 }: SearchAndFiltersProps) {
   return (
     <div className="sticky top-0 z-10 bg-white shadow-sm border-b border-gray-200 py-3">
@@ -70,11 +76,25 @@ export function SearchAndFilters({
             {/* Vehicle Count - Inline */}
             <span className="text-sm text-gray-600 whitespace-nowrap px-2">
               {totalCount !== undefined ? (
-                <>{totalCount} total</>
+                <>{vehicleCount} of {totalCount} vehicles</>
               ) : (
                 <>{vehicleCount} cars</>
               )}
             </span>
+
+            {/* Show Not Interested Toggle */}
+            <label className="flex items-center gap-1.5 text-sm text-gray-600 whitespace-nowrap cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showNotInterested}
+                onChange={(e) => onShowNotInterestedChange?.(e.target.checked)}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <span>Show Not Interested</span>
+              {!showNotInterested && notInterestedCount > 0 && (
+                <span className="text-xs text-gray-500">({notInterestedCount} hidden)</span>
+              )}
+            </label>
 
             {/* Sort Dropdown */}
             <div className="relative">

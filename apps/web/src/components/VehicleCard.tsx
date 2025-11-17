@@ -56,6 +56,8 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
     feedback,
     setFeedback,
     clearFeedback,
+    showNotInterested,
+    addHiddenVehicle,
   } = useVehicles();
 
   // Derive operation states for this vehicle (AC: 2)
@@ -137,7 +139,19 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
     try {
       setOperationState(vehicle.id, 'isUpdatingStatus', true);
       clearFeedback();
+
+      // Add to recently hidden vehicles BEFORE updating status
+      // This ensures the placeholder state is set before the vehicle is filtered out
+      // For deleted: always show placeholder
+      // For not_interested: only show placeholder if toggle is OFF
+      if (newStatus === 'deleted') {
+        addHiddenVehicle(vehicle.id, 'deleted');
+      } else if (newStatus === 'not_interested' && !showNotInterested) {
+        addHiddenVehicle(vehicle.id, 'not_interested');
+      }
+
       await updateVehicle(vehicle.id, { status: newStatus });
+
       setFeedback('success', 'Status updated successfully!', vehicle.id);
     } catch (error) {
       setFeedback('error', error instanceof Error ? error.message : 'Status update failed', vehicle.id);

@@ -17,7 +17,7 @@ const ChatBubbleLeftRightIcon = ({ className }: { className?: string }) => (
 export default function DashboardPage() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const { vehicles, allVehicles, refetch, sortBy, setSortBy, statusFilter, setStatusFilter, distanceFilter, setDistanceFilter } = useVehicles();
+  const { vehicles, allVehicles, refetch, sortBy, setSortBy, statusFilter, setStatusFilter, distanceFilter, setDistanceFilter, showNotInterested, setShowNotInterested, notInterestedCount, activePoolCount } = useVehicles();
 
   const handleRefresh = () => {
     refetch();
@@ -59,13 +59,16 @@ export default function DashboardPage() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           vehicleCount={vehicles.length}
-          totalCount={allVehicles.length}
+          totalCount={activePoolCount}
           sortBy={sortBy}
           onSortChange={setSortBy}
           statusFilter={statusFilter}
           onStatusFilterChange={setStatusFilter}
           distanceFilter={distanceFilter}
           onDistanceFilterChange={setDistanceFilter}
+          showNotInterested={showNotInterested}
+          onShowNotInterestedChange={setShowNotInterested}
+          notInterestedCount={notInterestedCount}
         />
 
         {/* Vehicle Dashboard */}

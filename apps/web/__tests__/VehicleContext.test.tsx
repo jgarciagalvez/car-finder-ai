@@ -603,6 +603,333 @@ describe('VehicleContext Filtering', () => {
     });
   });
 
+  describe('Show Not Interested Toggle (Story 3.4)', () => {
+    it('should initialize showNotInterested to false', async () => {
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(result.current.showNotInterested).toBe(false);
+    });
+
+    it('should toggle showNotInterested state', async () => {
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.setShowNotInterested(true);
+      });
+
+      expect(result.current.showNotInterested).toBe(true);
+
+      act(() => {
+        result.current.setShowNotInterested(false);
+      });
+
+      expect(result.current.showNotInterested).toBe(false);
+    });
+
+    it('should hide not_interested vehicles when toggle is OFF', async () => {
+      const mockVehicles = [
+        createMockVehicle({ id: '1', status: 'new' }),
+        createMockVehicle({ id: '2', status: 'not_interested' }),
+        createMockVehicle({ id: '3', status: 'to_contact' }),
+      ];
+
+      mockApi.fetchVehicles.mockResolvedValue({
+        vehicles: mockVehicles,
+        pagination: { offset: 0, limit: 50, total: 3, hasMore: false }
+      });
+
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // Default: showNotInterested is false
+      expect(result.current.showNotInterested).toBe(false);
+      expect(result.current.vehicles).toHaveLength(2);
+      expect(result.current.vehicles.every(v => v.status !== 'not_interested')).toBe(true);
+    });
+
+    it('should show not_interested vehicles when toggle is ON', async () => {
+      const mockVehicles = [
+        createMockVehicle({ id: '1', status: 'new' }),
+        createMockVehicle({ id: '2', status: 'not_interested' }),
+        createMockVehicle({ id: '3', status: 'to_contact' }),
+      ];
+
+      mockApi.fetchVehicles.mockResolvedValue({
+        vehicles: mockVehicles,
+        pagination: { offset: 0, limit: 50, total: 3, hasMore: false }
+      });
+
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.setShowNotInterested(true);
+      });
+
+      expect(result.current.vehicles).toHaveLength(3);
+      expect(result.current.vehicles.some(v => v.status === 'not_interested')).toBe(true);
+    });
+
+    it('should always hide deleted vehicles', async () => {
+      const mockVehicles = [
+        createMockVehicle({ id: '1', status: 'new' }),
+        createMockVehicle({ id: '2', status: 'deleted' }),
+        createMockVehicle({ id: '3', status: 'to_contact' }),
+      ];
+
+      mockApi.fetchVehicles.mockResolvedValue({
+        vehicles: mockVehicles,
+        pagination: { offset: 0, limit: 50, total: 3, hasMore: false }
+      });
+
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // Deleted should be hidden regardless of toggle
+      expect(result.current.vehicles).toHaveLength(2);
+      expect(result.current.vehicles.every(v => v.status !== 'deleted')).toBe(true);
+    });
+
+    it('should show deleted vehicles when explicitly filtered', async () => {
+      const mockVehicles = [
+        createMockVehicle({ id: '1', status: 'new' }),
+        createMockVehicle({ id: '2', status: 'deleted' }),
+        createMockVehicle({ id: '3', status: 'to_contact' }),
+      ];
+
+      mockApi.fetchVehicles.mockResolvedValue({
+        vehicles: mockVehicles,
+        pagination: { offset: 0, limit: 50, total: 3, hasMore: false }
+      });
+
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.setStatusFilter(['deleted']);
+      });
+
+      expect(result.current.vehicles).toHaveLength(1);
+      expect(result.current.vehicles[0].status).toBe('deleted');
+    });
+
+    it('should calculate notInterestedCount correctly', async () => {
+      const mockVehicles = [
+        createMockVehicle({ id: '1', status: 'new' }),
+        createMockVehicle({ id: '2', status: 'not_interested' }),
+        createMockVehicle({ id: '3', status: 'not_interested' }),
+        createMockVehicle({ id: '4', status: 'to_contact' }),
+      ];
+
+      mockApi.fetchVehicles.mockResolvedValue({
+        vehicles: mockVehicles,
+        pagination: { offset: 0, limit: 50, total: 4, hasMore: false }
+      });
+
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(result.current.notInterestedCount).toBe(2);
+    });
+
+    it('should calculate deletedCount correctly', async () => {
+      const mockVehicles = [
+        createMockVehicle({ id: '1', status: 'new' }),
+        createMockVehicle({ id: '2', status: 'deleted' }),
+        createMockVehicle({ id: '3', status: 'deleted' }),
+        createMockVehicle({ id: '4', status: 'deleted' }),
+      ];
+
+      mockApi.fetchVehicles.mockResolvedValue({
+        vehicles: mockVehicles,
+        pagination: { offset: 0, limit: 50, total: 4, hasMore: false }
+      });
+
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(result.current.deletedCount).toBe(3);
+    });
+  });
+
+  describe('Placeholder Management (Story 3.4)', () => {
+    it('should initialize recentlyHiddenVehicles as empty Map', async () => {
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(result.current.recentlyHiddenVehicles.size).toBe(0);
+    });
+
+    it('should initialize dismissedPlaceholders as empty Set', async () => {
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(result.current.dismissedPlaceholders.size).toBe(0);
+    });
+
+    it('should add hidden vehicle to recentlyHiddenVehicles', async () => {
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.addHiddenVehicle('vehicle-1', 'not_interested');
+      });
+
+      expect(result.current.recentlyHiddenVehicles.get('vehicle-1')).toBe('not_interested');
+    });
+
+    it('should add deleted vehicle to recentlyHiddenVehicles', async () => {
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.addHiddenVehicle('vehicle-2', 'deleted');
+      });
+
+      expect(result.current.recentlyHiddenVehicles.get('vehicle-2')).toBe('deleted');
+    });
+
+    it('should dismiss placeholder by adding to dismissedPlaceholders', async () => {
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.addHiddenVehicle('vehicle-1', 'not_interested');
+      });
+
+      act(() => {
+        result.current.dismissPlaceholder('vehicle-1');
+      });
+
+      expect(result.current.dismissedPlaceholders.has('vehicle-1')).toBe(true);
+    });
+
+    it('should keep recently hidden vehicles in list for placeholder display', async () => {
+      const mockVehicles = [
+        createMockVehicle({ id: '1', status: 'new' }),
+        createMockVehicle({ id: '2', status: 'not_interested' }),
+        createMockVehicle({ id: '3', status: 'to_contact' }),
+      ];
+
+      mockApi.fetchVehicles.mockResolvedValue({
+        vehicles: mockVehicles,
+        pagination: { offset: 0, limit: 50, total: 3, hasMore: false }
+      });
+
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // Mark vehicle 2 as recently hidden
+      act(() => {
+        result.current.addHiddenVehicle('2', 'not_interested');
+      });
+
+      // Even though toggle is OFF, vehicle should be in list for placeholder
+      expect(result.current.vehicles.some(v => v.id === '2')).toBe(true);
+    });
+
+    it('should remove vehicle from list when placeholder is dismissed', async () => {
+      const mockVehicles = [
+        createMockVehicle({ id: '1', status: 'new' }),
+        createMockVehicle({ id: '2', status: 'not_interested' }),
+        createMockVehicle({ id: '3', status: 'to_contact' }),
+      ];
+
+      mockApi.fetchVehicles.mockResolvedValue({
+        vehicles: mockVehicles,
+        pagination: { offset: 0, limit: 50, total: 3, hasMore: false }
+      });
+
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // Mark vehicle 2 as recently hidden
+      act(() => {
+        result.current.addHiddenVehicle('2', 'not_interested');
+      });
+
+      expect(result.current.vehicles.some(v => v.id === '2')).toBe(true);
+
+      // Dismiss placeholder
+      act(() => {
+        result.current.dismissPlaceholder('2');
+      });
+
+      expect(result.current.vehicles.some(v => v.id === '2')).toBe(false);
+    });
+
+    it('should clear all placeholders', async () => {
+      const { result } = renderHook(() => useVehicles(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.addHiddenVehicle('vehicle-1', 'not_interested');
+        result.current.addHiddenVehicle('vehicle-2', 'deleted');
+        result.current.dismissPlaceholder('vehicle-1');
+      });
+
+      expect(result.current.recentlyHiddenVehicles.size).toBe(2);
+      expect(result.current.dismissedPlaceholders.size).toBe(1);
+
+      act(() => {
+        result.current.clearPlaceholders();
+      });
+
+      expect(result.current.recentlyHiddenVehicles.size).toBe(0);
+      expect(result.current.dismissedPlaceholders.size).toBe(0);
+    });
+  });
+
   describe('Progressive Rendering (Story 3.1)', () => {
     it('should initialize vehiclesToRender to 50', async () => {
       const { result } = renderHook(() => useVehicles(), { wrapper });

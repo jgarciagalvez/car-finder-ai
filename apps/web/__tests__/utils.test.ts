@@ -509,7 +509,7 @@ describe('Sorting Functions', () => {
         expect(getStatusColor('contacted')).toBe('bg-orange-100 text-orange-800');
         expect(getStatusColor('to_visit')).toBe('bg-purple-100 text-purple-800');
         expect(getStatusColor('visited')).toBe('bg-green-100 text-green-800');
-        expect(getStatusColor('not_interested')).toBe('bg-gray-100 text-gray-800');
+        expect(getStatusColor('not_interested')).toBe('bg-red-100 text-red-800');
         expect(getStatusColor('deleted')).toBe('bg-red-100 text-red-800');
         expect(getStatusColor('unknown')).toBe('bg-gray-100 text-gray-800');
       });

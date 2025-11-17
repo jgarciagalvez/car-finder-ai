@@ -34,8 +34,8 @@ describe('SearchAndFilters', () => {
     });
 
     it('should display total count when provided', () => {
-      render(<SearchAndFilters {...defaultProps} vehicleCount={0} totalCount={100} />);
-      expect(screen.getByText('100 total')).toBeInTheDocument();
+      render(<SearchAndFilters {...defaultProps} vehicleCount={50} totalCount={100} />);
+      expect(screen.getByText('50 of 100 vehicles')).toBeInTheDocument();
     });
   });
 
@@ -191,6 +191,84 @@ describe('SearchAndFilters', () => {
       render(<SearchAndFilters {...defaultProps} onSortChange={undefined} />);
       const sortDropdown = screen.getByDisplayValue('Sort: Priority');
       fireEvent.change(sortDropdown, { target: { value: 'price_asc' } });
+      // Should not throw
+    });
+  });
+
+  describe('Show Not Interested Toggle (Story 3.4)', () => {
+    it('should render Show Not Interested checkbox', () => {
+      render(<SearchAndFilters {...defaultProps} />);
+      expect(screen.getByLabelText(/Show Not Interested/)).toBeInTheDocument();
+    });
+
+    it('should be unchecked by default', () => {
+      render(<SearchAndFilters {...defaultProps} showNotInterested={false} />);
+      const checkbox = screen.getByRole('checkbox');
+      expect(checkbox).not.toBeChecked();
+    });
+
+    it('should be checked when showNotInterested is true', () => {
+      render(<SearchAndFilters {...defaultProps} showNotInterested={true} />);
+      const checkbox = screen.getByRole('checkbox');
+      expect(checkbox).toBeChecked();
+    });
+
+    it('should call onShowNotInterestedChange when toggled', () => {
+      const onShowNotInterestedChange = jest.fn();
+      render(
+        <SearchAndFilters
+          {...defaultProps}
+          showNotInterested={false}
+          onShowNotInterestedChange={onShowNotInterestedChange}
+        />
+      );
+
+      const checkbox = screen.getByRole('checkbox');
+      fireEvent.click(checkbox);
+
+      expect(onShowNotInterestedChange).toHaveBeenCalledWith(true);
+    });
+
+    it('should show hidden count when toggle is OFF and count > 0', () => {
+      render(
+        <SearchAndFilters
+          {...defaultProps}
+          showNotInterested={false}
+          notInterestedCount={5}
+        />
+      );
+
+      expect(screen.getByText('(5 hidden)')).toBeInTheDocument();
+    });
+
+    it('should not show hidden count when toggle is ON', () => {
+      render(
+        <SearchAndFilters
+          {...defaultProps}
+          showNotInterested={true}
+          notInterestedCount={5}
+        />
+      );
+
+      expect(screen.queryByText('(5 hidden)')).not.toBeInTheDocument();
+    });
+
+    it('should not show hidden count when count is 0', () => {
+      render(
+        <SearchAndFilters
+          {...defaultProps}
+          showNotInterested={false}
+          notInterestedCount={0}
+        />
+      );
+
+      expect(screen.queryByText(/hidden/)).not.toBeInTheDocument();
+    });
+
+    it('should not crash when onShowNotInterestedChange is undefined', () => {
+      render(<SearchAndFilters {...defaultProps} onShowNotInterestedChange={undefined} />);
+      const checkbox = screen.getByRole('checkbox');
+      fireEvent.click(checkbox);
       // Should not throw
     });
   });

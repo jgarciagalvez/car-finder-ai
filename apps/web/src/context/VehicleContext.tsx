@@ -33,6 +33,9 @@ interface VehicleState {
   operationStates: Record<string, OperationState>;
   vehiclesToRender: number;
   feedback: FeedbackState;
+  showNotInterested: boolean;
+  recentlyHiddenVehicles: Map<string, 'not_interested' | 'deleted'>;
+  dismissedPlaceholders: Set<string>;
 }
 
 type VehicleAction =
@@ -51,7 +54,11 @@ type VehicleAction =
   | { type: 'CLEAR_OPERATION_STATE'; payload: { vehicleId: string; operation: keyof OperationState } }
   | { type: 'SET_VEHICLES_TO_RENDER'; payload: number }
   | { type: 'SET_FEEDBACK'; payload: { type: 'success' | 'error'; message: string; vehicleId?: string } }
-  | { type: 'CLEAR_FEEDBACK' };
+  | { type: 'CLEAR_FEEDBACK' }
+  | { type: 'SET_SHOW_NOT_INTERESTED'; payload: boolean }
+  | { type: 'ADD_HIDDEN_VEHICLE'; payload: { id: string; status: 'not_interested' | 'deleted' } }
+  | { type: 'DISMISS_PLACEHOLDER'; payload: string }
+  | { type: 'CLEAR_PLACEHOLDERS' };
 
 interface VehicleContextType {
   state: VehicleState;
@@ -70,6 +77,10 @@ interface VehicleContextType {
   setVehiclesToRender: (_count: number) => void;
   setFeedback: (_type: 'success' | 'error', _message: string, _vehicleId?: string) => void;
   clearFeedback: () => void;
+  setShowNotInterested: (_show: boolean) => void;
+  addHiddenVehicle: (_id: string, _status: 'not_interested' | 'deleted') => void;
+  dismissPlaceholder: (_id: string) => void;
+  clearPlaceholders: () => void;
 }
 
 const VehicleContext = createContext<VehicleContextType | undefined>(undefined);
@@ -91,6 +102,9 @@ const initialState: VehicleState = {
     type: null,
     message: null,
   },
+  showNotInterested: false,
+  recentlyHiddenVehicles: new Map(),
+  dismissedPlaceholders: new Set(),
 };
 
 function vehicleReducer(state: VehicleState, action: VehicleAction): VehicleState {
@@ -176,6 +190,24 @@ function vehicleReducer(state: VehicleState, action: VehicleAction): VehicleStat
           type: null,
           message: null,
         },
+      };
+    case 'SET_SHOW_NOT_INTERESTED':
+      return { ...state, showNotInterested: action.payload };
+    case 'ADD_HIDDEN_VEHICLE': {
+      const newMap = new Map(state.recentlyHiddenVehicles);
+      newMap.set(action.payload.id, action.payload.status);
+      return { ...state, recentlyHiddenVehicles: newMap };
+    }
+    case 'DISMISS_PLACEHOLDER': {
+      const newSet = new Set(state.dismissedPlaceholders);
+      newSet.add(action.payload);
+      return { ...state, dismissedPlaceholders: newSet };
+    }
+    case 'CLEAR_PLACEHOLDERS':
+      return {
+        ...state,
+        recentlyHiddenVehicles: new Map(),
+        dismissedPlaceholders: new Set(),
       };
     default:
       return state;
@@ -263,6 +295,22 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
     }, timeoutDuration);
   }, []);
 
+  const setShowNotInterested = useCallback((show: boolean) => {
+    dispatch({ type: 'SET_SHOW_NOT_INTERESTED', payload: show });
+  }, []);
+
+  const addHiddenVehicle = useCallback((id: string, status: 'not_interested' | 'deleted') => {
+    dispatch({ type: 'ADD_HIDDEN_VEHICLE', payload: { id, status } });
+  }, []);
+
+  const dismissPlaceholder = useCallback((id: string) => {
+    dispatch({ type: 'DISMISS_PLACEHOLDER', payload: id });
+  }, []);
+
+  const clearPlaceholders = useCallback(() => {
+    dispatch({ type: 'CLEAR_PLACEHOLDERS' });
+  }, []);
+
   const value: VehicleContextType = {
     state,
     setLoading,
@@ -280,6 +328,10 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
     setVehiclesToRender,
     setFeedback,
     clearFeedback,
+    setShowNotInterested,
+    addHiddenVehicle,
+    dismissPlaceholder,
+    clearPlaceholders,
   };
 
   return (

@@ -43,6 +43,8 @@ export function getStatusColor(status: string): string {
       return 'bg-purple-100 text-purple-800';
     case 'visited':
       return 'bg-green-100 text-green-800';
+    case 'not_interested':
+      return 'bg-red-100 text-red-800';
     case 'deleted':
       return 'bg-red-100 text-red-800';
     default:

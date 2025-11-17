@@ -2,6 +2,7 @@
 
 import { useVehicles } from '@/hooks/useVehicles';
 import { VehicleCard } from './VehicleCard';
+import { PlaceholderNotification } from './PlaceholderNotification';
 import { useRef, useEffect, useCallback } from 'react';
 
 export function VehicleDashboard() {
@@ -16,7 +17,11 @@ export function VehicleDashboard() {
     sortBy,
     vehiclesToRender,
     loadMoreForRendering,
-    setVehiclesToRender
+    setVehiclesToRender,
+    showNotInterested,
+    recentlyHiddenVehicles,
+    dismissedPlaceholders,
+    dismissPlaceholder
   } = useVehicles();
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
@@ -55,6 +60,29 @@ export function VehicleDashboard() {
       }
     };
   }, [handleLoadMore]);
+
+  // Helper function to determine if vehicle should show as placeholder
+  // MUST be defined before early returns to follow Rules of Hooks
+  const shouldShowPlaceholder = useCallback((vehicleId: string) => {
+    const hiddenStatus = recentlyHiddenVehicles.get(vehicleId);
+    const isDismissed = dismissedPlaceholders.has(vehicleId);
+
+    if (!hiddenStatus || isDismissed) {
+      return false;
+    }
+
+    // Show placeholder for deleted vehicles
+    if (hiddenStatus === 'deleted') {
+      return true;
+    }
+
+    // Show placeholder for not_interested only if toggle is OFF
+    if (hiddenStatus === 'not_interested' && !showNotInterested) {
+      return true;
+    }
+
+    return false;
+  }, [recentlyHiddenVehicles, dismissedPlaceholders, showNotInterested]);
 
   // Only show full loading spinner on initial load (when no vehicles are loaded yet)
   if (loading && allVehicles.length === 0) {
@@ -114,12 +142,33 @@ export function VehicleDashboard() {
     );
   }
 
+  // Helper function to get placeholder message
+  const getPlaceholderMessage = (status: 'not_interested' | 'deleted') => {
+    if (status === 'deleted') {
+      return 'Vehicle Deleted';
+    }
+    return 'Vehicle Added to Not Interested List';
+  };
+
   return (
     <div className="space-y-4">
-      {/* Vehicle List - Horizontal Cards */}
-      {vehicles.map((vehicle) => (
-        <VehicleCard key={vehicle.id} vehicle={vehicle} />
-      ))}
+      {/* Vehicle List - Horizontal Cards with Placeholders */}
+      {vehicles.map((vehicle) => {
+        const hiddenStatus = recentlyHiddenVehicles.get(vehicle.id);
+
+        if (hiddenStatus && shouldShowPlaceholder(vehicle.id)) {
+          return (
+            <PlaceholderNotification
+              key={`placeholder-${vehicle.id}`}
+              vehicleId={vehicle.id}
+              message={getPlaceholderMessage(hiddenStatus)}
+              onDismiss={dismissPlaceholder}
+            />
+          );
+        }
+
+        return <VehicleCard key={vehicle.id} vehicle={vehicle} />;
+      })}
 
       {/* Progressive rendering sentinel element */}
       {vehiclesToRender < filteredVehicles.length && (

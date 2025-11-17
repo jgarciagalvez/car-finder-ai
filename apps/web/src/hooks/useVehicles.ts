@@ -30,6 +30,10 @@ export function useVehicles() {
     setVehiclesToRender,
     setFeedback,
     clearFeedback,
+    setShowNotInterested,
+    addHiddenVehicle,
+    dismissPlaceholder,
+    clearPlaceholders,
   } = useVehicleContext();
 
   const loadVehicles = useCallback(async () => {
@@ -137,9 +141,26 @@ export function useVehicles() {
     // First sort the vehicles using compound sorting with full stack
     let result = sortVehiclesCompound(state.vehicles, state.sortStack);
 
-    // Apply status filter if active
+    // Apply status filter if active (explicit filter takes priority)
     if (state.statusFilter && state.statusFilter.length > 0) {
       result = result.filter(v => state.statusFilter!.includes(v.status));
+    } else {
+      // No explicit status filter - apply default hiding rules
+      // Always hide deleted vehicles unless explicitly filtered
+      // EXCEPTION: Keep vehicles in recentlyHiddenVehicles (for placeholder display)
+      result = result.filter(v => {
+        // Keep vehicle if it's in recentlyHiddenVehicles and not dismissed (for placeholder)
+        const isRecentlyHidden = state.recentlyHiddenVehicles.has(v.id);
+        const isDismissed = state.dismissedPlaceholders.has(v.id);
+        if (isRecentlyHidden && !isDismissed) {
+          return true; // Keep for placeholder rendering
+        }
+
+        // Normal filtering rules
+        if (v.status === 'deleted') return false;
+        if (!state.showNotInterested && v.status === 'not_interested') return false;
+        return true;
+      });
     }
 
     // Apply distance filter if active
@@ -161,7 +182,7 @@ export function useVehicles() {
     }
 
     return result;
-  }, [state.vehicles, state.sortStack, state.statusFilter, state.distanceFilter]);
+  }, [state.vehicles, state.sortStack, state.statusFilter, state.distanceFilter, state.showNotInterested, state.recentlyHiddenVehicles, state.dismissedPlaceholders]);
 
   // Progressive rendering: Slice filtered vehicles based on render count
   const visibleVehicles = useMemo(() => {
@@ -174,6 +195,26 @@ export function useVehicles() {
       setVehiclesToRender(Math.min(state.vehiclesToRender + 50, filteredVehicles.length));
     }
   }, [state.vehiclesToRender, filteredVehicles.length, setVehiclesToRender]);
+
+  // Calculate hidden counts for display
+  const notInterestedCount = useMemo(() => {
+    return state.vehicles.filter(v => v.status === 'not_interested').length;
+  }, [state.vehicles]);
+
+  const deletedCount = useMemo(() => {
+    return state.vehicles.filter(v => v.status === 'deleted').length;
+  }, [state.vehicles]);
+
+  // Calculate the "active pool" count (excluding deleted, and excluding not_interested when toggle OFF)
+  const activePoolCount = useMemo(() => {
+    return state.vehicles.filter(v => {
+      // Always exclude deleted
+      if (v.status === 'deleted') return false;
+      // Exclude not_interested when toggle is OFF
+      if (!state.showNotInterested && v.status === 'not_interested') return false;
+      return true;
+    }).length;
+  }, [state.vehicles, state.showNotInterested]);
 
   return {
     vehicles: visibleVehicles, // Visible vehicles for rendering
@@ -208,5 +249,16 @@ export function useVehicles() {
     setFeedback,
     clearFeedback,
     refetch: loadVehicles, // Alias for refetching data
+    // Show Not Interested toggle and placeholder management
+    showNotInterested: state.showNotInterested,
+    setShowNotInterested,
+    notInterestedCount,
+    deletedCount,
+    activePoolCount,
+    recentlyHiddenVehicles: state.recentlyHiddenVehicles,
+    dismissedPlaceholders: state.dismissedPlaceholders,
+    addHiddenVehicle,
+    dismissPlaceholder,
+    clearPlaceholders,
   };
 }

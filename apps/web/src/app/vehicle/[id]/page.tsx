@@ -51,6 +51,17 @@ export default function VehicleDetailPage({ params }: VehicleDetailPageProps) {
     loadVehicle();
   }, [params.id]);
 
+  // Set page title based on vehicle data
+  useEffect(() => {
+    if (isLoading) {
+      document.title = 'Loading... | Car Finder AI';
+    } else if (vehicle) {
+      document.title = `${vehicle.title} | Car Finder AI`;
+    } else {
+      document.title = 'Vehicle Not Found | Car Finder AI';
+    }
+  }, [vehicle, isLoading]);
+
   const handleVehicleUpdate = (updatedVehicle: Vehicle) => {
     setVehicle(updatedVehicle);
   };

@@ -5,7 +5,7 @@ import { AIChatSidebar } from '@/components/AIChatSidebar';
 import { Header } from '@/components/Header';
 import { SearchAndFilters } from '@/components/SearchAndFilters';
 import { useVehicles } from '@/hooks/useVehicles';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 // Fallback icon if Heroicons are not available
 const ChatBubbleLeftRightIcon = ({ className }: { className?: string }) => (
@@ -18,6 +18,11 @@ export default function DashboardPage() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { vehicles, allVehicles, refetch, sortBy, setSortBy, statusFilter, setStatusFilter, distanceFilter, setDistanceFilter, showNotInterested, setShowNotInterested, notInterestedCount, activePoolCount } = useVehicles();
+
+  // Set page title
+  useEffect(() => {
+    document.title = 'Dashboard | Car Finder AI';
+  }, []);
 
   const handleRefresh = () => {
     refetch();

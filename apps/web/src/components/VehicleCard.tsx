@@ -467,6 +467,8 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
                 disabled={isUpdatingStatus}
               >
                 <option value="new">New</option>
+                <option value="processed">Processed</option>
+                <option value="skipped">Skipped</option>
                 <option value="to_contact">To Contact</option>
                 <option value="contacted">Contacted</option>
                 <option value="to_visit">To Visit</option>

@@ -53,7 +53,8 @@ export class VehicleRepository {
         // User workflow data
         status: vehicle.status,
         personalNotes: vehicle.personalNotes,
-        
+        isRemovedFromSource: vehicle.isRemovedFromSource ? 1 : 0,
+
         // Timestamps
         scrapedAt: vehicle.scrapedAt.toISOString(),
         // createdAt and updatedAt will be auto-generated
@@ -126,6 +127,7 @@ export class VehicleRepository {
       if (updates.aiMechanicReport !== undefined) dbUpdates.aiMechanicReport = updates.aiMechanicReport;
       if (updates.aiDataSanityCheck !== undefined) dbUpdates.aiDataSanityCheck = updates.aiDataSanityCheck;
       if (updates.distanceFromWroclaw !== undefined) dbUpdates.distanceFromWroclaw = updates.distanceFromWroclaw;
+      if (updates.isRemovedFromSource !== undefined) dbUpdates.isRemovedFromSource = updates.isRemovedFromSource ? 1 : 0;
 
       if (Object.keys(dbUpdates).length === 0) {
         console.log('⚠️ No valid updates provided for vehicle:', id);
@@ -557,7 +559,8 @@ export class VehicleRepository {
       // User workflow data
       status: dbVehicle.status,
       personalNotes: dbVehicle.personalNotes,
-      
+      isRemovedFromSource: dbVehicle.isRemovedFromSource === 1,
+
       // Timestamps
       scrapedAt: new Date(dbVehicle.scrapedAt),
       createdAt: new Date(dbVehicle.createdAt),

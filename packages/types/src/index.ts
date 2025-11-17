@@ -1,7 +1,7 @@
 // Vehicle-related types based on architecture specifications
 
 export type VehicleSource = 'otomoto' | 'olx';
-export type VehicleStatus = 'new' | 'to_contact' | 'contacted' | 'to_visit' | 'visited' | 'not_interested' | 'deleted';
+export type VehicleStatus = 'new' | 'processed' | 'skipped' | 'to_contact' | 'contacted' | 'to_visit' | 'visited' | 'not_interested' | 'deleted';
 export type SellerType = 'private' | 'company' | null;
 
 export interface SellerInfo {
@@ -52,6 +52,7 @@ export interface Vehicle {
   // User Workflow Data
   status: VehicleStatus;
   personalNotes: string | null;
+  isRemovedFromSource: boolean; // Default: false, set by Story 3.7 existence check
 
   // Our Timestamps
   scrapedAt: Date;

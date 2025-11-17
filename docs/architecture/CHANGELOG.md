@@ -71,7 +71,7 @@ Extracted translation into standalone pipeline with automatic feature filtering 
 - `docs/architecture/core-workflows.md` - Added Translation workflow diagram, renumbered sections
 - `docs/architecture/api-specification.md` - Added POST /translate and /analyze endpoint specs
 - `docs/architecture/CHANGELOG.md` - This entry
-- `docs/stories/2.4c.story.md` - Completion notes and post-QA fixes
+- `docs/stories/completed/2.4c.story.md` - Completion notes and post-QA fixes
 
 ### Impact on Story 2.5
 
@@ -82,7 +82,7 @@ Extracted translation into standalone pipeline with automatic feature filtering 
 4. Call new API endpoints with confirmation dialogs
 5. Update tests to include new status and API interactions
 
-See `docs/stories/2.4c-impact-checklist.md` for detailed Story 2.5 updates.
+See `docs/stories/completed/2.4c-impact-checklist.md` for detailed Story 2.5 updates.
 
 ---
 

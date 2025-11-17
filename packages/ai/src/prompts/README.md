@@ -133,4 +133,4 @@ npm run analyze -- --vehicle-id <id>
 
 - [BMAD Core Documentation](https://github.com/badass-courses/bmad-core)
 - [Gemini API Documentation](https://ai.google.dev/docs)
-- [Story 2.3 Requirements](../../../docs/stories/2.3.story.md)
+- [Story 2.3 Requirements](../../../docs/stories/completed/2.3.story.md)

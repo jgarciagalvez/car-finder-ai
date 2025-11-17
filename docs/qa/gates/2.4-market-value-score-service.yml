@@ -72,7 +72,7 @@ recommendations:
       priority: medium
       impact: "Security hardening for future API exposure"
     - action: "Implement Post-MVP smart age-adaptive algorithm when dataset includes newer vehicles"
-      refs: ["docs/stories/2.4.story.md:303-374"]
+      refs: ["docs/stories/completed/2.4.story.md:303-374"]
       priority: low
       impact: "Enhanced accuracy for vehicles <10 years old"
 

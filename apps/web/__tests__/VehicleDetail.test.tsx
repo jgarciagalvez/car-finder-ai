@@ -125,9 +125,9 @@ describe('VehicleDetail Component', () => {
   it('should render Virtual Mechanic Report with markdown', () => {
     render(<VehicleDetail vehicle={mockVehicle} />);
 
-    expect(screen.getByText(/Virtual Mechanic/)).toBeInTheDocument();
-    const markdownContent = screen.getByTestId('markdown-content');
-    expect(markdownContent).toHaveTextContent('## Inspection Report');
+    expect(screen.getByText(/Virtual Mechanic Summary/)).toBeInTheDocument();
+    const markdownContent = screen.getAllByTestId('markdown-content')[0];
+    expect(markdownContent).toHaveTextContent('BMW X5 (N55 engine)');
   });
 
   it('should render vehicle description and features', () => {
@@ -242,6 +242,7 @@ describe('VehicleDetail Component', () => {
       aiPriorityRating: null,
       aiPrioritySummary: null,
       aiMechanicReport: null,
+      virtualMechanicSummary: null,
       aiDataSanityCheck: null,
     };
 
@@ -249,8 +250,13 @@ describe('VehicleDetail Component', () => {
 
     // Should still render basic vehicle info
     expect(screen.getAllByText('BMW X5 2020').length).toBeGreaterThan(0);
-    // AI Analysis section should not be rendered
-    expect(screen.queryByText('AI Analysis')).not.toBeInTheDocument();
+    // AI Analysis section header (h2) should not be rendered, but the label in workflow section will exist
+    const aiAnalysisHeaders = screen.getAllByText('AI Analysis');
+    // Should only find the label in My Workflow section, not the section header
+    expect(aiAnalysisHeaders).toHaveLength(1);
+    // Verify the scores are not rendered
+    expect(screen.queryByText(/\/100$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\/10$/)).not.toBeInTheDocument();
   });
 
   it('should handle vehicle with no photos', () => {

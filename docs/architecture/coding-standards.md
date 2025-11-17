@@ -34,6 +34,39 @@
 - API endpoints: `kebab-case` - `/api/vehicles`, `/api/ai-analysis`
 - Query parameters: `camelCase` - `?sortBy=price&filterStatus=new`
 
+## Configuration File Standards
+
+**TypeScript-First Rule:**
+- ALWAYS prefer `.ts` configuration files over `.js` when the framework supports it
+- Next.js, Tailwind CSS, and ESLint all support TypeScript configs
+- **NEVER** create a new config file without first checking if one already exists
+
+**Before Creating Configuration Files:**
+1. Check for existing `.ts` version first
+2. Check for existing `.js` version
+3. Check for existing `.json` version
+4. If a config file exists in ANY format, modify it - don't create a duplicate
+5. Config file priority (many tools use this): `.ts` > `.mjs` > `.js` > `.cjs` > `.json`
+
+**Known Conflict Risk:**
+- Tailwind CSS, Webpack, PostCSS, and other tools may prioritize `.js` over `.ts` when BOTH exist
+- **Duplicate configs cause silent failures** - the "wrong" config gets loaded
+- Always verify only ONE config file exists per tool
+
+**Current Project Config Standards:**
+- `tailwind.config.ts` - TypeScript (preferred)
+- `next.config.js` - JavaScript (Next.js standard)
+- `postcss.config.js` - JavaScript (PostCSS standard)
+- `jest.config.js` - JavaScript (Jest standard)
+- `.eslintrc.js` - JavaScript (standardized across all packages)
+- `tsconfig.json` - JSON (TypeScript standard)
+
+**Config File Modification Workflow:**
+1. `ls` or `dir` the directory to see all existing config files
+2. Open and read the existing config before making changes
+3. Modify the existing file - never create a parallel config
+4. If you must change formats (e.g., `.js` to `.ts`), DELETE the old file first
+
 ## Code Organization Standards
 
 **Import Order**:
@@ -72,4 +105,5 @@
   * **AI**: AI operations must use the provider abstraction layer from `packages/ai`
   * **AI Prompts**: AI prompts must be stored as markdown files in `packages/ai/src/prompts/`, never hardcoded in TypeScript
   * **Naming**: Follow established naming conventions for consistency across the monorepo
+  * **Configuration Files**: Never create duplicate config files; always check for existing configs before creating new ones. Framework configs must have exactly ONE file per tool.
 

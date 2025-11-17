@@ -55,6 +55,7 @@ export interface Vehicle {
   aiPriorityRating: number | null;
   aiPrioritySummary: string | null;
   aiMechanicReport: string | null;
+  virtualMechanicSummary: string | null; // Concise key insights from mechanic report
   aiDataSanityCheck: string | null;
 
   // User Workflow Data

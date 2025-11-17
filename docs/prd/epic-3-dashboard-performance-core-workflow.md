@@ -102,35 +102,53 @@
 
 ---
 
-### **Story 3.4: Filtering - Hide Deleted Vehicles by Default**
+### **Story 3.4: Filtering - Hide Not Interested & Deleted Vehicles**
 
-**As a** user, **I want** deleted vehicles hidden by default, **so that** I can focus on active vehicles unless I explicitly want to review deleted ones.
+**As a** user, **I want** "not interested" vehicles hidden by default with an easy toggle to show them, and "deleted" vehicles completely archived away, **so that** I can focus on active vehicles while still being able to review hidden ones when needed.
+
+**Context:**
+- Two-tier hiding system: "Not Interested" (soft hide, toggleable) vs "Deleted" (hard archive, filter-only)
+- Not Interested = "I might reconsider" → easily toggleable
+- Deleted = "Completely irrelevant" → only accessible via explicit status filter
+- Inline placeholders provide feedback when vehicles are hidden via status change
 
 **Acceptance Criteria:**
-1. **Default Behavior:**
-   - Dashboard hides vehicles with status="deleted" by default
-   - User sees only active/relevant vehicles on initial load
 
-2. **Show Deleted Toggle (Option A):**
-   - UI includes a "Show Deleted" checkbox or toggle button
-   - When enabled, deleted vehicles are shown in the list
-   - Toggle state persists during user session
+1. **Not Interested Status (Soft Hide):**
+   - Dashboard hides vehicles with status="not_interested" by default
+   - UI includes "Show Not Interested" checkbox toggle (OFF by default)
+   - When toggle ON, not_interested vehicles appear in normal sorted position with red status badge
+   - When toggle OFF, not_interested vehicles are hidden from list
+   - Toggle state persists during user session (SPA navigation)
 
-   **OR**
+2. **Deleted Status (Hard Archive):**
+   - Deleted vehicles are NEVER shown in regular list (no toggle)
+   - Deleted vehicles only visible when explicitly filtering via status dropdown (select "Deleted")
+   - Deleted vehicles appear in sorted order when filtered
 
-   **Status Filter Approach (Option B):**
-   - Deleted vehicles only visible when explicitly filtering by status="Deleted"
-   - When any other status filter is active, deleted vehicles remain hidden
-   - When no status filter is active, deleted vehicles remain hidden
+3. **Inline Placeholder Notifications:**
+   - When user changes status TO "not_interested" (with toggle OFF), show inline placeholder: "Vehicle Added to Not Interested List" with X dismiss button
+   - When user changes status TO "deleted", show inline placeholder: "Vehicle Deleted" with X dismiss button
+   - Placeholders persist in vehicle's position until manually dismissed (X clicked)
+   - Dismissing placeholder collapses the slot (list reflows)
+   - Placeholders only appear on ACTION (status change), NOT on page load with already-filtered vehicles
+   - If toggle is ON when marking "not_interested", vehicle stays visible (no placeholder needed)
+   - Placeholders are slim/subtle, non-intrusive
 
-3. **Existing Filter Integration:**
-   - New behavior works seamlessly with existing status filter
-   - No regression in other filtering functionality
+4. **Status Badge Styling:**
+   - "not_interested" status badge uses red background with red text
+   - Badge appears on image carousel when vehicle is visible
+
+5. **Filter Integration:**
+   - "Show Not Interested" toggle works independently from status filter dropdown
+   - Status filter dropdown can explicitly show "deleted" or "not_interested" vehicles
+   - No regression in sorting, distance filter, or other status filters
 
 **Technical Notes:**
 - Current status filter implementation: `apps/web/src/context/VehicleContext.tsx`
-- Decision between Option A and Option B should be made during story refinement
-- Option A is simpler UX, Option B is more explicit
+- State additions: `showNotInterested: boolean`, `recentlyHiddenVehicles: Map<string, 'not_interested' | 'deleted'>`, `dismissedPlaceholders: Set<string>`
+- New component: `PlaceholderNotification.tsx` for inline feedback
+- Placeholder lifecycle: Created on status change action, persists until X clicked, session-bound (clears on page refresh)
 
 ---
 
@@ -280,7 +298,7 @@
 - Advanced sorting capabilities (compound/stacked sorting)
 - Clear status differentiation (processed/skipped workflow)
 - Vehicle availability verification (manual check system)
-- Improved UX (hide deleted by default, dynamic page titles)
+- Improved UX (two-tier hiding for not_interested/deleted, inline placeholder feedback, dynamic page titles)
 
 **Database Changes Required:**
 - New field: `distanceFromWroclaw: number | null`

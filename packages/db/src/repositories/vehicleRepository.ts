@@ -252,7 +252,7 @@ export class VehicleRepository {
             eb('description', 'is', null),
             eb('aiDataSanityCheck', 'is', null),
             eb('personalFitScore', 'is', null),
-            eb('aiMechanicReport', 'is', null),
+            eb('virtualMechanicSummary', 'is', null),
             eb('marketValueScore', 'is', null),
             eb('aiPriorityRating', 'is', null),
           ])

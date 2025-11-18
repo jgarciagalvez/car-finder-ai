@@ -112,11 +112,14 @@ export function useVehicles() {
     }
   }, [setLoading, clearError, updateVehicleInContext, setError]);
 
-  const forceAnalyzeVehicle = useCallback(async (vehicleId: string): Promise<void> => {
+  const forceAnalyzeVehicle = useCallback(async (
+    vehicleId: string,
+    includeFullReport: boolean = false
+  ): Promise<void> => {
     try {
       setLoading(true);
       clearError();
-      const updatedVehicle = await analyzeVehicleApi(vehicleId, true);
+      const updatedVehicle = await analyzeVehicleApi(vehicleId, true, includeFullReport);
       updateVehicleInContext(updatedVehicle);
     } catch (error) {
       if (error instanceof ApiError) {

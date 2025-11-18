@@ -114,8 +114,16 @@ export async function translateVehicle(vehicleId: string, force: boolean = false
   return apiRequest<Vehicle>(url, { method: 'POST' });
 }
 
-export async function analyzeVehicle(vehicleId: string, force: boolean = false): Promise<Vehicle> {
-  const url = `/api/vehicles/${vehicleId}/analyze${force ? '?force=true' : ''}`;
+export async function analyzeVehicle(
+  vehicleId: string,
+  force: boolean = false,
+  includeFullReport: boolean = false
+): Promise<Vehicle> {
+  const params = new URLSearchParams();
+  if (force) params.append('force', 'true');
+  if (includeFullReport) params.append('includeFullReport', 'true');
+
+  const url = `/api/vehicles/${vehicleId}/analyze${params.toString() ? '?' + params.toString() : ''}`;
   return apiRequest<Vehicle>(url, { method: 'POST' });
 }
 

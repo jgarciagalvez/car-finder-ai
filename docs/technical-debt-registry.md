@@ -1,8 +1,8 @@
 # Technical Debt Registry
 
 **Last Updated:** 2025-11-18 (Verified against actual codebase)
-**Total Active Items:** 10
-**Total Estimated Effort:** 15-25 hours
+**Total Active Items:** 11
+**Total Estimated Effort:** 20-34 hours
 
 ---
 
@@ -208,6 +208,29 @@ This registry tracks all technical debt, deferred improvements, and post-MVP enh
 - **Proposed Story**: N/A - User validation task
 - **Status**: Validation task (not blocking)
 
+#### TD-018: Extract Button Confirmation Pattern to Reusable Hook
+- **Origin**: Story 3.9 (QA Review - Optional Follow-ups)
+- **Category**: Code Refactoring / DRY Improvement
+- **Impact**: LOW - Nice-to-have code quality improvement
+- **Effort**: 2-3 hours
+- **Description**: Multiple components use similar confirmation dialog patterns for AI credit-consuming operations
+  - VehicleCard has 3 confirmation dialogs (translate, quick analysis, full analysis)
+  - VehicleDetail has 3 confirmation dialogs (translate, quick analysis, full analysis, generate report)
+  - Each uses native `confirm()` with similar messaging patterns
+  - Opportunity to extract to reusable `useConfirmation` hook with consistent UX
+- **Verified Status**: ✅ CONFIRMED - Multiple confirmation patterns in VehicleCard and VehicleDetail
+- **Proposed Approach**:
+  - Create `apps/web/src/hooks/useConfirmation.ts` hook
+  - Standardize confirmation dialog UI (could use custom modal instead of native confirm)
+  - Centralize credit warning messaging
+  - Update VehicleCard and VehicleDetail to use hook
+- **Proposed Story**: Code quality improvement sprint
+- **Status**: Active
+- **Gate Ref**: `docs/qa/gates/3.9-ai-analysis-ux-full-report-visual-indicators.yml`
+- **Files Affected**:
+  - `apps/web/src/components/VehicleCard.tsx` (lines 124, 162, 200)
+  - `apps/web/src/components/VehicleDetail.tsx` (lines 167, 189, 268)
+
 ---
 
 ## Deferred Debt (Post-MVP)
@@ -324,8 +347,8 @@ This registry tracks all technical debt, deferred improvements, and post-MVP enh
 |----------|-------|------------------------|
 | HIGH | 0 | 0 hours |
 | MEDIUM | 4 | 9-15 hours |
-| LOW | 6 | 9-16 hours |
-| **TOTAL ACTIVE** | **10** | **18-31 hours** |
+| LOW | 7 | 11-19 hours |
+| **TOTAL ACTIVE** | **11** | **20-34 hours** |
 | Post-MVP Deferred | 2 | 6-9 hours |
 | Pre-existing | 1 | TBD |
 | **Resolved** | **6** | - |
@@ -336,14 +359,14 @@ This registry tracks all technical debt, deferred improvements, and post-MVP enh
 
 | Category | Count | Medium Priority Items |
 |----------|-------|----------------------|
-| Code Duplication / Refactoring | 2 | TD-002 (shouldCheckExistence) |
+| Code Duplication / Refactoring | 3 | TD-002 (shouldCheckExistence) |
 | Missing Tests | 2 | TD-004 (Frontend tests) |
 | UX Bugs / State Management | 1 | TD-017 (Button state management) |
 | Documentation | 2 | - |
 | Architectural Concerns | 1 | TD-006 (Nominatim scalability) |
 | Error Handling | 1 | - |
 | Performance | 2 | - |
-| **TOTAL** | **11** | **3** |
+| **TOTAL** | **12** | **3** |
 
 ---
 
@@ -411,3 +434,4 @@ All technical debt items have been verified against the actual codebase:
 | 2025-11-18 | Verified all items against actual codebase, resolved 3 items (TD-001, TD-005, TD-007), consolidated 2 duplicates (TD-009, TD-011 into TD-002), updated counts and effort estimates | Sarah (PO) |
 | 2025-11-18 | Removed TD-003 (backfill script tests) - one-time migration script doesn't need tests | Sarah (PO) |
 | 2025-11-18 | Added TD-017 (Quick/Full Analysis button state management) - UX bug identified during Story 3.9 development | User + Sarah (PO) |
+| 2025-11-18 | Added TD-018 (Extract button confirmation pattern to reusable hook) - DRY improvement from Story 3.9 QA review | Quinn (QA) |

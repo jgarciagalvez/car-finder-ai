@@ -248,15 +248,8 @@ router.post('/:id/translate', async (req: Request, res: Response) => {
       });
     }
 
-    res.status(202).json({
-      message: 'Translation completed successfully',
-      vehicle: {
-        id: updatedVehicle.id,
-        description: updatedVehicle.description,
-        features: updatedVehicle.features,
-        status: updatedVehicle.status,
-      }
-    });
+    // Return full Vehicle object directly (match analyze endpoint pattern)
+    res.status(202).json(updatedVehicle);
   } catch (error) {
     console.error('Error translating vehicle:', error);
     res.status(500).json({
@@ -271,6 +264,7 @@ router.post('/:id/analyze', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const force = req.query.force === 'true';
+    const includeFullReport = req.query.includeFullReport === 'true';
 
     const vehicleRepository = await ServiceRegistry.getVehicleRepository();
 
@@ -294,9 +288,9 @@ router.post('/:id/analyze', async (req: Request, res: Response) => {
     // Dynamic import to avoid circular dependencies
     const { VehicleAnalyzer } = await import('../scripts/analyze');
 
-    // Run analysis
+    // Run analysis with includeFullReport option
     const analyzer = await VehicleAnalyzer.create();
-    await analyzer.run({ vehicleId: id, force });
+    await analyzer.run({ vehicleId: id, force, includeFullReport });
 
     // Fetch updated vehicle
     const updatedVehicle = await vehicleRepository.findVehicleById(id);
@@ -307,19 +301,8 @@ router.post('/:id/analyze', async (req: Request, res: Response) => {
       });
     }
 
-    res.status(202).json({
-      message: 'Analysis completed successfully',
-      vehicle: {
-        id: updatedVehicle.id,
-        personalFitScore: updatedVehicle.personalFitScore,
-        marketValueScore: updatedVehicle.marketValueScore,
-        aiPriorityRating: updatedVehicle.aiPriorityRating,
-        aiPrioritySummary: updatedVehicle.aiPrioritySummary,
-        aiMechanicReport: updatedVehicle.aiMechanicReport,
-        virtualMechanicSummary: updatedVehicle.virtualMechanicSummary,
-        aiDataSanityCheck: updatedVehicle.aiDataSanityCheck,
-      }
-    });
+    // Return full Vehicle object directly (match PATCH endpoint pattern)
+    res.status(202).json(updatedVehicle);
   } catch (error) {
     console.error('Error analyzing vehicle:', error);
     res.status(500).json({

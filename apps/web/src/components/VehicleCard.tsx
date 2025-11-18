@@ -15,8 +15,9 @@ import {
 } from '@/lib/utils';
 import { useVehicles } from '@/hooks/useVehicles';
 import { checkVehicleExistence } from '@/lib/api';
+import { AnalysisStatusBadge } from './AnalysisStatusBadge';
 import Link from 'next/link';
-import React, { useState, MouseEvent } from 'react';
+import React, { useState, useEffect, MouseEvent } from 'react';
 // Fallback icons if Heroicons are not available
 const ChevronLeftIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -62,6 +63,11 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
   const [isNotesExpanded, setIsNotesExpanded] = useState(false);
   const [notes, setNotes] = useState(vehicle.personalNotes || '');
   const [localVehicle, setLocalVehicle] = useState(vehicle);
+
+  // Sync localVehicle with vehicle prop when it changes from global context
+  useEffect(() => {
+    setLocalVehicle(vehicle);
+  }, [vehicle]);
 
   // Access centralized state from context
   const {
@@ -139,6 +145,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
         }
       }
 
+      // Use context method to update global state
       await forceTranslateVehicle(vehicle.id);
       setFeedback('success', 'Vehicle translated successfully!', vehicle.id);
     } catch (error) {
@@ -148,11 +155,11 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
     }
   };
 
-  const handleForceAnalyze = async (e: MouseEvent) => {
+  const handleQuickAnalysis = async (e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (!confirm('Force re-analyze this vehicle? This will use AI credits.')) return;
+    if (!confirm('Force re-analyze this vehicle (summary only)? This will use AI credits.')) return;
 
     try {
       setOperationState(vehicle.id, 'isAnalyzing', true);
@@ -176,10 +183,49 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
         }
       }
 
-      await forceAnalyzeVehicle(vehicle.id);
-      setFeedback('success', 'Vehicle analyzed successfully!', vehicle.id);
+      // Use context method to update global state (includeFullReport=false for summary only)
+      await forceAnalyzeVehicle(vehicle.id, false);
+      setFeedback('success', 'Quick analysis completed successfully!', vehicle.id);
     } catch (error) {
       setFeedback('error', error instanceof Error ? error.message : 'Analysis failed', vehicle.id);
+    } finally {
+      setOperationState(vehicle.id, 'isAnalyzing', false);
+    }
+  };
+
+  const handleFullAnalysis = async (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!confirm('Generate full analysis including detailed mechanic report? This will use more AI credits.')) return;
+
+    try {
+      setOperationState(vehicle.id, 'isAnalyzing', true);
+      clearFeedback();
+
+      // Check existence if needed (4-hour cache)
+      if (shouldCheckExistence(localVehicle)) {
+        const result = await checkVehicleExistence(vehicle.id);
+
+        // Update local vehicle state with existence check result
+        setLocalVehicle(prev => ({
+          ...prev,
+          isRemovedFromSource: result.isRemovedFromSource,
+          lastExistenceCheck: result.lastExistenceCheck
+        }));
+
+        if (result.isRemovedFromSource) {
+          // Block operation and show warning
+          setFeedback('error', 'Cannot analyze - vehicle has been removed from Otomoto', vehicle.id);
+          return;
+        }
+      }
+
+      // Use context method to update global state (includeFullReport=true for full analysis)
+      await forceAnalyzeVehicle(vehicle.id, true);
+      setFeedback('success', 'Full analysis completed successfully!', vehicle.id);
+    } catch (error) {
+      setFeedback('error', error instanceof Error ? error.message : 'Full analysis failed', vehicle.id);
     } finally {
       setOperationState(vehicle.id, 'isAnalyzing', false);
     }
@@ -241,9 +287,17 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
 
   // Show action buttons for not_interested status or incomplete AI data
   const showActions =
-    vehicle.status === 'not_interested' ||
-    !vehicle.description ||
-    !vehicle.aiPriorityRating;
+    localVehicle.status === 'not_interested' ||
+    !localVehicle.description ||
+    !localVehicle.aiPriorityRating;
+
+  // Check if any AI data exists
+  const hasAnyAIData =
+    localVehicle.personalFitScore !== null ||
+    localVehicle.aiPriorityRating !== null ||
+    localVehicle.marketValueScore !== null ||
+    localVehicle.virtualMechanicSummary !== null ||
+    localVehicle.aiDataSanityCheck !== null;
 
   return (
     <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden relative">
@@ -404,38 +458,46 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
           </div>
 
           {/* AI Scores Row */}
-          <div className="flex gap-4 mb-4">
-            {/* AI Priority Rating */}
-            <div className={`border rounded-lg p-4 text-center min-w-[80px] ${getScoreColor(vehicle.aiPriorityRating)}`}>
-              <div className={`text-2xl font-bold ${getScoreTextColor(vehicle.aiPriorityRating)}`}>
-                {vehicle.aiPriorityRating ?? 'N/A'}
+          {hasAnyAIData && (
+            <div className="flex gap-4 mb-4 items-start">
+              {/* AI Priority Rating */}
+              <div className={`border rounded-lg p-4 text-center min-w-[80px] ${getScoreColor(localVehicle.aiPriorityRating)}`}>
+                <div className={`text-2xl font-bold ${getScoreTextColor(localVehicle.aiPriorityRating)}`}>
+                  {localVehicle.aiPriorityRating ?? 'N/A'}
+                </div>
+                <div className="text-xs font-medium">AI Priority</div>
               </div>
-              <div className="text-xs font-medium">AI Priority</div>
-            </div>
 
-            {/* Personal Fit Score */}
-            <div className={`border rounded-lg p-4 text-center min-w-[80px] ${getScoreColor(vehicle.personalFitScore)}`}>
-              <div className={`text-2xl font-bold ${getScoreTextColor(vehicle.personalFitScore)}`}>
-                {vehicle.personalFitScore ?? 'N/A'}
+              {/* Personal Fit Score */}
+              <div className={`border rounded-lg p-4 text-center min-w-[80px] ${getScoreColor(localVehicle.personalFitScore)}`}>
+                <div className={`text-2xl font-bold ${getScoreTextColor(localVehicle.personalFitScore)}`}>
+                  {localVehicle.personalFitScore ?? 'N/A'}
+                </div>
+                <div className="text-xs font-medium">Personal Fit</div>
               </div>
-              <div className="text-xs font-medium">Personal Fit</div>
-            </div>
 
-            {/* Market Value */}
-            <div className={`border rounded-lg p-4 text-center min-w-[80px] ${getMarketValueColor(vehicle.marketValueScore)}`}>
-              <div className={`text-2xl font-bold ${getMarketValueTextColor(vehicle.marketValueScore)} flex items-center justify-center`}>
-                <span className="text-sm mr-1">📈</span>
-                {formatMarketValue(vehicle.marketValueScore)}
+              {/* Market Value */}
+              <div className={`border rounded-lg p-4 text-center min-w-[80px] ${getMarketValueColor(localVehicle.marketValueScore)}`}>
+                <div className={`text-2xl font-bold ${getMarketValueTextColor(localVehicle.marketValueScore)} flex items-center justify-center`}>
+                  <span className="text-sm mr-1">📈</span>
+                  {formatMarketValue(localVehicle.marketValueScore)}
+                </div>
+                <div className="text-xs font-medium">vs Market</div>
               </div>
-              <div className="text-xs font-medium">vs Market</div>
+
+              {/* Analysis Status Badge - beside the cards, aligned to top */}
+              <AnalysisStatusBadge
+                virtualMechanicSummary={localVehicle.virtualMechanicSummary}
+                aiMechanicReport={localVehicle.aiMechanicReport}
+              />
             </div>
-          </div>
+          )}
 
           {/* AI Summary */}
-          {vehicle.aiPrioritySummary && (
+          {localVehicle.aiPrioritySummary && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
               <p className="text-sm text-blue-800">
-                {vehicle.aiPrioritySummary}
+                {localVehicle.aiPrioritySummary}
               </p>
             </div>
           )}
@@ -503,9 +565,9 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
           <div className="flex justify-between items-end">
             {/* Features */}
             <div className="flex flex-wrap gap-2 flex-1">
-              {vehicle.features && vehicle.features.length > 0 ? (
+              {localVehicle.features && localVehicle.features.length > 0 ? (
                 <>
-                  {vehicle.features.slice(0, 5).map((feature, index) => (
+                  {localVehicle.features.slice(0, 5).map((feature, index) => (
                     <span
                       key={index}
                       className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-medium"
@@ -513,9 +575,9 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
                       {feature.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                     </span>
                   ))}
-                  {vehicle.features.length > 5 && (
+                  {localVehicle.features.length > 5 && (
                     <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">
-                      +{vehicle.features.length - 5} more
+                      +{localVehicle.features.length - 5} more
                     </span>
                   )}
                 </>
@@ -528,7 +590,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
             <div className="ml-4 flex items-center gap-2">
               <select
                 className="bg-white border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                value={vehicle.status}
+                value={localVehicle.status}
                 onChange={handleStatusChange}
                 disabled={isUpdatingStatus}
               >
@@ -548,14 +610,15 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
             </div>
           </div>
 
-          {/* Action Buttons (shown for not_interested or incomplete AI data) */}
-          {showActions && (
-            <div className="mt-4 pt-4 border-t border-gray-200 flex gap-2">
+          {/* Action Buttons - show all, hide only when complete */}
+          <div className="mt-4 pt-4 border-t border-gray-200 flex flex-row flex-wrap gap-2">
+            {/* Force Translate - hide when translation exists */}
+            {!localVehicle.description && (
               <button
                 onClick={handleForceTranslate}
                 disabled={isTranslating}
                 className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 rounded-lg transition-colors"
-                title="Force re-translate this vehicle description"
+                title="Translate vehicle description"
               >
                 {isTranslating ? (
                   <>
@@ -567,33 +630,60 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
                     </svg>
-                    <span>Force Translate</span>
+                    <span>Translate</span>
                   </>
                 )}
               </button>
+            )}
 
+            {/* Quick Analysis - hide when summary exists */}
+            {!localVehicle.virtualMechanicSummary && (
               <button
-                onClick={handleForceAnalyze}
-                disabled={isAnalyzing}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 rounded-lg transition-colors"
-                title="Force re-analyze this vehicle with AI"
+                onClick={handleQuickAnalysis}
+                disabled={isAnalyzing || !localVehicle.description}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded-lg transition-colors"
+                title="Generate AI summary analysis (concise key insights)"
               >
                 {isAnalyzing ? (
                   <>
-                    <div className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full"></div>
+                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
                     <span>Analyzing...</span>
                   </>
                 ) : (
                   <>
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
-                    <span>Force Analyze</span>
+                    <span>Quick Analysis</span>
                   </>
                 )}
               </button>
-            </div>
-          )}
+            )}
+
+            {/* Full Analysis - hide when full report exists */}
+            {!localVehicle.aiMechanicReport && (
+              <button
+                onClick={handleFullAnalysis}
+                disabled={isAnalyzing || !localVehicle.description}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 disabled:bg-orange-300 disabled:cursor-not-allowed rounded-lg transition-colors"
+                title="Generate full detailed mechanic report (comprehensive analysis)"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                    <span>Analyzing...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span>Full Analysis</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

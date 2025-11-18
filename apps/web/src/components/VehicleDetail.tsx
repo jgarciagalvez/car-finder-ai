@@ -1,8 +1,8 @@
 'use client';
 
 import { Vehicle } from '@car-finder/types';
-import { useState } from 'react';
-import { updateVehicle, analyzeVehicle, checkVehicleExistence } from '@/lib/api';
+import { useState, useEffect } from 'react';
+import { updateVehicle, analyzeVehicle, checkVehicleExistence, translateVehicle } from '@/lib/api';
 import ReactMarkdown from 'react-markdown';
 
 // Helper function to determine if existence check is needed
@@ -62,10 +62,21 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
 
   // AI Analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [analyzeSuccess, setAnalyzeSuccess] = useState(false);
+  const [translateError, setTranslateError] = useState<string | null>(null);
+  const [translateSuccess, setTranslateSuccess] = useState(false);
 
   const photos = vehicle.photos && vehicle.photos.length > 0 ? vehicle.photos : vehicle.sourcePhotos;
+
+  // Sync localVehicle with vehicle prop changes
+  useEffect(() => {
+    setLocalVehicle(vehicle);
+    setVirtualMechanicSummary(vehicle.virtualMechanicSummary || '');
+    setAiMechanicReport(vehicle.aiMechanicReport || '');
+  }, [vehicle]);
 
   const handlePreviousPhoto = () => {
     setCurrentPhotoIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1));
@@ -152,16 +163,38 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
     setIsEditingFullReport(false);
   };
 
-  const handleAnalyzeVehicle = async (force: boolean = false) => {
-    if (force && !confirm('Force re-analyze this vehicle? This will use AI credits.')) return;
+  const handleGenerateDetailedReport = async () => {
+    if (!confirm('Generate detailed mechanic report? This will use 1 AI credit.')) return;
 
-    setIsAnalyzing(true);
+    setIsGeneratingReport(true);
     setAnalyzeError(null);
-    setAnalyzeSuccess(false);
 
     try {
-      // Check existence if needed (4-hour cache) and force is true
-      if (force && shouldCheckExistence(localVehicle)) {
+      const updated = await analyzeVehicle(vehicle.id, false, true); // force=false, includeFullReport=true
+      onVehicleUpdate?.(updated);
+      // Update local state with new values
+      setAiMechanicReport(updated.aiMechanicReport || '');
+      setIsFullReportExpanded(true); // Auto-expand on success
+      setAnalyzeSuccess(true);
+      setTimeout(() => setAnalyzeSuccess(false), 3000);
+    } catch (error) {
+      setAnalyzeError(error instanceof Error ? error.message : 'Report generation failed');
+      setTimeout(() => setAnalyzeError(null), 5000);
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  const handleTranslate = async () => {
+    if (!confirm('Translate this vehicle description? This will use AI credits.')) return;
+
+    setIsTranslating(true);
+    setTranslateError(null);
+    setTranslateSuccess(false);
+
+    try {
+      // Check existence if needed (4-hour cache)
+      if (shouldCheckExistence(localVehicle)) {
         const result = await checkVehicleExistence(vehicle.id);
 
         // Update local vehicle state with existence check result
@@ -172,22 +205,100 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
         }));
 
         if (result.isRemovedFromSource) {
-          // Block operation and show error
+          setTranslateError('Cannot translate - vehicle has been removed from Otomoto');
+          setTimeout(() => setTranslateError(null), 5000);
+          return;
+        }
+      }
+
+      const updated = await translateVehicle(vehicle.id, true);
+      onVehicleUpdate?.(updated);
+      setLocalVehicle(updated);
+      setTranslateSuccess(true);
+      setTimeout(() => setTranslateSuccess(false), 3000);
+    } catch (error) {
+      setTranslateError(error instanceof Error ? error.message : 'Translation failed');
+      setTimeout(() => setTranslateError(null), 5000);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  const handleQuickAnalysis = async () => {
+    if (!confirm('Generate quick analysis (summary only)? This will use AI credits.')) return;
+
+    setIsAnalyzing(true);
+    setAnalyzeError(null);
+    setAnalyzeSuccess(false);
+
+    try {
+      // Check existence if needed (4-hour cache)
+      if (shouldCheckExistence(localVehicle)) {
+        const result = await checkVehicleExistence(vehicle.id);
+
+        // Update local vehicle state with existence check result
+        setLocalVehicle(prev => ({
+          ...prev,
+          isRemovedFromSource: result.isRemovedFromSource,
+          lastExistenceCheck: result.lastExistenceCheck
+        }));
+
+        if (result.isRemovedFromSource) {
           setAnalyzeError('Cannot analyze - vehicle has been removed from Otomoto');
           setTimeout(() => setAnalyzeError(null), 5000);
           return;
         }
       }
 
-      const updated = await analyzeVehicle(vehicle.id, force);
+      const updated = await analyzeVehicle(vehicle.id, true, false); // force=true, includeFullReport=false
       onVehicleUpdate?.(updated);
-      // Update local state with new values
+      setLocalVehicle(updated);
+      setVirtualMechanicSummary(updated.virtualMechanicSummary || '');
+      setAnalyzeSuccess(true);
+      setTimeout(() => setAnalyzeSuccess(false), 3000);
+    } catch (error) {
+      setAnalyzeError(error instanceof Error ? error.message : 'Quick analysis failed');
+      setTimeout(() => setAnalyzeError(null), 5000);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleFullAnalysis = async () => {
+    if (!confirm('Generate full analysis including detailed mechanic report? This will use more AI credits.')) return;
+
+    setIsAnalyzing(true);
+    setAnalyzeError(null);
+    setAnalyzeSuccess(false);
+
+    try {
+      // Check existence if needed (4-hour cache)
+      if (shouldCheckExistence(localVehicle)) {
+        const result = await checkVehicleExistence(vehicle.id);
+
+        // Update local vehicle state with existence check result
+        setLocalVehicle(prev => ({
+          ...prev,
+          isRemovedFromSource: result.isRemovedFromSource,
+          lastExistenceCheck: result.lastExistenceCheck
+        }));
+
+        if (result.isRemovedFromSource) {
+          setAnalyzeError('Cannot analyze - vehicle has been removed from Otomoto');
+          setTimeout(() => setAnalyzeError(null), 5000);
+          return;
+        }
+      }
+
+      const updated = await analyzeVehicle(vehicle.id, true, true); // force=true, includeFullReport=true
+      onVehicleUpdate?.(updated);
+      setLocalVehicle(updated);
       setVirtualMechanicSummary(updated.virtualMechanicSummary || '');
       setAiMechanicReport(updated.aiMechanicReport || '');
       setAnalyzeSuccess(true);
       setTimeout(() => setAnalyzeSuccess(false), 3000);
     } catch (error) {
-      setAnalyzeError(error instanceof Error ? error.message : 'Analysis failed');
+      setAnalyzeError(error instanceof Error ? error.message : 'Full analysis failed');
       setTimeout(() => setAnalyzeError(null), 5000);
     } finally {
       setIsAnalyzing(false);
@@ -369,6 +480,37 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
                 Summary not generated for this vehicle. Run analysis to generate.
               </div>
             )}
+
+            {/* Generate/View Detailed Report Button */}
+            <div className="mt-3">
+              {!aiMechanicReport && !vehicle.aiMechanicReport ? (
+                <button
+                  onClick={handleGenerateDetailedReport}
+                  disabled={isGeneratingReport}
+                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline disabled:text-gray-400 disabled:cursor-not-allowed flex items-center gap-1"
+                >
+                  {isGeneratingReport ? (
+                    <>
+                      <div className="animate-spin h-3 w-3 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                      <span>Generating detailed report...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>✨</span>
+                      <span>Generate detailed report</span>
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={() => setIsFullReportExpanded(!isFullReportExpanded)}
+                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                >
+                  <span>📋</span>
+                  <span>{isFullReportExpanded ? 'Hide' : 'View'} detailed report</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Full Detailed Mechanic Report (Collapsible) */}
@@ -577,29 +719,90 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
             </select>
           </div>
 
-          {/* AI Analysis Actions */}
+          {/* Action Buttons - matching VehicleCard */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              AI Analysis
+              Actions
             </label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleAnalyzeVehicle(false)}
-                disabled={isAnalyzing}
-                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                title="Analyze missing data only"
-              >
-                {isAnalyzing ? 'Analyzing...' : 'Analyze'}
-              </button>
-              <button
-                onClick={() => handleAnalyzeVehicle(true)}
-                disabled={isAnalyzing}
-                className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                title="Force re-analyze all data (uses AI credits)"
-              >
-                {isAnalyzing ? 'Analyzing...' : 'Force Re-analyze'}
-              </button>
+            <div className="flex flex-wrap gap-2">
+              {/* Translate - hide when translation exists */}
+              {!localVehicle.description && (
+                <button
+                  onClick={handleTranslate}
+                  disabled={isTranslating}
+                  className="flex-1 min-w-[140px] px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                  title="Translate vehicle description"
+                >
+                  {isTranslating ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                      <span>Translating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                      </svg>
+                      <span>Translate</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* Quick Analysis - hide when summary exists */}
+              {!localVehicle.virtualMechanicSummary && (
+                <button
+                  onClick={handleQuickAnalysis}
+                  disabled={isAnalyzing || !localVehicle.description}
+                  className="flex-1 min-w-[140px] px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                  title="Generate AI summary analysis (concise key insights)"
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                      <span>Analyzing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      <span>Quick Analysis</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* Full Analysis - hide when full report exists */}
+              {!localVehicle.aiMechanicReport && (
+                <button
+                  onClick={handleFullAnalysis}
+                  disabled={isAnalyzing || !localVehicle.description}
+                  className="flex-1 min-w-[140px] px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-orange-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                  title="Generate full detailed mechanic report (comprehensive analysis)"
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                      <span>Analyzing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span>Full Analysis</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
+            {translateError && (
+              <p className="mt-2 text-sm text-red-600">{translateError}</p>
+            )}
+            {translateSuccess && (
+              <p className="mt-2 text-sm text-green-600">Translation completed successfully!</p>
+            )}
             {analyzeError && (
               <p className="mt-2 text-sm text-red-600">{analyzeError}</p>
             )}

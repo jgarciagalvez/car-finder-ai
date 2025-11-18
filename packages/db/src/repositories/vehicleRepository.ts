@@ -280,7 +280,8 @@ export class VehicleRepository {
         .selectFrom('vehicles')
         .selectAll()
         .where('status', '!=', 'deleted')
-        .where('status', '!=', 'not_interested');
+        .where('status', '!=', 'not_interested')
+        .where('status', '!=', 'skipped');
 
       if (!force) {
         // Only fetch vehicles without translation (missing description OR features)

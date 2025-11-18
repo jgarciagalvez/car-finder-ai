@@ -402,13 +402,13 @@ export class VehicleTranslator {
     const hasFeatures = hasRequiredFeatures(vehicle, this.config.requiredFeatures);
 
     if (!options.force && !hasFeatures && this.config.requiredFeatures.length > 0) {
-      console.log('  ⚠️  Missing all required features - marking as not_interested (skipping translation)');
+      console.log('  ⚠️  Missing all required features - marking as skipped (skipping translation)');
 
       const missingFeaturesMsg = `Vehicle automatically excluded: None of the required features found. ` +
         `Vehicle must have at least one of: ${this.config.requiredFeatures.join(', ')}`;
 
       await this.vehicleRepository.updateVehicle(vehicle.id, {
-        status: 'not_interested',
+        status: 'skipped',
         aiDataSanityCheck: JSON.stringify({
           issues: [{
             severity: 'info',

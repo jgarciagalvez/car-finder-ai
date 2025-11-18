@@ -17,6 +17,7 @@
     "migrate-add-distance": "tsx src/scripts/migrate-add-distance.ts",
     "backfill-distances": "tsx src/scripts/backfill-distances.ts",
     "migrate-statuses": "tsx src/scripts/migrate-statuses.ts",
+    "reset-filtered": "tsx src/scripts/reset-filtered.ts",
     "full-pipeline": "tsx src/scripts/ingest.ts && tsx src/scripts/translate.ts && tsx src/scripts/analyze.ts"
   },
   "dependencies": {

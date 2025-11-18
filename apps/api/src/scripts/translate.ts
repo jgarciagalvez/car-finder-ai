@@ -43,6 +43,7 @@ interface TranslationRunLog {
   vehiclesCompleted: number;
   vehiclesFailed: number;
   vehiclesFiltered: number;
+  removedFromSource: number;
   failures: TranslationFailure[];
 }
 
@@ -62,6 +63,66 @@ interface SearchConfig {
   analysisSettings?: {
     userCriteria: any;
   };
+}
+
+/**
+ * Determine if existence check is needed for a vehicle
+ * - Skip if scraped less than 4 hours ago (fresh data)
+ * - Check if never checked or checked more than 4 hours ago
+ * @exported for testing
+ */
+export function shouldCheckExistence(vehicle: Vehicle): boolean {
+  // Skip if scraped less than 4 hours ago (fresh data)
+  const scrapedAt = new Date(vehicle.scrapedAt);
+  const hoursSinceScraped = (Date.now() - scrapedAt.getTime()) / (1000 * 60 * 60);
+  if (hoursSinceScraped < 4) return false;
+
+  // Check if never checked or checked more than 4 hours ago
+  if (!vehicle.lastExistenceCheck) return true;
+
+  const lastCheck = new Date(vehicle.lastExistenceCheck);
+  const hoursSinceCheck = (Date.now() - lastCheck.getTime()) / (1000 * 60 * 60);
+  return hoursSinceCheck > 4;
+}
+
+/**
+ * Check if a vehicle still exists on the source website
+ * Makes HEAD request to sourceUrl with 10s timeout
+ * Updates database with result
+ * Returns true if exists, false if removed
+ * On network error: logs warning, returns true (fail-open)
+ * @exported for testing
+ */
+export async function checkVehicleExistence(
+  vehicle: Vehicle,
+  vehicleRepository: VehicleRepository
+): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    const response = await fetch(vehicle.sourceUrl, {
+      method: 'HEAD',
+      redirect: 'follow',
+      signal: controller.signal
+    });
+
+    clearTimeout(timeout);
+
+    const exists = !(response.status === 404 || response.status === 410);
+
+    // Update database
+    await vehicleRepository.updateVehicle(vehicle.id, {
+      isRemovedFromSource: !exists,
+      lastExistenceCheck: new Date().toISOString()
+    });
+
+    return exists;
+  } catch (error) {
+    // Network error - fail open, allow operation to proceed
+    console.warn(`⚠️  Existence check failed (network error) - proceeding with operation`);
+    return true; // Fail-open for resilience
+  }
 }
 
 /**
@@ -171,6 +232,7 @@ export class VehicleTranslator {
       vehiclesCompleted: 0,
       vehiclesFailed: 0,
       vehiclesFiltered: 0,
+      removedFromSource: 0,
       failures: [],
     };
   }
@@ -205,6 +267,17 @@ export class VehicleTranslator {
       for (let i = 0; i < vehicles.length; i++) {
         const vehicle = vehicles[i];
         console.log(`\n[${i + 1}/${vehicles.length}] Processing vehicle ${vehicle.id}...`);
+
+        // Check vehicle existence before processing (4-hour cache)
+        if (shouldCheckExistence(vehicle)) {
+          const exists = await checkVehicleExistence(vehicle, this.vehicleRepository);
+
+          if (!exists) {
+            console.log(`⚠️  Skipping ${vehicle.id} - removed from source`);
+            this.runLog.removedFromSource++;
+            continue;
+          }
+        }
 
         let wasFiltered = false;
         try {
@@ -368,6 +441,9 @@ export class VehicleTranslator {
     console.log(`✅ Completed:        ${this.runLog.vehiclesCompleted}`);
     console.log(`🚫 Filtered Out:     ${this.runLog.vehiclesFiltered}`);
     console.log(`❌ Failed:           ${this.runLog.vehiclesFailed}`);
+    if (this.runLog.removedFromSource > 0) {
+      console.log(`🗑️  Removed:          ${this.runLog.removedFromSource} (no longer on source)`);
+    }
     console.log(`⏱️  Duration:         ${duration.toFixed(2)}s`);
 
     if (this.runLog.failures.length > 0) {

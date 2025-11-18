@@ -2,8 +2,23 @@
 
 import { Vehicle } from '@car-finder/types';
 import { useState } from 'react';
-import { updateVehicle, analyzeVehicle } from '@/lib/api';
+import { updateVehicle, analyzeVehicle, checkVehicleExistence } from '@/lib/api';
 import ReactMarkdown from 'react-markdown';
+
+// Helper function to determine if existence check is needed
+function shouldCheckExistence(vehicle: Vehicle): boolean {
+  // Skip if scraped less than 4 hours ago (fresh data)
+  const scrapedAt = new Date(vehicle.scrapedAt);
+  const hoursSinceScraped = (Date.now() - scrapedAt.getTime()) / (1000 * 60 * 60);
+  if (hoursSinceScraped < 4) return false;
+
+  // Check if never checked or checked more than 4 hours ago
+  if (!vehicle.lastExistenceCheck) return true;
+
+  const lastCheck = new Date(vehicle.lastExistenceCheck);
+  const hoursSinceCheck = (Date.now() - lastCheck.getTime()) / (1000 * 60 * 60);
+  return hoursSinceCheck > 4;
+}
 
 export interface VehicleDetailProps {
   vehicle: Vehicle;
@@ -34,6 +49,7 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
   const [status, setStatus] = useState(vehicle.status);
   const [personalNotes, setPersonalNotes] = useState(vehicle.personalNotes || '');
   const [isSaving, setIsSaving] = useState(false);
+  const [localVehicle, setLocalVehicle] = useState(vehicle);
 
   // Virtual Mechanic Summary state
   const [virtualMechanicSummary, setVirtualMechanicSummary] = useState(vehicle.virtualMechanicSummary || '');
@@ -144,6 +160,25 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
     setAnalyzeSuccess(false);
 
     try {
+      // Check existence if needed (4-hour cache) and force is true
+      if (force && shouldCheckExistence(localVehicle)) {
+        const result = await checkVehicleExistence(vehicle.id);
+
+        // Update local vehicle state with existence check result
+        setLocalVehicle(prev => ({
+          ...prev,
+          isRemovedFromSource: result.isRemovedFromSource,
+          lastExistenceCheck: result.lastExistenceCheck
+        }));
+
+        if (result.isRemovedFromSource) {
+          // Block operation and show error
+          setAnalyzeError('Cannot analyze - vehicle has been removed from Otomoto');
+          setTimeout(() => setAnalyzeError(null), 5000);
+          return;
+        }
+      }
+
       const updated = await analyzeVehicle(vehicle.id, force);
       onVehicleUpdate?.(updated);
       // Update local state with new values

@@ -14,6 +14,7 @@ import {
   formatMarketValue
 } from '@/lib/utils';
 import { useVehicles } from '@/hooks/useVehicles';
+import { checkVehicleExistence } from '@/lib/api';
 import Link from 'next/link';
 import React, { useState, MouseEvent } from 'react';
 // Fallback icons if Heroicons are not available
@@ -39,12 +40,28 @@ interface VehicleCardProps {
   vehicle: Vehicle;
 }
 
+// Helper function to determine if existence check is needed
+function shouldCheckExistence(vehicle: Vehicle): boolean {
+  // Skip if scraped less than 4 hours ago (fresh data)
+  const scrapedAt = new Date(vehicle.scrapedAt);
+  const hoursSinceScraped = (Date.now() - scrapedAt.getTime()) / (1000 * 60 * 60);
+  if (hoursSinceScraped < 4) return false;
+
+  // Check if never checked or checked more than 4 hours ago
+  if (!vehicle.lastExistenceCheck) return true;
+
+  const lastCheck = new Date(vehicle.lastExistenceCheck);
+  const hoursSinceCheck = (Date.now() - lastCheck.getTime()) / (1000 * 60 * 60);
+  return hoursSinceCheck > 4;
+}
+
 export function VehicleCard({ vehicle }: VehicleCardProps) {
   // Local state (essential per-card UI state only - AC: 1)
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
   const [isNotesExpanded, setIsNotesExpanded] = useState(false);
   const [notes, setNotes] = useState(vehicle.personalNotes || '');
+  const [localVehicle, setLocalVehicle] = useState(vehicle);
 
   // Access centralized state from context
   const {
@@ -103,6 +120,25 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
     try {
       setOperationState(vehicle.id, 'isTranslating', true);
       clearFeedback();
+
+      // Check existence if needed (4-hour cache)
+      if (shouldCheckExistence(localVehicle)) {
+        const result = await checkVehicleExistence(vehicle.id);
+
+        // Update local vehicle state with existence check result
+        setLocalVehicle(prev => ({
+          ...prev,
+          isRemovedFromSource: result.isRemovedFromSource,
+          lastExistenceCheck: result.lastExistenceCheck
+        }));
+
+        if (result.isRemovedFromSource) {
+          // Block operation and show warning
+          setFeedback('error', 'Cannot translate - vehicle has been removed from Otomoto', vehicle.id);
+          return;
+        }
+      }
+
       await forceTranslateVehicle(vehicle.id);
       setFeedback('success', 'Vehicle translated successfully!', vehicle.id);
     } catch (error) {
@@ -121,6 +157,25 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
     try {
       setOperationState(vehicle.id, 'isAnalyzing', true);
       clearFeedback();
+
+      // Check existence if needed (4-hour cache)
+      if (shouldCheckExistence(localVehicle)) {
+        const result = await checkVehicleExistence(vehicle.id);
+
+        // Update local vehicle state with existence check result
+        setLocalVehicle(prev => ({
+          ...prev,
+          isRemovedFromSource: result.isRemovedFromSource,
+          lastExistenceCheck: result.lastExistenceCheck
+        }));
+
+        if (result.isRemovedFromSource) {
+          // Block operation and show warning
+          setFeedback('error', 'Cannot analyze - vehicle has been removed from Otomoto', vehicle.id);
+          return;
+        }
+      }
+
       await forceAnalyzeVehicle(vehicle.id);
       setFeedback('success', 'Vehicle analyzed successfully!', vehicle.id);
     } catch (error) {

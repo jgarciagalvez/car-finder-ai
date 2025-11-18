@@ -2,7 +2,7 @@
  * VehicleRepository Unit Tests
  */
 
-import { VehicleRepository } from './VehicleRepository';
+import { VehicleRepository } from './vehicleRepository';
 import { Vehicle as VehicleType } from '@car-finder/types';
 import { Kysely } from 'kysely';
 import { Database as DatabaseSchema } from '../schema';
@@ -351,6 +351,105 @@ describe('VehicleRepository', () => {
       expect(consoleErrorSpy).toHaveBeenCalled();
 
       consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('findVehiclesNeedingAnalysis', () => {
+    it('should exclude not_interested vehicles', async () => {
+      // Setup - Mock the chained query builder methods with proper chaining
+      const mockWhereChained = jest.fn();
+      const mockOrderByChained = jest.fn(() => ({
+        execute: mockExecute
+      }));
+
+      // Create chain: where() -> where() -> orderBy() -> execute()
+      mockWhereChained.mockReturnValueOnce({ // First where (OR condition)
+        where: mockWhereChained
+      }).mockReturnValueOnce({ // Second where (status != deleted)
+        where: mockWhereChained
+      }).mockReturnValueOnce({ // Third where (status != not_interested)
+        orderBy: mockOrderByChained,
+        execute: mockExecute
+      });
+
+      const mockSelectAllChained = jest.fn(() => ({
+        where: mockWhereChained,
+      }));
+
+      // Override selectFrom for this test to return the chained mock
+      const mockSelectFromChained = jest.fn(() => ({
+        selectAll: mockSelectAllChained,
+      }));
+
+      repository['db'] = {
+        selectFrom: mockSelectFromChained,
+      } as unknown as Kysely<DatabaseSchema>;
+
+      mockExecute.mockResolvedValue([]);
+
+      await repository.findVehiclesNeedingAnalysis();
+
+      // Verify the query chain
+      expect(mockSelectFromChained).toHaveBeenCalledWith('vehicles');
+      expect(mockSelectAllChained).toHaveBeenCalled();
+
+      // Verify all where calls were made
+      expect(mockWhereChained).toHaveBeenCalled();
+      expect(mockOrderByChained).toHaveBeenCalledWith('createdAt', 'desc');
+    });
+
+    it('should return vehicles needing analysis', async () => {
+      const mockDbVehicle = {
+        ...mockVehicle,
+        sourceParameters: JSON.stringify(mockVehicle.sourceParameters),
+        sourceEquipment: JSON.stringify(mockVehicle.sourceEquipment),
+        sourcePhotos: JSON.stringify(mockVehicle.sourcePhotos),
+        features: JSON.stringify(mockVehicle.features),
+        sellerInfo: JSON.stringify(mockVehicle.sellerInfo),
+        photos: JSON.stringify(mockVehicle.photos),
+        sourceCreatedAt: mockVehicle.sourceCreatedAt.toISOString(),
+        scrapedAt: mockVehicle.scrapedAt.toISOString(),
+        createdAt: mockVehicle.createdAt.toISOString(),
+        updatedAt: mockVehicle.updatedAt.toISOString(),
+        personalFitScore: null,
+        status: 'new',
+      };
+
+      // Setup - Mock the chained query builder methods with proper chaining
+      const mockWhereChained = jest.fn();
+      const mockOrderByChained = jest.fn(() => ({
+        execute: mockExecute
+      }));
+
+      // Create chain: where() -> where() -> orderBy() -> execute()
+      mockWhereChained.mockReturnValueOnce({ // First where (OR condition)
+        where: mockWhereChained
+      }).mockReturnValueOnce({ // Second where (status != deleted)
+        where: mockWhereChained
+      }).mockReturnValueOnce({ // Third where (status != not_interested)
+        orderBy: mockOrderByChained,
+        execute: mockExecute
+      });
+
+      const mockSelectAllChained = jest.fn(() => ({
+        where: mockWhereChained,
+      }));
+
+      const mockSelectFromChained = jest.fn(() => ({
+        selectAll: mockSelectAllChained,
+      }));
+
+      repository['db'] = {
+        selectFrom: mockSelectFromChained,
+      } as unknown as Kysely<DatabaseSchema>;
+
+      mockExecute.mockResolvedValue([mockDbVehicle]);
+
+      const results = await repository.findVehiclesNeedingAnalysis();
+
+      expect(results).toHaveLength(1);
+      expect(results[0].id).toBe('test-vehicle-123');
+      expect(results[0].personalFitScore).toBeNull();
     });
   });
 

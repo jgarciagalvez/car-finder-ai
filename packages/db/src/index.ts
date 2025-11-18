@@ -1,6 +1,6 @@
 // Main exports for the database package
 export { DatabaseService } from './database';
-export { VehicleRepository } from './repositories/VehicleRepository';
+export { VehicleRepository } from './repositories/vehicleRepository';
 export * from './schema';
 
 // Re-export types for convenience

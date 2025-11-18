@@ -258,6 +258,7 @@ export class VehicleRepository {
           ])
         )
         .where('status', '!=', 'deleted')
+        .where('status', '!=', 'not_interested')
         .orderBy('createdAt', 'desc')
         .execute();
 

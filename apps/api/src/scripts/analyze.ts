@@ -42,6 +42,7 @@ interface AnalysisStats {
   analyzed: number;
   failed: number;
   skipped: number;
+  removedFromSource: number;
   errors: Array<{ vehicleId: string; error: string }>;
   startTime: Date;
   endTime?: Date;
@@ -86,6 +87,66 @@ interface AnalysisFailure {
   errorType: string;
   timestamp: Date;
   retryable: boolean;
+}
+
+/**
+ * Determine if existence check is needed for a vehicle
+ * - Skip if scraped less than 4 hours ago (fresh data)
+ * - Check if never checked or checked more than 4 hours ago
+ * @exported for testing
+ */
+export function shouldCheckExistence(vehicle: Vehicle): boolean {
+  // Skip if scraped less than 4 hours ago (fresh data)
+  const scrapedAt = new Date(vehicle.scrapedAt);
+  const hoursSinceScraped = (Date.now() - scrapedAt.getTime()) / (1000 * 60 * 60);
+  if (hoursSinceScraped < 4) return false;
+
+  // Check if never checked or checked more than 4 hours ago
+  if (!vehicle.lastExistenceCheck) return true;
+
+  const lastCheck = new Date(vehicle.lastExistenceCheck);
+  const hoursSinceCheck = (Date.now() - lastCheck.getTime()) / (1000 * 60 * 60);
+  return hoursSinceCheck > 4;
+}
+
+/**
+ * Check if a vehicle still exists on the source website
+ * Makes HEAD request to sourceUrl with 10s timeout
+ * Updates database with result
+ * Returns true if exists, false if removed
+ * On network error: logs warning, returns true (fail-open)
+ * @exported for testing
+ */
+export async function checkVehicleExistence(
+  vehicle: Vehicle,
+  vehicleRepository: VehicleRepository
+): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    const response = await fetch(vehicle.sourceUrl, {
+      method: 'HEAD',
+      redirect: 'follow',
+      signal: controller.signal
+    });
+
+    clearTimeout(timeout);
+
+    const exists = !(response.status === 404 || response.status === 410);
+
+    // Update database
+    await vehicleRepository.updateVehicle(vehicle.id, {
+      isRemovedFromSource: !exists,
+      lastExistenceCheck: new Date().toISOString()
+    });
+
+    return exists;
+  } catch (error) {
+    // Network error - fail open, allow operation to proceed
+    console.warn(`⚠️  Existence check failed (network error) - proceeding with operation`);
+    return true; // Fail-open for resilience
+  }
 }
 
 /**
@@ -208,6 +269,7 @@ export class VehicleAnalyzer {
       analyzed: 0,
       failed: 0,
       skipped: 0,
+      removedFromSource: 0,
       errors: [],
       startTime: new Date(),
     };
@@ -292,6 +354,18 @@ export class VehicleAnalyzer {
             const globalIndex = batchStart + index;
 
             try {
+              // Check vehicle existence before processing (4-hour cache)
+              if (shouldCheckExistence(vehicle)) {
+                const exists = await checkVehicleExistence(vehicle, this.vehicleRepository);
+
+                if (!exists) {
+                  console.log(`  ⚠️  Skipping ${vehicle.id.substring(0, 8)} - removed from source [${globalIndex + 1}/${vehicles.length}]`);
+                  this.stats.removedFromSource++;
+                  this.stats.skipped++;
+                  return;
+                }
+              }
+
               // Use quiet mode when concurrency > 1 to avoid log interleaving
               const quietMode = concurrency > 1;
               await this.analyzeVehicle(vehicle, options, quietMode);
@@ -723,6 +797,9 @@ export class VehicleAnalyzer {
     console.log(`✅ Completed:      ${this.runLog.vehiclesCompleted}`);
     console.log(`❌ Failed:         ${this.runLog.vehiclesFailed}`);
     console.log(`⏭️  Skipped:        ${this.stats.skipped}`);
+    if (this.stats.removedFromSource > 0) {
+      console.log(`🗑️  Removed:        ${this.stats.removedFromSource} (no longer on source)`);
+    }
     console.log(`⏱️  Duration:       ${duration.toFixed(2)}s (${(duration / 60).toFixed(1)} min)`);
     console.log(`⚡ Throughput:      ${vehiclesPerHour.toFixed(1)} vehicles/hour`);
     console.log(`📞 API Calls:       ${totalApiCalls} total, ${averageRPM.toFixed(1)} RPM average`);

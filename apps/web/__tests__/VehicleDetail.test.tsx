@@ -61,6 +61,7 @@ describe('VehicleDetail Component', () => {
     status: 'new',
     personalNotes: null,
     isRemovedFromSource: false,
+    lastExistenceCheck: null,
     scrapedAt: new Date('2023-01-15'),
     createdAt: new Date('2023-01-15'),
     updatedAt: new Date('2023-01-16'),

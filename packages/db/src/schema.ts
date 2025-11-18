@@ -47,6 +47,7 @@ export interface VehicleTable {
   status: 'new' | 'processed' | 'skipped' | 'to_contact' | 'contacted' | 'to_visit' | 'visited' | 'not_interested' | 'deleted';
   personalNotes: string | null;
   isRemovedFromSource: number | null; // SQLite uses 0/1 for boolean, default 0
+  lastExistenceCheck: string | null; // ISO date string of last existence check
 
   // Timestamps
   scrapedAt: string; // ISO date string
@@ -111,6 +112,7 @@ export const CREATE_VEHICLES_TABLE = `
     status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'processed', 'skipped', 'to_contact', 'contacted', 'to_visit', 'visited', 'not_interested', 'deleted')),
     personalNotes TEXT,
     isRemovedFromSource INTEGER DEFAULT 0,
+    lastExistenceCheck TEXT DEFAULT NULL,
 
     -- Timestamps
     scrapedAt TEXT NOT NULL,

@@ -42,6 +42,7 @@ router.get('/', async (req: Request, res: Response) => {
       status: vehicle.status,
       personalNotes: vehicle.personalNotes,
       isRemovedFromSource: vehicle.isRemovedFromSource,
+      lastExistenceCheck: vehicle.lastExistenceCheck,
       createdAt: vehicle.createdAt.toISOString(),
       updatedAt: vehicle.updatedAt.toISOString(),
     }));
@@ -103,6 +104,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       status: vehicle.status,
       personalNotes: vehicle.personalNotes,
       isRemovedFromSource: vehicle.isRemovedFromSource,
+      lastExistenceCheck: vehicle.lastExistenceCheck,
       createdAt: vehicle.createdAt.toISOString(),
       updatedAt: vehicle.updatedAt.toISOString(),
     };
@@ -198,6 +200,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
       status: updatedVehicle.status,
       personalNotes: updatedVehicle.personalNotes,
       isRemovedFromSource: updatedVehicle.isRemovedFromSource,
+      lastExistenceCheck: updatedVehicle.lastExistenceCheck,
       createdAt: updatedVehicle.createdAt.toISOString(),
       updatedAt: updatedVehicle.updatedAt.toISOString(),
     };
@@ -322,6 +325,77 @@ router.post('/:id/analyze', async (req: Request, res: Response) => {
     res.status(500).json({
       error: 'Internal server error',
       message: error instanceof Error ? error.message : 'Failed to analyze vehicle'
+    });
+  }
+});
+
+// POST /api/vehicles/:id/check-existence - Check if vehicle still exists on source
+router.post('/:id/check-existence', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const vehicleRepository = await ServiceRegistry.getVehicleRepository();
+
+    // Check if vehicle exists in our database
+    const vehicle = await vehicleRepository.findVehicleById(id);
+    if (!vehicle) {
+      return res.status(404).json({
+        error: 'Vehicle not found',
+        message: `No vehicle found with ID: ${id}`
+      });
+    }
+
+    // Make HEAD request to sourceUrl with timeout
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+    let httpStatus: number;
+    let exists: boolean;
+
+    try {
+      const response = await fetch(vehicle.sourceUrl, {
+        method: 'HEAD',
+        redirect: 'follow',
+        signal: controller.signal
+      });
+
+      clearTimeout(timeout);
+      httpStatus = response.status;
+
+      // 404 or 410 means vehicle is removed
+      if (response.status === 404 || response.status === 410) {
+        exists = false;
+      } else {
+        exists = true;
+      }
+    } catch (fetchError) {
+      clearTimeout(timeout);
+      // Network error, timeout, etc. - don't update fields
+      console.error('Error checking vehicle existence:', fetchError);
+      return res.status(500).json({
+        error: 'Network error',
+        message: 'Failed to check vehicle existence due to network issue'
+      });
+    }
+
+    // Update database with result
+    const lastExistenceCheck = new Date().toISOString();
+    await vehicleRepository.updateVehicle(id, {
+      isRemovedFromSource: !exists,
+      lastExistenceCheck
+    });
+
+    res.status(200).json({
+      vehicleId: id,
+      isRemovedFromSource: !exists,
+      lastExistenceCheck,
+      httpStatus,
+      message: exists ? 'Vehicle still available' : 'Vehicle removed from Otomoto'
+    });
+  } catch (error) {
+    console.error('Error checking vehicle existence:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Check failed'
     });
   }
 });

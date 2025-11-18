@@ -387,6 +387,7 @@ export class IngestionPipeline {
         status: 'new',
         personalNotes: null,
         isRemovedFromSource: false,
+        lastExistenceCheck: null,
 
         // Timestamps
         scrapedAt: now,
@@ -560,6 +561,7 @@ export class IngestionPipeline {
       status: 'new',
       personalNotes: null,
       isRemovedFromSource: false,
+      lastExistenceCheck: null,
 
       // Timestamps
       scrapedAt: now,

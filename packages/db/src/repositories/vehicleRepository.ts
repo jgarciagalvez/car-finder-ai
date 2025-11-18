@@ -54,6 +54,7 @@ export class VehicleRepository {
         status: vehicle.status,
         personalNotes: vehicle.personalNotes,
         isRemovedFromSource: vehicle.isRemovedFromSource ? 1 : 0,
+        lastExistenceCheck: vehicle.lastExistenceCheck,
 
         // Timestamps
         scrapedAt: vehicle.scrapedAt.toISOString(),
@@ -128,6 +129,7 @@ export class VehicleRepository {
       if (updates.aiDataSanityCheck !== undefined) dbUpdates.aiDataSanityCheck = updates.aiDataSanityCheck;
       if (updates.distanceFromWroclaw !== undefined) dbUpdates.distanceFromWroclaw = updates.distanceFromWroclaw;
       if (updates.isRemovedFromSource !== undefined) dbUpdates.isRemovedFromSource = updates.isRemovedFromSource ? 1 : 0;
+      if (updates.lastExistenceCheck !== undefined) dbUpdates.lastExistenceCheck = updates.lastExistenceCheck;
 
       if (Object.keys(dbUpdates).length === 0) {
         console.log('⚠️ No valid updates provided for vehicle:', id);
@@ -560,6 +562,7 @@ export class VehicleRepository {
       status: dbVehicle.status,
       personalNotes: dbVehicle.personalNotes,
       isRemovedFromSource: dbVehicle.isRemovedFromSource === 1,
+      lastExistenceCheck: dbVehicle.lastExistenceCheck,
 
       // Timestamps
       scrapedAt: new Date(dbVehicle.scrapedAt),

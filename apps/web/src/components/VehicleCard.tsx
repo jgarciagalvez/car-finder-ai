@@ -266,9 +266,20 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
           {/* Title and Price Row */}
           <div className="flex justify-between items-start mb-3">
             <Link href={`/vehicle/${vehicle.id}`} className="flex-1">
-              <h3 className="font-semibold text-lg text-gray-900 hover:text-blue-600 transition-colors cursor-pointer">
-                {vehicle.title}
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-lg text-gray-900 hover:text-blue-600 transition-colors cursor-pointer">
+                  {vehicle.title}
+                </h3>
+                {/* Removed from Source Warning Badge */}
+                {vehicle.isRemovedFromSource && (
+                  <span className="bg-orange-100 text-orange-800 border border-orange-300 px-2 py-0.5 rounded text-xs font-medium flex items-center gap-1 whitespace-nowrap">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    Removed from Source
+                  </span>
+                )}
+              </div>
             </Link>
             
             <div className="text-right ml-4">

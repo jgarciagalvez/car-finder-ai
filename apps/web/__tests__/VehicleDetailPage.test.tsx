@@ -1,12 +1,23 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import VehicleDetailPage from '@/app/vehicle/[id]/page';
-import { fetchVehicleById } from '@/lib/api';
+import { fetchVehicleById, checkVehicleExistence } from '@/lib/api';
 import type { Vehicle } from '@car-finder/types';
 
 // Mock the API
-jest.mock('@/lib/api');
+jest.mock('@/lib/api', () => ({
+  fetchVehicleById: jest.fn(),
+  checkVehicleExistence: jest.fn().mockResolvedValue({
+    vehicleId: '123',
+    isRemovedFromSource: false,
+    lastExistenceCheck: new Date().toISOString(),
+    httpStatus: 200,
+    message: 'Vehicle still available'
+  })
+}));
+
 const mockFetchVehicleById = fetchVehicleById as jest.MockedFunction<typeof fetchVehicleById>;
+const mockCheckVehicleExistence = checkVehicleExistence as jest.MockedFunction<typeof checkVehicleExistence>;
 
 // Mock the VehicleDetail component
 jest.mock('@/components/VehicleDetail', () => ({
@@ -73,6 +84,7 @@ describe('Vehicle Detail Page', () => {
     status: 'new',
     personalNotes: null,
     isRemovedFromSource: false,
+    lastExistenceCheck: null,
     scrapedAt: new Date('2023-01-15'),
     createdAt: new Date('2023-01-15'),
     updatedAt: new Date('2023-01-16'),
@@ -295,6 +307,66 @@ describe('Vehicle Detail Page', () => {
       await waitFor(() => {
         expect(document.title).toBe('Audi A4 2.0 TDI | Car Finder AI');
       });
+    });
+  });
+
+  // Toast notification tests for AC2.6
+  describe('Toast Notification for Removed Vehicle', () => {
+    it('should show toast notification when vehicle is detected as removed', async () => {
+      const removedVehicle = { ...mockVehicle, lastExistenceCheck: null };
+      mockFetchVehicleById.mockResolvedValueOnce(removedVehicle);
+      mockCheckVehicleExistence.mockResolvedValueOnce({
+        vehicleId: '123',
+        isRemovedFromSource: true,
+        lastExistenceCheck: new Date().toISOString(),
+        httpStatus: 404,
+        message: 'Vehicle removed from Otomoto'
+      });
+
+      render(<VehicleDetailPage params={{ id: '123' }} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('This vehicle has been removed from Otomoto')).toBeInTheDocument();
+      }, { timeout: 3000 });
+
+      expect(screen.getByTestId('toast-notification')).toBeInTheDocument();
+    });
+
+    it('should not show toast when vehicle is still available', async () => {
+      const availableVehicle = { ...mockVehicle, lastExistenceCheck: null };
+      mockFetchVehicleById.mockResolvedValueOnce(availableVehicle);
+      mockCheckVehicleExistence.mockResolvedValueOnce({
+        vehicleId: '123',
+        isRemovedFromSource: false,
+        lastExistenceCheck: new Date().toISOString(),
+        httpStatus: 200,
+        message: 'Vehicle still available'
+      });
+
+      render(<VehicleDetailPage params={{ id: '123' }} />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('vehicle-detail')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText('This vehicle has been removed from Otomoto')).not.toBeInTheDocument();
+    });
+
+    it('should not show toast when existence check is not needed', async () => {
+      const recentlyCheckedVehicle = {
+        ...mockVehicle,
+        lastExistenceCheck: new Date().toISOString()
+      };
+      mockFetchVehicleById.mockResolvedValueOnce(recentlyCheckedVehicle);
+
+      render(<VehicleDetailPage params={{ id: '123' }} />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('vehicle-detail')).toBeInTheDocument();
+      });
+
+      // checkVehicleExistence should not be called since lastExistenceCheck is recent
+      expect(screen.queryByText('This vehicle has been removed from Otomoto')).not.toBeInTheDocument();
     });
   });
 });

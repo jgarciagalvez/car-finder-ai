@@ -47,6 +47,7 @@ describe('Sorting Functions', () => {
     status: 'new',
     personalNotes: null,
     isRemovedFromSource: false,
+    lastExistenceCheck: null,
     scrapedAt: new Date(),
     createdAt: new Date(),
     updatedAt: new Date(),

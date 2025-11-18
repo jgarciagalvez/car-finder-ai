@@ -68,6 +68,7 @@ const createMockVehicle = (overrides: Partial<Vehicle> = {}): Vehicle => ({
   status: 'new',
   personalNotes: null,
   isRemovedFromSource: false,
+  lastExistenceCheck: null,
   scrapedAt: new Date(),
   createdAt: new Date(),
   updatedAt: new Date(),

@@ -53,10 +53,11 @@ export interface Vehicle {
   status: VehicleStatus;
   personalNotes: string | null;
   isRemovedFromSource: boolean; // Default: false, set by Story 3.7 existence check
+  lastExistenceCheck: string | null; // ISO timestamp of last existence check
 
   // Our Timestamps
   scrapedAt: Date;
-  createdAt: Date; 
+  createdAt: Date;
   updatedAt: Date;
 }
 

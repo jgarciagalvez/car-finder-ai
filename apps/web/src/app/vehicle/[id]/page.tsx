@@ -2,10 +2,11 @@
 
 import { AIChatSidebar } from '@/components/AIChatSidebar';
 import { VehicleDetail } from '@/components/VehicleDetail';
-import { fetchVehicleById } from '@/lib/api';
+import { Toast } from '@/components/Toast';
+import { fetchVehicleById, checkVehicleExistence } from '@/lib/api';
 import { Vehicle } from '@car-finder/types';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 // Fallback icons
 const ChatBubbleLeftRightIcon = ({ className }: { className?: string }) => (
@@ -31,6 +32,7 @@ export default function VehicleDetailPage({ params }: VehicleDetailPageProps) {
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showToast, setShowToast] = useState(false);
 
   useEffect(() => {
     const loadVehicle = async () => {
@@ -62,12 +64,64 @@ export default function VehicleDetailPage({ params }: VehicleDetailPageProps) {
     }
   }, [vehicle, isLoading]);
 
+  // Auto-check vehicle existence on load (only if no check within 24 hours)
+  const existenceCheckDone = useRef(false);
+  useEffect(() => {
+    if (!vehicle || existenceCheckDone.current) return;
+
+    const checkExistence = async () => {
+      // Check if last existence check was within 4 hours
+      const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
+      const now = Date.now();
+
+      let shouldCheck = true;
+      if (vehicle.lastExistenceCheck) {
+        const lastCheckTime = new Date(vehicle.lastExistenceCheck).getTime();
+        if (now - lastCheckTime < FOUR_HOURS_MS) {
+          shouldCheck = false;
+        }
+      }
+
+      if (shouldCheck) {
+        try {
+          const result = await checkVehicleExistence(vehicle.id);
+          // Update local vehicle state with new values
+          setVehicle(prev => prev ? {
+            ...prev,
+            isRemovedFromSource: result.isRemovedFromSource,
+            lastExistenceCheck: result.lastExistenceCheck
+          } : prev);
+
+          // Show toast notification if vehicle was removed (AC2.6)
+          if (result.isRemovedFromSource) {
+            setShowToast(true);
+          }
+        } catch (err) {
+          // Silently fail - this is a background check
+          console.error('Error checking vehicle existence:', err);
+        }
+      }
+      existenceCheckDone.current = true;
+    };
+
+    checkExistence();
+  }, [vehicle]);
   const handleVehicleUpdate = (updatedVehicle: Vehicle) => {
     setVehicle(updatedVehicle);
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Toast Notification */}
+      {showToast && (
+        <Toast
+          message="This vehicle has been removed from Otomoto"
+          type="warning"
+          duration={5000}
+          onClose={() => setShowToast(false)}
+        />
+      )}
+
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">

@@ -222,7 +222,18 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
         <div className="p-6">
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{vehicle.title}</h1>
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-3xl font-bold text-gray-900">{vehicle.title}</h1>
+                {/* Removed from Source Warning Badge */}
+                {vehicle.isRemovedFromSource && (
+                  <span className="bg-orange-100 text-orange-800 border border-orange-300 px-3 py-1 rounded text-sm font-medium flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    Removed from Source
+                  </span>
+                )}
+              </div>
               <p className="text-gray-600">{vehicle.year} • {vehicle.mileage.toLocaleString()} km</p>
             </div>
             <div className="text-right">

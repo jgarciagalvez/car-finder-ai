@@ -14,6 +14,14 @@ export interface VehiclesResponse {
   pagination: PaginationMetadata;
 }
 
+export interface CheckExistenceResult {
+  vehicleId: string;
+  isRemovedFromSource: boolean;
+  lastExistenceCheck: string;
+  httpStatus: number;
+  message: string;
+}
+
 export class ApiError extends Error {
   public status: number;
   public response?: any;
@@ -109,6 +117,12 @@ export async function translateVehicle(vehicleId: string, force: boolean = false
 export async function analyzeVehicle(vehicleId: string, force: boolean = false): Promise<Vehicle> {
   const url = `/api/vehicles/${vehicleId}/analyze${force ? '?force=true' : ''}`;
   return apiRequest<Vehicle>(url, { method: 'POST' });
+}
+
+export async function checkVehicleExistence(vehicleId: string): Promise<CheckExistenceResult> {
+  return apiRequest<CheckExistenceResult>(`/api/vehicles/${vehicleId}/check-existence`, {
+    method: 'POST',
+  });
 }
 
 // Health check

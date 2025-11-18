@@ -38,7 +38,12 @@ module.exports = {
     '/node_modules/',
     '/dist/'
   ],
-  
+
+  // Transform ES modules (p-limit, yocto-queue)
+  transformIgnorePatterns: [
+    'node_modules/(?!(p-limit|yocto-queue)/)'
+  ],
+
   // Clear mocks between tests
   clearMocks: true,
 };

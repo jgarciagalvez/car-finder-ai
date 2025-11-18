@@ -10,6 +10,7 @@
  *   pnpm translate                                   # Translate all vehicles needing translation
  *   pnpm translate --vehicle-id <id>                 # Translate specific vehicle
  *   pnpm translate --limit 10                        # Translate only first 10 vehicles
+ *   pnpm translate --concurrency <n>                 # Process N vehicles concurrently (default: 1)
  *   pnpm translate --force                           # Force re-translation, bypass filters
  *
  * Environment Variables:
@@ -25,6 +26,7 @@ import { WorkspaceUtils } from '@car-finder/services';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import pLimit from 'p-limit';
 
 // Load environment variables from the workspace root
 WorkspaceUtils.loadEnvFromRoot();
@@ -33,6 +35,7 @@ interface TranslationOptions {
   vehicleId?: string;
   limit?: number;
   force?: boolean;
+  concurrency?: number;
 }
 
 interface TranslationRunLog {
@@ -147,7 +150,7 @@ export function loadSearchConfig(): SearchConfig {
 
 /**
  * Check if vehicle has at least one of the required features (ANY-match logic)
- * Checks the ORIGINAL Polish sourceEquipment field before translation
+ * Checks BOTH sourceEquipment AND sourceDescriptionHtml (Polish fields before translation)
  */
 export function hasRequiredFeatures(vehicle: Vehicle, requiredFeatures: string[]): boolean {
   if (requiredFeatures.length === 0) {
@@ -169,16 +172,35 @@ export function hasRequiredFeatures(vehicle: Vehicle, requiredFeatures: string[]
   // Flatten all Polish features from all categories
   const allPolishFeatures: string[] = Object.values(sourceEquipment).flat();
 
-  if (allPolishFeatures.length === 0) {
-    return false;
-  }
+  // ANY-match: vehicle must have at least one required feature
+  // Check BOTH sourceEquipment AND sourceDescriptionHtml (case-insensitive)
+  return requiredFeatures.some(requiredFeature => {
+    const requiredLower = requiredFeature.toLowerCase();
 
-  // ANY-match: vehicle must have at least one required feature (case-insensitive)
-  return allPolishFeatures.some(polishFeature => {
-    const featureLower = polishFeature.toLowerCase();
-    return requiredFeatures.some(requiredFeature =>
-      featureLower.includes(requiredFeature.toLowerCase())
+    // Check in sourceEquipment (existing behavior)
+    const foundInEquipment = allPolishFeatures.some(polishFeature =>
+      polishFeature.toLowerCase().includes(requiredLower)
     );
+    if (foundInEquipment) return true;
+
+    // NEW: Check in sourceDescriptionHtml
+    if (!vehicle.sourceDescriptionHtml) return false;
+
+    // For Polish word matching, handle declensions by checking if description contains the term
+    // Use a stem-based approach: remove common Polish endings for more flexible matching
+    const descriptionLower = vehicle.sourceDescriptionHtml.toLowerCase();
+
+    // Direct substring match (works for most cases)
+    if (descriptionLower.includes(requiredLower)) return true;
+
+    // Handle Polish declensions: strip common endings like ą, ę, ę, ą for klimatyzacja/klimatyzację
+    // Create a stem by removing the last 3 characters if the word is long enough
+    if (requiredLower.length > 6) {
+      const stem = requiredLower.slice(0, -3);
+      if (descriptionLower.includes(stem)) return true;
+    }
+
+    return false;
   });
 }
 
@@ -249,7 +271,7 @@ export class VehicleTranslator {
   }
 
   /**
-   * Run the translation pipeline
+   * Run the translation pipeline with concurrent batch processing
    */
   async run(options: TranslationOptions = {}): Promise<void> {
     console.log('🌐 Starting Vehicle Translation Pipeline...\n');
@@ -262,51 +284,74 @@ export class VehicleTranslator {
         return;
       }
 
-      console.log(`📊 Found ${vehicles.length} vehicle(s) to translate\n`);
+      const concurrency = options.concurrency || 1; // Default: 1 for 15 RPM safety
+      console.log(`📊 Found ${vehicles.length} vehicle(s) to translate (concurrency: ${concurrency})\n`);
 
-      for (let i = 0; i < vehicles.length; i++) {
-        const vehicle = vehicles[i];
-        console.log(`\n[${i + 1}/${vehicles.length}] Processing vehicle ${vehicle.id}...`);
+      // Create p-limit limiter for concurrency control
+      const limit = pLimit(concurrency);
 
-        // Check vehicle existence before processing (4-hour cache)
-        if (shouldCheckExistence(vehicle)) {
-          const exists = await checkVehicleExistence(vehicle, this.vehicleRepository);
+      // Process vehicles in batches
+      const batchSize = concurrency;
+      const totalBatches = Math.ceil(vehicles.length / batchSize);
 
-          if (!exists) {
-            console.log(`⚠️  Skipping ${vehicle.id} - removed from source`);
-            this.runLog.removedFromSource++;
-            continue;
-          }
-        }
+      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+        const batchStart = batchIndex * batchSize;
+        const batchEnd = Math.min(batchStart + batchSize, vehicles.length);
+        const batch = vehicles.slice(batchStart, batchEnd);
 
-        let wasFiltered = false;
-        try {
-          wasFiltered = await this.translateVehicle(vehicle, options);
-          this.runLog.vehiclesCompleted++;
+        console.log(`\nBatch ${batchIndex + 1}/${totalBatches}: Processing vehicles ${batchStart + 1}-${batchEnd} of ${vehicles.length}`);
 
-          if (!wasFiltered) {
-            console.log(`✅ Translation complete for ${vehicle.id}`);
-          }
-        } catch (error) {
-          this.runLog.vehiclesFailed++;
-          const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-          console.error(`❌ Failed to process ${vehicle.id}: ${errorMsg}`);
+        // Process batch concurrently using p-limit
+        const batchPromises = batch.map((vehicle, index) =>
+          limit(async () => {
+            const globalIndex = batchStart + index;
 
-          this.runLog.failures.push({
-            vehicleId: vehicle.id,
-            vehicleTitle: vehicle.title,
-            vehicleUrl: vehicle.sourceUrl,
-            error: errorMsg,
-            errorType: getErrorType(error instanceof Error ? error : new Error(errorMsg)),
-            timestamp: new Date(),
-            retryable: isRetryableError(error instanceof Error ? error : new Error(errorMsg)),
-          });
+            try {
+              // Check vehicle existence before processing (4-hour cache)
+              if (shouldCheckExistence(vehicle)) {
+                const exists = await checkVehicleExistence(vehicle, this.vehicleRepository);
 
-          continue;
-        }
+                if (!exists) {
+                  console.log(`  ⚠️  Skipping ${vehicle.id.substring(0, 8)} - removed from source [${globalIndex + 1}/${vehicles.length}]`);
+                  this.runLog.removedFromSource++;
+                  return;
+                }
+              }
 
-        // Rate limiting: 15 RPM = 4 seconds (only if AI was called)
-        if (!wasFiltered && i < vehicles.length - 1) {
+              // Translate vehicle
+              const wasFiltered = await this.translateVehicle(vehicle, options);
+              this.runLog.vehiclesCompleted++;
+
+              if (!wasFiltered) {
+                console.log(`  ✅ ${vehicle.id.substring(0, 8)} translation complete [${globalIndex + 1}/${vehicles.length}]`);
+              }
+            } catch (error) {
+              this.runLog.vehiclesFailed++;
+              const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+              console.error(`  ❌ ${vehicle.id.substring(0, 8)} failed: ${errorMsg} [${globalIndex + 1}/${vehicles.length}]`);
+
+              this.runLog.failures.push({
+                vehicleId: vehicle.id,
+                vehicleTitle: vehicle.title,
+                vehicleUrl: vehicle.sourceUrl,
+                error: errorMsg,
+                errorType: getErrorType(error instanceof Error ? error : new Error(errorMsg)),
+                timestamp: new Date(),
+                retryable: isRetryableError(error instanceof Error ? error : new Error(errorMsg)),
+              });
+              // Don't re-throw - allow other vehicles in batch to continue
+            }
+          })
+        );
+
+        // Wait for all vehicles in batch to complete
+        await Promise.all(batchPromises);
+
+        console.log(`Batch ${batchIndex + 1} complete. [Completed: ${this.runLog.vehiclesCompleted}, Failed: ${this.runLog.vehiclesFailed}, Filtered: ${this.runLog.vehiclesFiltered}]`);
+
+        // Rate limiting: 4-second delay between batches (not within batch)
+        // With concurrency=1: 1 vehicle per 4s = 15 RPM (compliant)
+        if (batchIndex < totalBatches - 1) {
           console.log('⏳ Waiting 4 seconds (rate limit)...');
           await this.delay(4000);
         }
@@ -474,6 +519,9 @@ function parseArgs(): TranslationOptions {
     } else if (arg === '--limit' && i + 1 < args.length) {
       options.limit = parseInt(args[i + 1], 10);
       i++;
+    } else if (arg === '--concurrency' && i + 1 < args.length) {
+      options.concurrency = parseInt(args[i + 1], 10);
+      i++;
     } else if (arg === '--force') {
       options.force = true;
     } else if (arg === '--help' || arg === '-h') {
@@ -496,19 +544,24 @@ Usage:
   pnpm translate                                # Translate all vehicles needing translation
   pnpm translate --vehicle-id <id>              # Translate specific vehicle
   pnpm translate --limit 10                     # Translate only first 10 vehicles
+  pnpm translate --concurrency <n>              # Process N vehicles concurrently (default: 1)
   pnpm translate --force                        # Force re-translation, bypass filters
   pnpm translate --help                         # Show this help message
 
 Flags:
-  --force       Re-translate even if already translated, bypass required features filter
+  --concurrency <n>   Number of vehicles to process concurrently (default: 1)
+                      ⚠️  WARNING: Concurrency > 1 may exceed 15 RPM rate limit
+                      Recommended: Keep at 1 for safety (1 vehicle per 4s = 15 RPM)
+  --force             Re-translate even if already translated, bypass required features filter
 
 Environment Variables:
   GEMINI_API_KEY       Required. Your Gemini API key for AI translation
   DATABASE_PATH        Optional. Path to database file (default: <root>/data/vehicles.db)
 
 Examples:
-  pnpm translate                                # Translate all untranslated vehicles
+  pnpm translate                                # Translate all untranslated vehicles (sequential)
   pnpm translate --limit 5                      # Translate first 5 vehicles
+  pnpm translate --concurrency 2 --limit 10     # Translate 10 vehicles with concurrency=2
   pnpm translate --vehicle-id abc123            # Translate specific vehicle
   pnpm translate --force --vehicle-id abc123    # Re-translate vehicle, bypass filter
   `);

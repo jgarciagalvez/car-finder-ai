@@ -1,8 +1,8 @@
 # Technical Debt Registry
 
 **Last Updated:** 2025-11-18 (Verified against actual codebase)
-**Total Active Items:** 9
-**Total Estimated Effort:** 14-23 hours
+**Total Active Items:** 10
+**Total Estimated Effort:** 15-25 hours
 
 ---
 
@@ -66,6 +66,29 @@ This registry tracks all technical debt, deferred improvements, and post-MVP enh
 - **Files Affected**:
   - `apps/web/src/components/VehicleCard.tsx:114-183`
   - `apps/web/src/components/VehicleDetail.tsx:155-194`
+
+#### TD-017: Quick/Full Analysis Button State Management
+- **Origin**: Story 3.9 (Work in Progress - identified during implementation)
+- **Category**: UX Bug / State Management
+- **Impact**: MEDIUM - Confusing user experience during analysis operations
+- **Effort**: 1-2 hours
+- **Description**: When clicking "Quick Analysis" button, BOTH "Quick Analysis" and "Full Analysis" buttons show "analysing..." animation/loading state
+  - **Current Behavior**: Both buttons enter loading state simultaneously
+  - **Intended Behavior**:
+    - Only the clicked button should show loading animation (spinner + "Analysing..." text)
+    - The other button should be disabled/non-clickable (same visual state as when vehicle has no translation)
+  - This creates user confusion about which operation is running
+- **Verified Status**: ✅ CONFIRMED - Bug identified during Story 3.9 development
+- **Root Cause**: Likely both buttons check the same `isAnalyzing` state from context, need separate state for `isQuickAnalyzing` vs `isFullAnalyzing` OR check operation type
+- **Proposed Fix**:
+  - Option A: Add operation type tracking to operation state (e.g., `analysisType: 'quick' | 'full' | null`)
+  - Option B: Separate state flags (`isQuickAnalyzing`, `isFullAnalyzing`)
+  - Option C: Disable all buttons when any analysis is running, show loading only on clicked button
+- **Proposed Story**: Fix in Story 3.9 or create Story 3.11 (UX Polish)
+- **Status**: Active - Should be fixed before Story 3.9 completion
+- **Files Affected**:
+  - `apps/web/src/components/VehicleCard.tsx` (Quick/Full Analysis buttons)
+  - `apps/web/src/context/VehicleContext.tsx` (operation state management)
 
 #### TD-006: Nominatim API Production Scalability
 - **Origin**: Story 3.2 (QA Review - Security Review / Performance)
@@ -300,9 +323,9 @@ This registry tracks all technical debt, deferred improvements, and post-MVP enh
 | Priority | Count | Total Estimated Effort |
 |----------|-------|------------------------|
 | HIGH | 0 | 0 hours |
-| MEDIUM | 3 | 8-13 hours |
+| MEDIUM | 4 | 9-15 hours |
 | LOW | 6 | 9-16 hours |
-| **TOTAL ACTIVE** | **9** | **17-29 hours** |
+| **TOTAL ACTIVE** | **10** | **18-31 hours** |
 | Post-MVP Deferred | 2 | 6-9 hours |
 | Pre-existing | 1 | TBD |
 | **Resolved** | **6** | - |
@@ -315,11 +338,12 @@ This registry tracks all technical debt, deferred improvements, and post-MVP enh
 |----------|-------|----------------------|
 | Code Duplication / Refactoring | 2 | TD-002 (shouldCheckExistence) |
 | Missing Tests | 2 | TD-004 (Frontend tests) |
+| UX Bugs / State Management | 1 | TD-017 (Button state management) |
 | Documentation | 2 | - |
 | Architectural Concerns | 1 | TD-006 (Nominatim scalability) |
 | Error Handling | 1 | - |
 | Performance | 2 | - |
-| **TOTAL** | **10** | **2** |
+| **TOTAL** | **11** | **3** |
 
 ---
 
@@ -386,3 +410,4 @@ All technical debt items have been verified against the actual codebase:
 | 2025-11-18 | Initial registry creation with comprehensive debt from Epic 1-4 stories | Sarah (PO) + Quinn (QA) |
 | 2025-11-18 | Verified all items against actual codebase, resolved 3 items (TD-001, TD-005, TD-007), consolidated 2 duplicates (TD-009, TD-011 into TD-002), updated counts and effort estimates | Sarah (PO) |
 | 2025-11-18 | Removed TD-003 (backfill script tests) - one-time migration script doesn't need tests | Sarah (PO) |
+| 2025-11-18 | Added TD-017 (Quick/Full Analysis button state management) - UX bug identified during Story 3.9 development | User + Sarah (PO) |

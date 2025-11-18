@@ -292,9 +292,235 @@
 
 ---
 
+### **Story 3.8: Existence Verification for AI Operations**
+
+**As a** user, **I want** the system to verify vehicle availability before running expensive AI operations, **so that** I don't waste API credits on vehicles that have been removed from Otomoto.
+
+**Context:**
+- Story 3.7 implemented existence verification on detail page visits (user-driven, passive)
+- AI operations (translation, analysis) consume expensive Gemini API credits (~4-5 calls per vehicle for full analysis)
+- Current gap: Force translate/analyze buttons and batch commands don't check if vehicle is still available before processing
+- Inconsistency: `pnpm analyze` processes `not_interested` vehicles, but `pnpm translate` skips them
+
+**Acceptance Criteria:**
+
+1. **Consistency Fix - Filter `not_interested` Vehicles:**
+   - Update `findVehiclesNeedingAnalysis()` repository method to filter out `not_interested` vehicles
+   - Match behavior of `findVehiclesNeedingTranslation()` (already filters both `deleted` and `not_interested`)
+   - Batch `pnpm analyze` command skips `not_interested` vehicles automatically
+   - Prevents wasting AI credits on vehicles user has explicitly dismissed
+
+2. **Force Translate Button (VehicleCard/VehicleDetail):**
+   - Before calling translation API, check vehicle existence (use endpoint from Story 3.7)
+   - Respect 4-hour cache: only check if `lastExistenceCheck` is null or >4 hours old
+   - Skip check if vehicle was scraped <4 hours ago (fresh data)
+   - If vehicle is removed (404/410):
+     - Block translation operation
+     - Show toast notification: "Cannot translate - vehicle has been removed from Otomoto"
+     - Update `isRemovedFromSource = true` and `lastExistenceCheck = now()`
+     - Do NOT call translation API (save credits)
+   - If vehicle is available (200):
+     - Update `isRemovedFromSource = false` and `lastExistenceCheck = now()`
+     - Proceed with translation normally
+
+3. **Force Analysis Button (VehicleCard/VehicleDetail):**
+   - Before calling analysis API, check vehicle existence
+   - Same 4-hour cache logic as Force Translate
+   - If vehicle is removed:
+     - Block analysis operation
+     - Show toast notification: "Cannot analyze - vehicle has been removed from Otomoto"
+     - Update existence fields
+     - Do NOT call analysis API (save ~4-5 API calls)
+   - If vehicle is available:
+     - Update existence fields
+     - Proceed with analysis normally
+
+4. **Batch `pnpm analyze` Command:**
+   - Before processing each vehicle, check if existence verification is needed
+   - Verification triggers if: `lastExistenceCheck` is null OR >4 hours old
+   - Skip verification if: vehicle was scraped <4 hours ago
+   - If vehicle is removed during check:
+     - Skip analysis for that vehicle
+     - Log: "⚠️  Skipping {vehicleId} - removed from source"
+     - Update `isRemovedFromSource = true` and `lastExistenceCheck = now()`
+     - Increment skipped count in run summary
+   - If vehicle is available:
+     - Update existence fields
+     - Proceed with analysis
+   - Rate limiting: existence check counts toward 15 RPM limit (factor into batch delays)
+
+5. **Batch `pnpm translate` Command:**
+   - Add same existence verification logic as analyze command
+   - Check before translation API call
+   - Skip translation if vehicle is removed
+   - Log and update fields accordingly
+   - Note: `pnpm translate` already filters `not_interested` vehicles ✓
+
+6. **Error Handling:**
+   - Network errors during existence check (timeouts, connection issues):
+     - Log warning: "⚠️  Existence check failed (network error) - proceeding with operation"
+     - Do NOT update `isRemovedFromSource` or `lastExistenceCheck` on error
+     - Allow operation to proceed (fail-open for resilience)
+   - HTTP errors (5xx):
+     - Same fail-open behavior (proceed with operation)
+   - Only 404/410 responses block operations and set `isRemovedFromSource = true`
+
+7. **No Breaking Changes:**
+   - Regular "Analyze" button (non-force) behavior unchanged
+   - Single vehicle operations (`--vehicle-id` flag) still work
+   - Existing tests remain valid
+   - Backwards compatible with existing database
+
+**Technical Notes:**
+- Files to modify:
+  - `packages/db/src/repositories/vehicleRepository.ts` - Add `not_interested` filter to `findVehiclesNeedingAnalysis()`
+  - `apps/api/src/scripts/analyze.ts` - Add existence check in `analyzeVehicle()` method
+  - `apps/api/src/scripts/translate.ts` - Add existence check in `translateVehicle()` method
+  - `apps/web/src/components/VehicleCard.tsx` - Add existence check before force translate/analyze
+  - `apps/web/src/components/VehicleDetail.tsx` - Add existence check before force translate/analyze
+  - `apps/web/src/lib/api.ts` - May need to add helper for existence check API call
+
+- Reuse existing endpoint: `POST /api/vehicles/:id/check-existence` (from Story 3.7)
+- 4-hour cache logic matches Story 3.7 behavior
+- Existence check is NON-BLOCKING for page load (only blocks AI operation)
+- Rate limiting consideration: existence checks count as API calls (HEAD requests to Otomoto)
+- Consider batching existence checks in `pnpm analyze` if processing many vehicles (optional optimization)
+
+**Dependencies:**
+- ✅ Story 3.5 (Status Management) - Adds `isRemovedFromSource` field
+- ✅ Story 3.7 (Existence Check) - Adds `lastExistenceCheck` field and `/check-existence` endpoint
+
+**Testing Considerations:**
+- Mock Otomoto responses (200, 404, 410, 500, timeout)
+- Test 4-hour cache logic (skip check if recent)
+- Test fresh vehicle logic (skip check if scraped <4 hours ago)
+- Test fail-open on network errors
+- Verify `not_interested` filtering in batch analyze
+- Verify toast notifications appear correctly
+- Verify API credits are NOT consumed when vehicle is removed
+
+---
+
+### **Story 3.9: AI Analysis UX - Full Report Generation & Visual Indicators**
+
+**As a** user, **I want** clear visual indicators of analysis completeness and the ability to generate full mechanic reports on-demand, **so that** I can understand what analysis has been performed and access detailed reports only when needed, saving AI credits.
+
+**Context:**
+- Current bug: Force Re-analyze button only generates summary, not full report (missing `includeFullReport` option)
+- Current bug: API response structure mismatch causes frontend state update issues
+- UX gap: No visual indication of what analysis has been performed (summary vs. full report)
+- UX gap: No way to request full detailed mechanic report without re-running entire analysis
+- Resource efficiency: Full reports cost additional AI credits and should be opt-in
+
+**Acceptance Criteria:**
+
+1. **CLI Behavior:**
+   - `pnpm analyze` generates virtual mechanic summary only (default behavior)
+   - `pnpm analyze --include-full-report` generates both summary AND full detailed mechanic report
+   - Both commands respect existing `--force` flag behavior
+   - Flag applies to single vehicle (`--vehicle-id`) and batch operations
+
+2. **Visual Indicators - Vehicle Card:**
+   - Location: Next to AI scores section (Personal Fit Score, Market Value, Priority Rating)
+   - Style: Small icon + short text pills, subtle and non-intrusive
+   - Badge variants:
+     - `📊 Summary` - When `virtualMechanicSummary` exists but `aiMechanicReport` is null
+     - `📋 Full` - When both `virtualMechanicSummary` AND `aiMechanicReport` exist
+     - `⚠️ No Analysis` - When `virtualMechanicSummary` is null (no analysis performed)
+   - Badges appear only when AI Analysis section is visible (at least one AI field populated)
+
+3. **Vehicle Card Action Buttons (Renamed for Clarity):**
+   - Replace current "Analyze" button with **"Quick Analysis"** (purple)
+     - Generates summary only
+     - Fills missing AI data (sanity check, fit score, summary, market value, priority rating)
+     - Shows confirmation if re-analyzing existing data (force behavior)
+   - Add new **"Full Analysis"** button (orange)
+     - Generates summary + full detailed mechanic report
+     - Shows confirmation with credit warning: "Generate full analysis including detailed report? This will use AI credits."
+     - Button only visible when vehicle has been translated (`description` is not null)
+   - Both buttons show loading spinner during operation
+   - Both buttons show success/error toasts after completion
+
+4. **Vehicle Details Page - Full Report Request:**
+   - Below Virtual Mechanic Summary section, add dynamic button/link
+   - Button text changes based on state:
+     - **"✨ Generate detailed report"** - When `aiMechanicReport` is null
+       - Triggers AI generation with loading spinner
+       - Shows confirmation: "Generate detailed mechanic report? This will use 1 AI credit."
+       - On success, expands to show the newly generated report
+     - **"📋 View detailed report"** - When `aiMechanicReport` exists
+       - Expands/collapses existing report section (no API call)
+       - Toggle behavior (expand/collapse)
+   - Report section is collapsible (same as current implementation)
+   - Button styled as subtle link/button, not prominently featured
+
+5. **API Fixes (Technical - Bug Resolution):**
+   - Fix analyze endpoint response structure in `apps/api/src/routes/vehicles.ts`:
+     - Current: Returns `{ message: string, vehicle: {...} }`
+     - Fixed: Returns full `Vehicle` object directly (consistent with PATCH endpoint)
+   - Pass `includeFullReport` option from frontend to `VehicleAnalyzer`:
+     - Add query parameter: `?includeFullReport=true`
+     - Wire through route handler to analyzer.run() options
+   - Ensure frontend properly updates state with returned vehicle data:
+     - Update `virtualMechanicSummary` state
+     - Update `aiMechanicReport` state
+     - Refresh visual indicators
+
+6. **Loading & Feedback States:**
+   - All analysis operations show loading spinner (no time estimates)
+   - Success: Show green toast "Analysis completed successfully!"
+   - Error: Show red toast with error message
+   - Full report generation: Show loading spinner with text "Generating detailed report..."
+   - All feedback follows existing patterns (Story 3.8 credit warnings pattern)
+
+7. **No Breaking Changes:**
+   - Existing analyze functionality remains unchanged
+   - Database schema unchanged (uses existing `virtualMechanicSummary` and `aiMechanicReport` fields)
+   - Backward compatible with existing analyzed vehicles
+   - All existing tests remain valid
+
+**Technical Notes:**
+- Files to modify:
+  - `apps/api/src/routes/vehicles.ts` - Fix response structure, add `includeFullReport` query param
+  - `apps/api/src/scripts/analyze.ts` - Already supports `includeFullReport`, ensure it's wired correctly
+  - `apps/web/src/components/VehicleCard.tsx` - Add visual indicators, rename buttons, add Full Analysis button
+  - `apps/web/src/components/VehicleDetail.tsx` - Add dynamic Generate/View button, handle full report generation
+  - `apps/web/src/lib/api.ts` - Update `analyzeVehicle()` to accept `includeFullReport` parameter, fix type expectations
+
+- Visual indicator implementation:
+  - Add badge component or inline styled element
+  - Position: Flexbox next to scores grid
+  - Responsive: Stack on mobile if needed
+
+- Credit usage pattern (match Story 3.8):
+  - Confirmation dialogs for operations that consume credits
+  - Clear messaging: "This will use X AI credits"
+
+- Full report generation from detail page:
+  - New API call: `POST /api/vehicles/:id/analyze?includeFullReport=true&force=false`
+  - Only generates full report (summary already exists)
+  - Should NOT re-run other analysis steps (sanity check, fit score, priority rating)
+  - Consider: Add `onlyFullReport` flag to skip already-complete steps
+
+**Dependencies:**
+- No blocking dependencies (can be implemented immediately)
+- Complements Story 3.8 (existence verification) - both use similar confirmation patterns
+
+**Testing Considerations:**
+- Test `includeFullReport` flag in CLI (`pnpm analyze --include-full-report`)
+- Test visual indicators appear correctly based on analysis state
+- Test button rename doesn't break existing functionality
+- Test Full Analysis button generates both summary and report
+- Test Generate/View button state changes correctly
+- Test API response structure fix updates frontend state properly
+- Test confirmation dialogs appear for credit-consuming operations
+- Mock AI service to avoid consuming real credits during testing
+
+---
+
 ## Epic Summary
 
-**Total Stories:** 7
+**Total Stories:** 9
 
 **Key Outcomes:**
 - Dashboard performance fixed (stable for 100+ vehicles)
@@ -302,7 +528,9 @@
 - Advanced sorting capabilities (compound/stacked sorting)
 - Clear status differentiation (processed/skipped workflow)
 - Vehicle availability verification (auto-check on detail page visit)
+- Resource efficiency (existence verification before AI operations prevents wasted credits)
 - Improved UX (two-tier hiding for not_interested/deleted, inline placeholder feedback, dynamic page titles)
+- AI analysis transparency (visual indicators for analysis completeness, on-demand full report generation)
 
 **Database Changes Required:**
 - New field: `distanceFromWroclaw: number | null`
@@ -315,7 +543,8 @@
 **Dependencies:**
 - Story 3.1 (Performance fix) should be completed first (CRITICAL)
 - Story 3.2 (Location) adds sortable field used by Story 3.3 (Sorting)
-- Story 3.5 (Status management) adds field used by Story 3.7 (Existence check)
+- Story 3.5 (Status management) adds field used by Story 3.7 and 3.8 (Existence checks)
+- Story 3.7 (Existence check) adds endpoint/fields used by Story 3.8 (AI operation verification)
 - Other stories are relatively independent
 
 **Future Enhancements Deferred:**

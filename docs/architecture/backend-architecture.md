@@ -40,3 +40,11 @@ The backend follows a **dual-purpose Node.js architecture** optimized for local 
 - **Rapid Iteration**: Prompt tuning without code changes or recompilation
 - **Consistent Structure**: All prompts follow standard template (Agent Role, Task, Input Schema, Instructions, Output Format, Examples)
 
+## Translation Workflow
+
+- **Dictionary-First Translation**: Pre-mapped Polish→English features in `packages/ai/src/dictionaries/feature-dictionary.json` (189+ mappings)
+- **DictionaryLoader Utility**: `packages/ai/src/utils/DictionaryLoader.ts` provides translation and auto-learning methods
+- **Cost Optimization**: Reduces AI API calls by ~80% for common features
+- **Configuration**: `search-config.json` stores required features for filtering
+- **Feature Extraction**: Description-only features verified against dictionary and added to structured feature list (with AI validation for broken/non-working mentions)
+

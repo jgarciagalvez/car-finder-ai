@@ -532,12 +532,13 @@
 
 **Acceptance Criteria:**
 1. **Enhanced Feature Filtering with Description Search:**
-   - `hasRequiredFeatures()` function searches both `sourceEquipment` AND `sourceDescriptionHtml` for required feature keywords
-   - Polish A/C keywords searched in description: "klimatyzacja", "klimatyzacji", "klima", "AC", "A/C" (case-insensitive)
+   - `hasRequiredFeatures()` function searches both `sourceEquipment` AND `sourceDescriptionHtml` for required features
+   - Uses `requiredFeatures` array from `search-config.json` (10 klimatyzacja variations, no hardcoded keywords)
+   - Searches description HTML for ANY of the Polish terms in `requiredFeatures` (case-insensitive)
    - Vehicle passes filter if required feature found in EITHER sourceEquipment OR description
-   - Vehicles with A/C in features list continue to pass (existing behavior preserved)
-   - Vehicles with A/C only in description now pass filter (new behavior)
-   - Vehicles with no A/C in either source fail filter (existing behavior preserved)
+   - Vehicles with required features in equipment list continue to pass (existing behavior preserved)
+   - Vehicles with required features only in description now pass filter (new behavior)
+   - Implementation uses existing configuration infrastructure (search-config.json), not hardcoded Polish keywords
 
 2. **Concurrent Translation Processing:**
    - Add `concurrency` parameter to `TranslationOptions` interface (default: 3)
@@ -565,10 +566,13 @@
 
 **Technical Notes:**
 - Files to modify: `apps/api/src/scripts/translate.ts` (main changes in hasRequiredFeatures, run method, parseArgs)
+- Configuration: `search-config.json` now includes all 10 klimatyzacja variations from feature-dictionary.json
+- Uses existing dictionary infrastructure from Story 2.3 (feature-dictionary.json with 189 Polish→English translations)
 - Reference implementation: `apps/api/src/scripts/analyze.ts:337-394` for concurrent processing pattern
 - Use p-limit library (already installed and used by analyze.ts)
 - Rate limiting: 15 RPM Gemini API limit - concurrency=3 with 4-second batch delay = safe
 - No database schema changes required
+- No hardcoded Polish keywords - uses search-config.json configuration
 - Test file: `apps/api/src/scripts/__tests__/translate.test.ts` (create if doesn't exist)
 
 **Dependencies:**

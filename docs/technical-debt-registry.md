@@ -30,17 +30,15 @@ This registry tracks all technical debt, deferred improvements, and post-MVP enh
   - **User Impact**: Missing potentially good car matches
 - **Verified Status**: ✅ CONFIRMED - translate.ts:152-183 only checks sourceEquipment, not description
 - **Root Cause**: Pre-translation filter (translate.ts:356-378) runs BEFORE description is translated, so we can't check translated description. Filter only checks Polish feature list.
-- **Proposed Approach**:
-  - **Option A** (Recommended): Enhance `hasRequiredFeatures()` to also search `sourceDescriptionHtml` for Polish A/C keywords
-    - Search for: "klimatyzacja", "klimatyzacji", "klima", "AC", "A/C", etc.
-    - Case-insensitive search in Polish description HTML
-    - Pass filter if EITHER sourceEquipment OR description mentions A/C
-  - **Option B**: Remove pre-translation filter, translate all vehicles, filter after translation
-    - More expensive (uses AI credits for all vehicles)
-    - More accurate (can check translated description)
-  - **Option C**: Two-phase translation (light check, then full translation)
-    - Complex, not worth the effort
-- **Recommended Solution**: Option A - keyword search in Polish description
+- **Approved Approach** (Configuration-Based):
+  - Enhance `hasRequiredFeatures()` to search BOTH `sourceEquipment` AND `sourceDescriptionHtml` for required features
+  - Uses `requiredFeatures` array from `search-config.json` (10 klimatyzacja variations from feature-dictionary.json)
+  - Case-insensitive search for ANY of the Polish terms in `requiredFeatures`
+  - NO hardcoded keywords - configuration-driven approach
+  - Pass filter if EITHER sourceEquipment OR description mentions required feature
+  - Leverages existing dictionary infrastructure from Story 2.3
+  - Configuration file updated to include all 10 klimatyzacja variations from dictionary
+- **Why Not Hardcode**: Project uses dictionary-first translation approach (Story 2.3) with DictionaryLoader utility and feature-dictionary.json (189+ mappings). Configuration-based approach is consistent with existing architecture.
 - **Proposed Story**: 3.10 (bundled with TD-019 as "Translation Quality & Performance Improvements")
 - **Status**: Active
 - **Files Affected**:

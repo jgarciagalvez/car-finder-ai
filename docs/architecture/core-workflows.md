@@ -55,23 +55,33 @@ The translation pipeline processes vehicles with NULL description/features field
 sequenceDiagram
     participant Script as translate.ts
     participant Config as search-config.json
+    participant Dict as DictionaryLoader
     participant Repo as VehicleRepository
     participant AI as AIService<br/>(packages/ai)
     participant Gemini as Gemini API (Flash-Lite)
     participant DB as SQLite Database
 
     Script->>Config: Load translationModel & requiredFeatures
+    Script->>Dict: loadFeatureDictionary()
+    Dict-->>Script: Feature dictionary (189+ mappings)
     Script->>Repo: findVehiclesNeedingTranslation()
     Repo-->>Script: Vehicles with NULL description/features
 
     loop For each vehicle
         Script->>Script: Parse sourceEquipment (Polish JSON)
-        Script->>Script: hasRequiredFeatures() check
+        Script->>Script: hasRequiredFeatures() check<br/>(searches sourceEquipment & sourceDescriptionHtml)
 
         alt Has required features OR --force flag
-            Script->>AI: translateVehicleContent(vehicle)
-            AI->>Gemini: Translation prompt (Polish → English)
-            Gemini-->>AI: Translated description + features
+            Script->>Dict: translateFeatures(polishFeatures)
+            Dict-->>Script: {translated, unmapped} features
+
+            alt Has unmapped features
+                Script->>AI: translateVehicleContent(vehicle, unmapped)
+                AI->>Gemini: Translation prompt (Polish → English)
+                Gemini-->>AI: Translated description + unmapped features
+                Script->>Dict: addTranslations(newMappings) - Auto-learn
+            end
+
             Script->>Repo: updateVehicle(description, features)
             Repo->>DB: UPDATE vehicle
         else Missing ALL required features
@@ -84,8 +94,11 @@ sequenceDiagram
 ```
 
 **Key Points:**
+- **Dictionary-First Translation**: Common features translated via `DictionaryLoader` (189+ mappings), reducing AI calls by ~80%
+- **Auto-Learning**: Unmapped features translated by AI are automatically added back to dictionary
 - Feature filtering happens BEFORE translation (saves API costs)
-- Uses `sourceEquipment` (Polish) for matching, not translated `features`
+- `hasRequiredFeatures()` searches BOTH `sourceEquipment` AND `sourceDescriptionHtml` for required features (config-driven, no hardcoded keywords)
+- Uses `requiredFeatures` from `search-config.json` for filtering (Polish terms from dictionary)
 - Filtered vehicles marked as `'not_interested'` status
 - Uses faster model (gemini-2.5-flash-lite) vs analysis model
 - Respects 15 RPM rate limit (4s delay)

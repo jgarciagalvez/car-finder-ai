@@ -1,8 +1,8 @@
 # Technical Debt Registry
 
 **Last Updated:** 2025-11-18 (Verified against actual codebase)
-**Total Active Items:** 11
-**Total Estimated Effort:** 20-34 hours
+**Total Active Items:** 13
+**Total Estimated Effort:** 26-43 hours
 
 ---
 
@@ -15,6 +15,42 @@ This registry tracks all technical debt, deferred improvements, and post-MVP enh
 ---
 
 ## Active Debt (Prioritized Backlog)
+
+### 🔴 HIGH Priority
+
+#### TD-022: Enhanced Feature Filtering with Description Search
+- **Origin**: User observation (2025-11-18) - Vehicles filtered out incorrectly when A/C mentioned in description only
+- **Category**: Data Quality / Feature Filtering Logic
+- **Impact**: HIGH - Missing potentially good vehicles, impacts user satisfaction
+- **Effort**: 3-5 hours
+- **Description**: Vehicles are being filtered as `not_interested` before translation when they lack required features in `sourceEquipment`, but some vehicles mention A/C in their description instead of listing it as a feature
+  - **Current Behavior**: `hasRequiredFeatures()` only checks `sourceEquipment` (Polish feature list)
+  - **Problem**: Some sellers mention "klimatyzacja" (A/C) in description HTML but don't list it as a feature
+  - **Impact**: These vehicles get marked as `not_interested` and never get translated/analyzed
+  - **User Impact**: Missing potentially good car matches
+- **Verified Status**: ✅ CONFIRMED - translate.ts:152-183 only checks sourceEquipment, not description
+- **Root Cause**: Pre-translation filter (translate.ts:356-378) runs BEFORE description is translated, so we can't check translated description. Filter only checks Polish feature list.
+- **Proposed Approach**:
+  - **Option A** (Recommended): Enhance `hasRequiredFeatures()` to also search `sourceDescriptionHtml` for Polish A/C keywords
+    - Search for: "klimatyzacja", "klimatyzacji", "klima", "AC", "A/C", etc.
+    - Case-insensitive search in Polish description HTML
+    - Pass filter if EITHER sourceEquipment OR description mentions A/C
+  - **Option B**: Remove pre-translation filter, translate all vehicles, filter after translation
+    - More expensive (uses AI credits for all vehicles)
+    - More accurate (can check translated description)
+  - **Option C**: Two-phase translation (light check, then full translation)
+    - Complex, not worth the effort
+- **Recommended Solution**: Option A - keyword search in Polish description
+- **Proposed Story**: 3.10 (bundled with TD-019 as "Translation Quality & Performance Improvements")
+- **Status**: Active
+- **Files Affected**:
+  - `apps/api/src/scripts/translate.ts:152-183` (hasRequiredFeatures function)
+  - `apps/api/src/scripts/__tests__/translate.test.ts` (add tests for description search)
+- **Test Cases Needed**:
+  - Vehicle with A/C in features list (existing, should pass)
+  - Vehicle with A/C in description only (new, should pass)
+  - Vehicle with A/C in both (should pass)
+  - Vehicle with no A/C anywhere (should fail)
 
 ### 🟡 MEDIUM Priority
 
@@ -39,7 +75,7 @@ This registry tracks all technical debt, deferred improvements, and post-MVP enh
   - Create EXISTENCE_CHECK_CACHE_HOURS constant (15 minutes)
   - Add fail-open strategy code comments (30 minutes)
   - Update all 4 file references (1-2 hours)
-- **Proposed Story**: 3.10
+- **Proposed Story**: 3.11
 - **Status**: Active
 - **Gate Ref**: `docs/qa/gates/3.8-existence-verification-ai-ops.yml`
 - **Files Affected**:
@@ -118,7 +154,7 @@ This registry tracks all technical debt, deferred improvements, and post-MVP enh
   - Different from `shouldCheckExistence` - this one makes actual API calls
   - Can be extracted to shared scripts utility module
 - **Verified Status**: ✅ CONFIRMED - Function duplicated in both scripts
-- **Proposed Story**: 3.10 (bundled with TD-002)
+- **Proposed Story**: 3.11 (bundled with TD-002)
 - **Status**: Active
 - **Gate Ref**: `docs/qa/gates/3.8-existence-verification-ai-ops.yml`
 - **Files Affected**:
@@ -230,6 +266,32 @@ This registry tracks all technical debt, deferred improvements, and post-MVP enh
 - **Files Affected**:
   - `apps/web/src/components/VehicleCard.tsx` (lines 124, 162, 200)
   - `apps/web/src/components/VehicleDetail.tsx` (lines 167, 189, 268)
+
+#### TD-019: Implement Concurrent/Batch Translation Processing
+- **Origin**: User request (2025-11-18) - Identified during pnpm translate performance observation
+- **Category**: Performance / Code Consistency
+- **Impact**: MEDIUM - Translation currently processes one-by-one, much slower than analyze
+- **Effort**: 3-4 hours
+- **Description**: Implement concurrent processing for translation script to match analyze script performance
+  - **Current Behavior**: translate.ts uses sequential for loop (one vehicle at a time)
+  - **Desired Behavior**: Concurrent processing with p-limit like analyze.ts (3 vehicles at a time)
+  - Analyze script has --concurrency flag and batch processing with Promise.all
+  - Translation takes 4 seconds per vehicle sequentially (very slow for large batches)
+  - With concurrency=3, could process 3x faster while respecting 15 RPM rate limit
+- **Verified Status**: ✅ CONFIRMED - translate.ts:267-313 uses simple for loop, no concurrency
+- **Proposed Approach**:
+  - Add `concurrency` parameter to TranslationOptions (default: 3)
+  - Add `--concurrency` flag to CLI arguments
+  - Use p-limit for concurrent processing (same pattern as analyze.ts:337-394)
+  - Add batch processing with Promise.all
+  - Maintain 4-second delay between batches (not within batch)
+  - Update help text and examples
+- **Proposed Story**: 3.10 (bundled with TD-022 as "Translation Quality & Performance Improvements")
+- **Status**: Active
+- **Files Affected**:
+  - `apps/api/src/scripts/translate.ts:254-324` (run() method needs concurrent processing)
+  - `apps/api/src/scripts/translate.ts:32-36` (TranslationOptions interface needs concurrency field)
+  - `apps/api/src/scripts/translate.ts:464-486` (parseArgs needs --concurrency flag)
 
 ---
 
@@ -345,10 +407,10 @@ This registry tracks all technical debt, deferred improvements, and post-MVP enh
 
 | Priority | Count | Total Estimated Effort |
 |----------|-------|------------------------|
-| HIGH | 0 | 0 hours |
-| MEDIUM | 4 | 9-15 hours |
+| HIGH | 1 | 3-5 hours |
+| MEDIUM | 5 | 12-19 hours |
 | LOW | 7 | 11-19 hours |
-| **TOTAL ACTIVE** | **11** | **20-34 hours** |
+| **TOTAL ACTIVE** | **13** | **26-43 hours** |
 | Post-MVP Deferred | 2 | 6-9 hours |
 | Pre-existing | 1 | TBD |
 | **Resolved** | **6** | - |
@@ -357,22 +419,36 @@ This registry tracks all technical debt, deferred improvements, and post-MVP enh
 
 ## Category Breakdown
 
-| Category | Count | Medium Priority Items |
-|----------|-------|----------------------|
-| Code Duplication / Refactoring | 3 | TD-002 (shouldCheckExistence) |
-| Missing Tests | 2 | TD-004 (Frontend tests) |
-| UX Bugs / State Management | 1 | TD-017 (Button state management) |
-| Documentation | 2 | - |
-| Architectural Concerns | 1 | TD-006 (Nominatim scalability) |
-| Error Handling | 1 | - |
-| Performance | 2 | - |
-| **TOTAL** | **12** | **3** |
+| Category | Count | High Priority Items | Medium Priority Items |
+|----------|-------|---------------------|----------------------|
+| Data Quality / Feature Filtering | 1 | TD-022 (A/C description search) | - |
+| Code Duplication / Refactoring | 3 | - | TD-002 (shouldCheckExistence) |
+| Missing Tests | 2 | - | TD-004 (Frontend tests) |
+| UX Bugs / State Management | 1 | - | TD-017 (Button state management) |
+| Documentation | 2 | - | - |
+| Architectural Concerns | 1 | - | TD-006 (Nominatim scalability) |
+| Error Handling | 1 | - | - |
+| Performance / Code Consistency | 3 | - | TD-019 (Concurrent translation) |
+| **TOTAL** | **14** | **1** | **4** |
 
 ---
 
 ## Recommended Story Bundles
 
-### Story 3.10: Code Quality - Existence Check Utilities Refactoring
+### Story 3.10: Translation Quality & Performance Improvements
+**Estimated Total Effort:** 6-9 hours
+**Priority:** HIGH (includes high-priority data quality fix)
+**Items Bundled:**
+- TD-022: Enhanced feature filtering with description search (3-5 hours) - HIGH PRIORITY
+  - Fix vehicles being incorrectly filtered when A/C mentioned in description only
+  - Add Polish keyword search in sourceDescriptionHtml
+  - Critical for data quality and user satisfaction
+- TD-019: Implement concurrent/batch translation processing (3-4 hours) - MEDIUM PRIORITY
+  - Add concurrency parameter and --concurrency flag
+  - Implement p-limit batch processing like analyze script
+  - Improve translation throughput 3x
+
+### Story 3.11: Code Quality - Existence Check Utilities Refactoring
 **Estimated Total Effort:** 4-7 hours
 **Items Bundled:**
 - TD-002: Extract shouldCheckExistence to shared utility (3-5 hours) - CONSOLIDATED
@@ -435,3 +511,5 @@ All technical debt items have been verified against the actual codebase:
 | 2025-11-18 | Removed TD-003 (backfill script tests) - one-time migration script doesn't need tests | Sarah (PO) |
 | 2025-11-18 | Added TD-017 (Quick/Full Analysis button state management) - UX bug identified during Story 3.9 development | User + Sarah (PO) |
 | 2025-11-18 | Added TD-018 (Extract button confirmation pattern to reusable hook) - DRY improvement from Story 3.9 QA review | Quinn (QA) |
+| 2025-11-18 | Added TD-019 (Concurrent translation processing) and TD-022 (Enhanced feature filtering with description search) - User observations during translation testing. Created Story 3.11 bundle for translation improvements. | User + James (Dev) |
+| 2025-11-18 | Corrected story bundle assignments: Swapped Story 3.10 (now TD-022 + TD-019 Translation improvements - HIGH priority) with Story 3.11 (now TD-002 + TD-008 Code refactoring - MEDIUM priority). Story 3.10 should address HIGH priority data quality bug before Story 4.3. | Sarah (PO) |

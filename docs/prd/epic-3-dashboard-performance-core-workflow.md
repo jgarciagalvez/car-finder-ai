@@ -518,9 +518,77 @@
 
 ---
 
+### **Story 3.10: Translation Quality & Performance Improvements**
+
+**As a** user, **I want** vehicles with required features mentioned only in descriptions to be correctly included in translation processing, and for translation to run concurrently for faster processing, **so that** I don't miss good vehicle matches and can process translation batches efficiently.
+
+**Context:**
+- **Data Quality Issue (TD-022 - HIGH Priority)**: Vehicles are filtered as `not_interested` before translation when they lack required features in `sourceEquipment`, but some vehicles mention required features (like A/C) in `sourceDescriptionHtml` instead
+- **User Discovery**: "Sometimes the car lists the A/C in the description, but not really in the features"
+- **Impact**: Missing potentially good vehicles that have required features mentioned in Polish description
+- **Performance Issue (TD-019 - MEDIUM Priority)**: Translation processes vehicles sequentially (one at a time), much slower than analyze script (which uses concurrent processing)
+- **Current Performance**: 4 seconds per vehicle sequentially = very slow for large batches
+- **Desired Behavior**: Concurrent processing with p-limit (similar to analyze script) for 3x performance improvement
+
+**Acceptance Criteria:**
+1. **Enhanced Feature Filtering with Description Search:**
+   - `hasRequiredFeatures()` function searches both `sourceEquipment` AND `sourceDescriptionHtml` for required feature keywords
+   - Polish A/C keywords searched in description: "klimatyzacja", "klimatyzacji", "klima", "AC", "A/C" (case-insensitive)
+   - Vehicle passes filter if required feature found in EITHER sourceEquipment OR description
+   - Vehicles with A/C in features list continue to pass (existing behavior preserved)
+   - Vehicles with A/C only in description now pass filter (new behavior)
+   - Vehicles with no A/C in either source fail filter (existing behavior preserved)
+
+2. **Concurrent Translation Processing:**
+   - Add `concurrency` parameter to `TranslationOptions` interface (default: 3)
+   - Add `--concurrency` CLI flag to allow user control of concurrent processing
+   - Use p-limit library for concurrent processing (same pattern as analyze.ts)
+   - Process up to N vehicles concurrently (where N = concurrency parameter)
+   - Maintain 4-second delay between batches (not within batch) for 15 RPM rate limit compliance
+   - Concurrent processing uses Promise.all() for batch execution
+   - Progress tracking shows concurrent operations clearly
+
+3. **Error Handling & Backward Compatibility:**
+   - Failed vehicle translation doesn't block other concurrent operations
+   - Errors logged clearly with vehicle ID
+   - Script continues processing remaining vehicles on individual failures
+   - Comprehensive summary report at completion (success/failure/skipped counts)
+   - Script can still run with concurrency=1 for debugging (sequential mode)
+   - All existing functionality remains intact (--vehicle-id, --limit flags, etc.)
+   - No breaking changes to translation API or database schema
+
+4. **Testing Requirements:**
+   - Unit tests for enhanced `hasRequiredFeatures()` function covering all scenarios
+   - Unit tests for concurrent translation processing
+   - Integration test: concurrent translation respects rate limits
+   - Integration test: enhanced filtering correctly includes/excludes vehicles
+
+**Technical Notes:**
+- Files to modify: `apps/api/src/scripts/translate.ts` (main changes in hasRequiredFeatures, run method, parseArgs)
+- Reference implementation: `apps/api/src/scripts/analyze.ts:337-394` for concurrent processing pattern
+- Use p-limit library (already installed and used by analyze.ts)
+- Rate limiting: 15 RPM Gemini API limit - concurrency=3 with 4-second batch delay = safe
+- No database schema changes required
+- Test file: `apps/api/src/scripts/__tests__/translate.test.ts` (create if doesn't exist)
+
+**Dependencies:**
+- No blocking dependencies
+- Complements Story 4.3 (Features Management) - automated fix before manual UI
+- Uses same concurrent processing pattern as Story 4.1 (Parallel Analysis)
+
+**Testing Considerations:**
+- Test enhanced filtering with vehicles having A/C in description only
+- Test concurrent processing with various concurrency levels (1, 3, 5)
+- Verify rate limiting compliance (monitor API calls, should not exceed 15 RPM)
+- Test error isolation (one failed translation doesn't block others)
+- Performance comparison: sequential vs concurrent (expect ~3x improvement)
+- Test all existing CLI flags continue working (--vehicle-id, --limit, --force)
+
+---
+
 ## Epic Summary
 
-**Total Stories:** 9
+**Total Stories:** 10
 
 **Key Outcomes:**
 - Dashboard performance fixed (stable for 100+ vehicles)
@@ -531,6 +599,8 @@
 - Resource efficiency (existence verification before AI operations prevents wasted credits)
 - Improved UX (two-tier hiding for not_interested/deleted, inline placeholder feedback, dynamic page titles)
 - AI analysis transparency (visual indicators for analysis completeness, on-demand full report generation)
+- Translation quality improvements (enhanced feature filtering with description search)
+- Translation performance improvements (3x faster with concurrent processing)
 
 **Database Changes Required:**
 - New field: `distanceFromWroclaw: number | null`
@@ -545,6 +615,9 @@
 - Story 3.2 (Location) adds sortable field used by Story 3.3 (Sorting)
 - Story 3.5 (Status management) adds field used by Story 3.7 and 3.8 (Existence checks)
 - Story 3.7 (Existence check) adds endpoint/fields used by Story 3.8 (AI operation verification)
+- Story 3.10 (Translation improvements) should be completed before Story 4.3 (Features Management)
+  - Story 3.10 fixes automated feature detection (reduces volume of vehicles needing manual correction)
+  - Story 4.3 provides manual feature management UI (handles remaining edge cases)
 - Other stories are relatively independent
 
 **Future Enhancements Deferred:**

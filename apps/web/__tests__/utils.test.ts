@@ -51,6 +51,7 @@ describe('Sorting Functions', () => {
     scrapedAt: new Date(),
     createdAt: new Date(),
     updatedAt: new Date(),
+    hasTailgate: false,
     ...overrides
   });
 
@@ -254,6 +255,31 @@ describe('Sorting Functions', () => {
       expect(sorted[1].id).toBe('1');
       expect(sorted[2].id).toBe('3'); // Oldest
     });
+
+    it('should sort tailgate vehicles first before applying other sorts', () => {
+      // Story 4.5 AC4: Primary sort is hasTailgate, regardless of other criteria
+      const vehicles = [
+        createMockVehicle({ id: '1', hasTailgate: false, aiPriorityRating: 95, priceEur: 10000 }),
+        createMockVehicle({ id: '2', hasTailgate: true, aiPriorityRating: 70, priceEur: 20000 }),
+        createMockVehicle({ id: '3', hasTailgate: false, aiPriorityRating: 90, priceEur: 8000 }),
+        createMockVehicle({ id: '4', hasTailgate: true, aiPriorityRating: 80, priceEur: 15000 })
+      ];
+      const sorted = sortVehicles(vehicles, 'price_asc');
+
+      // All tailgate vehicles must appear before non-tailgate vehicles
+      expect(sorted[0].hasTailgate).toBe(true);
+      expect(sorted[1].hasTailgate).toBe(true);
+      expect(sorted[2].hasTailgate).toBe(false);
+      expect(sorted[3].hasTailgate).toBe(false);
+
+      // Within tailgate group: sorted by priority (secondary), then price (tertiary)
+      expect(sorted[0].id).toBe('4'); // tailgate: true, priority: 80, price: 15000
+      expect(sorted[1].id).toBe('2'); // tailgate: true, priority: 70, price: 20000
+
+      // Within non-tailgate group: sorted by priority (secondary), then price (tertiary)
+      expect(sorted[2].id).toBe('1'); // tailgate: false, priority: 95, price: 10000
+      expect(sorted[3].id).toBe('3'); // tailgate: false, priority: 90, price: 8000
+    });
   });
 
   describe('sortVehiclesCompound', () => {
@@ -291,7 +317,7 @@ describe('Sorting Functions', () => {
     });
 
     it('should apply two-level sort: price then priority', () => {
-      // Stack: ['priority', 'price_asc'] means price_asc is primary, priority is tiebreaker
+      // Story 4.5: 3-tier sorting always applies: tailgate first, priority second, user's sort third
       const vehicles = [
         createMockVehicle({ id: '1', priceEur: 10000, aiPriorityRating: 70 }),
         createMockVehicle({ id: '2', priceEur: 10000, aiPriorityRating: 90 }),
@@ -299,12 +325,13 @@ describe('Sorting Functions', () => {
         createMockVehicle({ id: '4', priceEur: 10000, aiPriorityRating: 80 })
       ];
       const sorted = sortVehiclesCompound(vehicles, ['priority', 'price_asc']);
-      // Primary sort: price_asc (10000, 10000, 10000, 15000)
-      // Tiebreaker: priority descending (90, 80, 70)
-      expect(sorted[0].id).toBe('2'); // 10000, priority 90
-      expect(sorted[1].id).toBe('4'); // 10000, priority 80
-      expect(sorted[2].id).toBe('1'); // 10000, priority 70
-      expect(sorted[3].id).toBe('3'); // 15000
+      // Primary: tailgate (all false, no effect)
+      // Secondary: priority descending (90, 85, 80, 70)
+      // Tertiary: price_asc (for tied priorities)
+      expect(sorted[0].id).toBe('2'); // priority 90, price 10000
+      expect(sorted[1].id).toBe('3'); // priority 85, price 15000
+      expect(sorted[2].id).toBe('4'); // priority 80, price 10000
+      expect(sorted[3].id).toBe('1'); // priority 70, price 10000
     });
 
     it('should apply three-level sort: mileage, price, year', () => {

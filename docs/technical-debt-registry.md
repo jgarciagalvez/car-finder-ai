@@ -1,8 +1,8 @@
 # Technical Debt Registry
 
-**Last Updated:** 2025-11-18 (Verified against actual codebase)
-**Total Active Items:** 13
-**Total Estimated Effort:** 26-43 hours
+**Last Updated:** 2025-01-19 (Verified against actual codebase)
+**Total Active Items:** 14
+**Total Estimated Effort:** 28-46 hours
 
 ---
 
@@ -50,6 +50,39 @@ This registry tracks all technical debt, deferred improvements, and post-MVP enh
   - Vehicle with A/C in both (should pass)
   - Vehicle with no A/C anywhere (should fail)
 
+#### TD-023: Market Value Analysis Infinite Loop Bug
+- **Origin**: User observation (2025-01-19) - Analysis pipeline stuck processing same vehicles repeatedly
+- **Category**: Critical Bug / Analysis Pipeline
+- **Impact**: HIGH - Blocks analysis pipeline progress, wastes compute resources
+- **Effort**: 2-3 hours
+- **Description**: Vehicles with insufficient market comparables (<3) get stuck in infinite analysis loop
+  - **Current Behavior**: When `MarketValueService.calculateMarketValue()` returns `null` (insufficient comparables), nothing is added to the `analysis` object
+  - **Problem**: Line 699 in analyze.ts checks `if (Object.keys(analysis).length > 0)` before marking completed - empty object prevents completion tracking
+  - **Impact**: Vehicle stays with `marketValueScore = null` in database, gets re-selected for analysis on every run
+  - **User Impact**: Pipeline never completes, same vehicles processed repeatedly, no progress on new vehicles
+  - **Example**: Ford Transit with 1/3 comparables shows "✅ complete" in logs but "✅ Completed: 0" in summary
+- **Verified Status**: ✅ CONFIRMED - analyze.ts:632-636 and 699 confirmed, vehicles with insufficient comparables loop infinitely
+- **Root Cause**: "Insufficient data" treated as incomplete analysis instead of valid result with no data
+- **Approved Approach**:
+  - Store sentinel value `"insufficient_data"` instead of `null` when market value calculation returns null
+  - Distinguishes three states: `null` (not analyzed), `"insufficient_data"` (analyzed but no data), percentage string (valid result)
+  - Frontend displays "No Data" for sentinel value, "N/A" for null
+  - No database migration needed (already supports `string | null`)
+- **Proposed Story**: 3.11 (Market Value Analysis Infinite Loop Bug Fix)
+- **Status**: Draft - Story created, ready for implementation
+- **Files Affected**:
+  - `apps/api/src/scripts/analyze.ts:635-636` (assign sentinel value when null)
+  - `apps/api/src/scripts/analyze.ts:699` (completion tracking logic verified correct)
+  - `packages/db/src/repositories/vehicleRepository.ts:245-270` (query logic verified correct)
+  - `apps/web/src/components/VehicleCard.tsx` (or similar - add "No Data" display)
+  - `apps/api/src/scripts/__tests__/analyze.test.ts` (add test for sentinel value)
+- **Test Cases Needed**:
+  - Unit test: Vehicle with <3 comparables gets `"insufficient_data"` value
+  - Unit test: `analysis` object is not empty when sentinel assigned
+  - Integration test: Re-running analysis skips vehicles with sentinel value
+  - UI test: `"insufficient_data"` renders as "No Data" with tooltip
+  - Manual test: Verify completion counter increments correctly
+
 ### 🟡 MEDIUM Priority
 
 #### TD-002: Extract shouldCheckExistence to Shared Utility (CONSOLIDATED)
@@ -73,7 +106,7 @@ This registry tracks all technical debt, deferred improvements, and post-MVP enh
   - Create EXISTENCE_CHECK_CACHE_HOURS constant (15 minutes)
   - Add fail-open strategy code comments (30 minutes)
   - Update all 4 file references (1-2 hours)
-- **Proposed Story**: 3.11
+- **Proposed Story**: 3.12 (bumped from 3.11 due to TD-023 bug priority)
 - **Status**: Active
 - **Gate Ref**: `docs/qa/gates/3.8-existence-verification-ai-ops.yml`
 - **Files Affected**:
@@ -152,7 +185,7 @@ This registry tracks all technical debt, deferred improvements, and post-MVP enh
   - Different from `shouldCheckExistence` - this one makes actual API calls
   - Can be extracted to shared scripts utility module
 - **Verified Status**: ✅ CONFIRMED - Function duplicated in both scripts
-- **Proposed Story**: 3.11 (bundled with TD-002)
+- **Proposed Story**: 3.12 (bundled with TD-002, bumped from 3.11 due to TD-023 bug priority)
 - **Status**: Active
 - **Gate Ref**: `docs/qa/gates/3.8-existence-verification-ai-ops.yml`
 - **Files Affected**:
@@ -405,10 +438,10 @@ This registry tracks all technical debt, deferred improvements, and post-MVP enh
 
 | Priority | Count | Total Estimated Effort |
 |----------|-------|------------------------|
-| HIGH | 1 | 3-5 hours |
+| HIGH | 2 | 5-8 hours |
 | MEDIUM | 5 | 12-19 hours |
 | LOW | 7 | 11-19 hours |
-| **TOTAL ACTIVE** | **13** | **26-43 hours** |
+| **TOTAL ACTIVE** | **14** | **28-46 hours** |
 | Post-MVP Deferred | 2 | 6-9 hours |
 | Pre-existing | 1 | TBD |
 | **Resolved** | **6** | - |
@@ -419,6 +452,7 @@ This registry tracks all technical debt, deferred improvements, and post-MVP enh
 
 | Category | Count | High Priority Items | Medium Priority Items |
 |----------|-------|---------------------|----------------------|
+| Critical Bugs / Analysis Pipeline | 1 | TD-023 (Market value infinite loop) | - |
 | Data Quality / Feature Filtering | 1 | TD-022 (A/C description search) | - |
 | Code Duplication / Refactoring | 3 | - | TD-002 (shouldCheckExistence) |
 | Missing Tests | 2 | - | TD-004 (Frontend tests) |
@@ -427,7 +461,7 @@ This registry tracks all technical debt, deferred improvements, and post-MVP enh
 | Architectural Concerns | 1 | - | TD-006 (Nominatim scalability) |
 | Error Handling | 1 | - | - |
 | Performance / Code Consistency | 3 | - | TD-019 (Concurrent translation) |
-| **TOTAL** | **14** | **1** | **4** |
+| **TOTAL** | **15** | **2** | **4** |
 
 ---
 
@@ -446,7 +480,17 @@ This registry tracks all technical debt, deferred improvements, and post-MVP enh
   - Implement p-limit batch processing like analyze script
   - Improve translation throughput 3x
 
-### Story 3.11: Code Quality - Existence Check Utilities Refactoring
+### Story 3.11: Market Value Analysis Infinite Loop Bug Fix
+**Estimated Total Effort:** 2-3 hours
+**Priority:** HIGH (critical bug blocking analysis pipeline)
+**Items Bundled:**
+- TD-023: Market Value Analysis Infinite Loop Bug (2-3 hours) - HIGH PRIORITY
+  - Fix vehicles with insufficient market comparables getting stuck in infinite loop
+  - Store sentinel value "insufficient_data" instead of null
+  - Update frontend to display "No Data" for sentinel value
+  - Critical for analysis pipeline progress
+
+### Story 3.12: Code Quality - Existence Check Utilities Refactoring
 **Estimated Total Effort:** 4-7 hours
 **Items Bundled:**
 - TD-002: Extract shouldCheckExistence to shared utility (3-5 hours) - CONSOLIDATED
@@ -510,4 +554,5 @@ All technical debt items have been verified against the actual codebase:
 | 2025-11-18 | Added TD-017 (Quick/Full Analysis button state management) - UX bug identified during Story 3.9 development | User + Sarah (PO) |
 | 2025-11-18 | Added TD-018 (Extract button confirmation pattern to reusable hook) - DRY improvement from Story 3.9 QA review | Quinn (QA) |
 | 2025-11-18 | Added TD-019 (Concurrent translation processing) and TD-022 (Enhanced feature filtering with description search) - User observations during translation testing. Created Story 3.11 bundle for translation improvements. | User + James (Dev) |
-| 2025-11-18 | Corrected story bundle assignments: Swapped Story 3.10 (now TD-022 + TD-019 Translation improvements - HIGH priority) with Story 3.11 (now TD-002 + TD-008 Code refactoring - MEDIUM priority). Story 3.10 should address HIGH priority data quality bug before Story 4.3. | Sarah (PO) |
+| 2025-11-18 | Corrected story bundle assignments: Swapped Story 3.10 (now TD-022 + TD-019 Translation improvements - HIGH priority) with original Story 3.11 (now TD-002 + TD-008 Code refactoring - MEDIUM priority, moved to Story 3.12). Story 3.10 should address HIGH priority data quality bug. | Sarah (PO) |
+| 2025-01-19 | Added TD-023 (Market Value Analysis Infinite Loop Bug) - HIGH priority critical bug discovered during Stories 4.1/4.2 testing. Vehicles with insufficient market comparables get stuck in infinite analysis loop. Created Story 3.11 for bug fix (bumped code refactoring to Story 3.12). Updated totals: 14 active items, 28-46 hours effort. | Bob (SM) + User |

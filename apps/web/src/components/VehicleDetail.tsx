@@ -51,6 +51,13 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
   const [isSaving, setIsSaving] = useState(false);
   const [localVehicle, setLocalVehicle] = useState(vehicle);
 
+  // Modal state for lightbox
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalPhotoIndex, setModalPhotoIndex] = useState(0);
+
+  // Thumbnail navigation state
+  const [thumbnailStartIndex, setThumbnailStartIndex] = useState(0);
+
   // Virtual Mechanic Summary state
   const [virtualMechanicSummary, setVirtualMechanicSummary] = useState(vehicle.virtualMechanicSummary || '');
   const [isEditingSummary, setIsEditingSummary] = useState(false);
@@ -84,6 +91,39 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
 
   const handleNextPhoto = () => {
     setCurrentPhotoIndex((prev) => (prev === photos.length - 1 ? 0 : prev + 1));
+  };
+
+  // Modal handlers
+  const handleOpenModal = (index: number) => {
+    setModalPhotoIndex(index);
+    setIsModalOpen(true);
+  };
+
+  // Thumbnail click handler
+  const handleThumbnailClick = (index: number) => {
+    setCurrentPhotoIndex(index);
+  };
+
+  // Thumbnail navigation handlers (circular)
+  const handleThumbnailPrevious = () => {
+    setThumbnailStartIndex((prev) => {
+      if (prev === 0) {
+        // Wrap to end
+        return Math.max(0, photos.length - 10);
+      }
+      return Math.max(prev - 2, 0);
+    });
+  };
+
+  const handleThumbnailNext = () => {
+    setThumbnailStartIndex((prev) => {
+      const maxIndex = Math.max(0, photos.length - 10);
+      if (prev >= maxIndex) {
+        // Wrap to start
+        return 0;
+      }
+      return Math.min(prev + 2, maxIndex);
+    });
   };
 
   const handleStatusChange = async (newStatus: string) => {
@@ -372,7 +412,9 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
               <img
                 src={photos[currentPhotoIndex]}
                 alt={`${vehicle.title} - Photo ${currentPhotoIndex + 1}`}
-                className="w-full h-96 aspect-square object-cover"
+                className="w-full h-96 aspect-square object-cover cursor-pointer"
+                onClick={() => handleOpenModal(currentPhotoIndex)}
+                title="Click to view full size"
               />
               {photos.length > 1 && (
                 <>
@@ -402,6 +444,58 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
             </div>
           )}
         </div>
+
+        {/* Thumbnail Strip - Below Carousel */}
+        {photos.length > 1 && (
+          <div className="p-4 bg-gray-50 border-t border-gray-200">
+            <div className="flex items-center justify-center gap-2">
+              {/* Left Arrow - Always visible */}
+              <button
+                onClick={handleThumbnailPrevious}
+                className="flex-shrink-0 p-2 bg-gray-200 hover:bg-gray-300 rounded-full transition-colors"
+                aria-label="Previous thumbnails"
+              >
+                <ChevronLeftIcon className="w-4 h-4" />
+              </button>
+
+              {/* Thumbnails */}
+              <div className="flex gap-2">
+                {photos.slice(thumbnailStartIndex, thumbnailStartIndex + 10).map((photo, index) => {
+                  const photoIndex = thumbnailStartIndex + index;
+                  const isActive = photoIndex === currentPhotoIndex;
+
+                  return (
+                    <button
+                      key={photoIndex}
+                      onClick={() => handleThumbnailClick(photoIndex)}
+                      className={`w-16 h-16 rounded overflow-hidden transition-all ${
+                        isActive
+                          ? 'opacity-100 ring-2 ring-blue-500 scale-105'
+                          : 'opacity-40 hover:opacity-70'
+                      }`}
+                      aria-label={`View photo ${photoIndex + 1}`}
+                    >
+                      <img
+                        src={photo}
+                        alt={`Thumbnail ${photoIndex + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Right Arrow - Always visible */}
+              <button
+                onClick={handleThumbnailNext}
+                className="flex-shrink-0 p-2 bg-gray-200 hover:bg-gray-300 rounded-full transition-colors"
+                aria-label="Next thumbnails"
+              >
+                <ChevronRightIcon className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Title and Price Overlay */}
         <div className="p-6">
@@ -1103,6 +1197,120 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
       </aside>
       </div>
       {/* End Desktop Two-Column Layout */}
+
+      {/* Custom Modal - Image + Thumbnails */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex flex-col">
+          {/* Close Button */}
+          <button
+            onClick={() => setIsModalOpen(false)}
+            className="absolute top-4 right-4 z-10 p-2 bg-gray-800 hover:bg-gray-700 rounded-full transition-colors"
+            aria-label="Close"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+              className="w-6 h-6 text-white"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          {/* Image Container - Takes remaining space above thumbnails */}
+          <div className="flex-1 flex items-center justify-center p-4 relative overflow-hidden">
+            {/* Navigation Arrows */}
+            {photos.length > 1 && (
+              <>
+                <button
+                  onClick={() => setModalPhotoIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1))}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors z-10"
+                  aria-label="Previous photo"
+                >
+                  <ChevronLeftIcon className="w-8 h-8" />
+                </button>
+                <button
+                  onClick={() => setModalPhotoIndex((prev) => (prev === photos.length - 1 ? 0 : prev + 1))}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors z-10"
+                  aria-label="Next photo"
+                >
+                  <ChevronRightIcon className="w-8 h-8" />
+                </button>
+              </>
+            )}
+
+            {/* Main Image */}
+            <img
+              src={photos[modalPhotoIndex]}
+              alt={`Photo ${modalPhotoIndex + 1}`}
+              className="max-w-[95%] max-h-[90%] object-contain"
+            />
+
+            {/* Photo Counter */}
+            {photos.length > 1 && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/50 text-white px-4 py-2 rounded-full text-sm">
+                {modalPhotoIndex + 1} / {photos.length}
+              </div>
+            )}
+          </div>
+
+          {/* Thumbnail Strip - Below Image */}
+          {photos.length > 1 && (
+            <div className="w-full bg-black/95 border-t border-gray-700">
+              <div className="flex items-center justify-center gap-2 p-4">
+                {/* Left Arrow */}
+                <button
+                  onClick={handleThumbnailPrevious}
+                  className="flex-shrink-0 p-2 bg-gray-700 hover:bg-gray-600 rounded-full transition-colors"
+                  aria-label="Previous thumbnails"
+                >
+                  <ChevronLeftIcon className="w-4 h-4 text-white" />
+                </button>
+
+                {/* Thumbnails */}
+                <div className="flex gap-2">
+                  {photos
+                    .slice(thumbnailStartIndex, thumbnailStartIndex + 10)
+                    .map((photo, index) => {
+                      const photoIndex = thumbnailStartIndex + index;
+                      const isActive = photoIndex === modalPhotoIndex;
+
+                      return (
+                        <button
+                          key={photoIndex}
+                          onClick={() => setModalPhotoIndex(photoIndex)}
+                          className={`w-16 h-16 rounded overflow-hidden transition-all ${
+                            isActive
+                              ? 'opacity-100 ring-2 ring-blue-500 scale-105'
+                              : 'opacity-40 hover:opacity-70'
+                          }`}
+                          aria-label={`View photo ${photoIndex + 1}`}
+                        >
+                          <img
+                            src={photo}
+                            alt={`Thumbnail ${photoIndex + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </button>
+                      );
+                    })}
+                </div>
+
+                {/* Right Arrow */}
+                <button
+                  onClick={handleThumbnailNext}
+                  className="flex-shrink-0 p-2 bg-gray-700 hover:bg-gray-600 rounded-full transition-colors"
+                  aria-label="Next thumbnails"
+                >
+                  <ChevronRightIcon className="w-4 h-4 text-white" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

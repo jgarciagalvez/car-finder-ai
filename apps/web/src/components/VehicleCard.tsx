@@ -286,7 +286,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
   };
 
   // Show action buttons for not_interested status or incomplete AI data
-  const showActions =
+  const _showActions =
     localVehicle.status === 'not_interested' ||
     !localVehicle.description ||
     !localVehicle.aiPriorityRating;

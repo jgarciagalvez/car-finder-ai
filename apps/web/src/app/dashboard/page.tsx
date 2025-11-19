@@ -17,7 +17,7 @@ const ChatBubbleLeftRightIcon = ({ className }: { className?: string }) => (
 export default function DashboardPage() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const { vehicles, allVehicles, refetch, sortBy, setSortBy, statusFilter, setStatusFilter, distanceFilter, setDistanceFilter, showNotInterested, setShowNotInterested, notInterestedCount, activePoolCount } = useVehicles();
+  const { vehicles, allVehicles: _allVehicles, refetch, sortBy, setSortBy, statusFilter, setStatusFilter, distanceFilter, setDistanceFilter, showNotInterested, setShowNotInterested, notInterestedCount, activePoolCount } = useVehicles();
 
   // Set page title
   useEffect(() => {

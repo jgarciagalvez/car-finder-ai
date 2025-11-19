@@ -15,6 +15,25 @@ jest.mock('react-markdown', () => {
   };
 });
 
+// Mock yet-another-react-lightbox
+jest.mock('yet-another-react-lightbox', () => {
+  return function MockLightbox({ open, close, index, slides }: any) {
+    if (!open) return null;
+    return (
+      <div data-testid="lightbox-modal">
+        <button onClick={close} data-testid="lightbox-close">Close</button>
+        <div data-testid="lightbox-image">{slides[index]?.src}</div>
+        <div data-testid="lightbox-counter">{index + 1} / {slides.length}</div>
+      </div>
+    );
+  };
+});
+
+jest.mock('yet-another-react-lightbox/plugins/thumbnails', () => ({
+  __esModule: true,
+  default: jest.fn(),
+}));
+
 describe('VehicleDetail Component', () => {
   const mockVehicle: Vehicle = {
     id: '123',
@@ -300,5 +319,51 @@ describe('VehicleDetail Component', () => {
 
     // Status should revert back to original
     expect(statusDropdown).toHaveValue('new');
+  });
+
+  // Modal Tests
+  describe('Image Modal and Gallery Navigation', () => {
+    it('should open modal when carousel image is clicked', () => {
+      render(<VehicleDetail vehicle={mockVehicle} />);
+
+      const carouselImage = screen.getByAltText(/BMW X5 2020 - Photo 1/);
+      fireEvent.click(carouselImage);
+
+      expect(screen.getByTestId('lightbox-modal')).toBeInTheDocument();
+    });
+
+    it('should close modal when close button is clicked', () => {
+      render(<VehicleDetail vehicle={mockVehicle} />);
+
+      const carouselImage = screen.getByAltText(/BMW X5 2020 - Photo 1/);
+      fireEvent.click(carouselImage);
+
+      const closeButton = screen.getByTestId('lightbox-close');
+      fireEvent.click(closeButton);
+
+      expect(screen.queryByTestId('lightbox-modal')).not.toBeInTheDocument();
+    });
+
+    it('should open modal at correct photo index', () => {
+      render(<VehicleDetail vehicle={mockVehicle} />);
+
+      // Navigate to second photo
+      const nextButton = screen.getByLabelText('Next photo');
+      fireEvent.click(nextButton);
+
+      // Click image to open modal
+      const carouselImage = screen.getByAltText(/BMW X5 2020 - Photo 2/);
+      fireEvent.click(carouselImage);
+
+      // Modal should show photo 2
+      expect(screen.getByTestId('lightbox-image')).toHaveTextContent('photo2.jpg');
+    });
+
+    it('should make carousel image clickable with cursor pointer', () => {
+      render(<VehicleDetail vehicle={mockVehicle} />);
+
+      const carouselImage = screen.getByAltText(/BMW X5 2020 - Photo 1/);
+      expect(carouselImage.className).toContain('cursor-pointer');
+    });
   });
 });

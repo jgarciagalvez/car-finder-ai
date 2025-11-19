@@ -50,7 +50,7 @@ describe('VehicleDetail Component', () => {
       memberSince: '2019',
     },
     photos: ['photo1.jpg', 'photo2.jpg', 'photo3.jpg'],
-    personalFitScore: 85,
+    personalFitScore: 8.5,
     marketValueScore: '-5%',
     aiPriorityRating: 8,
     aiPrioritySummary: 'Good value for money. Low mileage for the year.',
@@ -113,9 +113,9 @@ describe('VehicleDetail Component', () => {
   it('should render AI analysis scores when available', () => {
     render(<VehicleDetail vehicle={mockVehicle} />);
 
-    expect(screen.getByText('85/100')).toBeInTheDocument(); // personalFitScore
-    expect(screen.getByText('-5%')).toBeInTheDocument(); // marketValueScore
-    expect(screen.getByText('8/10')).toBeInTheDocument(); // aiPriorityRating
+    expect(screen.getAllByText('8.5/10').length).toBeGreaterThan(0); // personalFitScore (appears in sidebar and mobile)
+    expect(screen.getAllByText('-5%').length).toBeGreaterThan(0); // marketValueScore (appears in sidebar and mobile)
+    expect(screen.getAllByText('8/10').length).toBeGreaterThan(0); // aiPriorityRating (appears in sidebar and mobile)
   });
 
   it('should render AI priority summary', () => {
@@ -195,7 +195,7 @@ describe('VehicleDetail Component', () => {
   it('should render status dropdown', () => {
     render(<VehicleDetail vehicle={mockVehicle} />);
 
-    const statusDropdown = screen.getByRole('combobox', { name: /status/i });
+    const statusDropdown = screen.getByLabelText('Status');
     expect(statusDropdown).toBeInTheDocument();
     expect(statusDropdown).toHaveValue('new');
   });
@@ -206,7 +206,7 @@ describe('VehicleDetail Component', () => {
 
     render(<VehicleDetail vehicle={mockVehicle} />);
 
-    const statusDropdown = screen.getByRole('combobox', { name: /status/i });
+    const statusDropdown = screen.getByLabelText('Status');
     fireEvent.change(statusDropdown, { target: { value: 'to_contact' } });
 
     await waitFor(() => {
@@ -217,8 +217,8 @@ describe('VehicleDetail Component', () => {
   it('should render personal notes textarea', () => {
     render(<VehicleDetail vehicle={mockVehicle} />);
 
-    const notesTextarea = screen.getByRole('textbox', { name: /personal notes/i });
-    expect(notesTextarea).toBeInTheDocument();
+    const notesTextareas = screen.getAllByRole('textbox', { name: /personal notes/i });
+    expect(notesTextareas.length).toBeGreaterThan(0); // Both sidebar and mobile versions
   });
 
   it('should update personal notes on blur', async () => {
@@ -227,7 +227,8 @@ describe('VehicleDetail Component', () => {
 
     render(<VehicleDetail vehicle={mockVehicle} />);
 
-    const notesTextarea = screen.getByRole('textbox', { name: /personal notes/i });
+    const notesTextareas = screen.getAllByRole('textbox', { name: /personal notes/i });
+    const notesTextarea = notesTextareas[0]; // Use first one (sidebar desktop version)
     fireEvent.change(notesTextarea, { target: { value: 'Test notes' } });
     fireEvent.blur(notesTextarea);
 
@@ -252,12 +253,9 @@ describe('VehicleDetail Component', () => {
 
     // Should still render basic vehicle info
     expect(screen.getAllByText('BMW X5 2020').length).toBeGreaterThan(0);
-    // AI Analysis section header (h2) should not be rendered, but the label in workflow section will exist
-    const aiAnalysisHeaders = screen.getAllByText('AI Analysis');
-    // Should only find the label in My Workflow section, not the section header
-    expect(aiAnalysisHeaders).toHaveLength(1);
+    // AI Scores section should not be rendered when no scores exist
+    expect(screen.queryByText('AI Scores')).not.toBeInTheDocument();
     // Verify the scores are not rendered
-    expect(screen.queryByText(/\/100$/)).not.toBeInTheDocument();
     expect(screen.queryByText(/\/10$/)).not.toBeInTheDocument();
   });
 
@@ -280,7 +278,7 @@ describe('VehicleDetail Component', () => {
 
     render(<VehicleDetail vehicle={mockVehicle} onVehicleUpdate={onVehicleUpdate} />);
 
-    const statusDropdown = screen.getByRole('combobox', { name: /status/i });
+    const statusDropdown = screen.getByLabelText('Status');
     fireEvent.change(statusDropdown, { target: { value: 'contacted' } });
 
     await waitFor(() => {
@@ -293,7 +291,7 @@ describe('VehicleDetail Component', () => {
 
     render(<VehicleDetail vehicle={mockVehicle} />);
 
-    const statusDropdown = screen.getByRole('combobox', { name: /status/i });
+    const statusDropdown = screen.getByLabelText('Status');
     fireEvent.change(statusDropdown, { target: { value: 'contacted' } });
 
     await waitFor(() => {

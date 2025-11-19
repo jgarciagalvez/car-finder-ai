@@ -471,7 +471,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
               {/* Personal Fit Score */}
               <div className={`border rounded-lg p-4 text-center min-w-[80px] ${getScoreColor(localVehicle.personalFitScore)}`}>
                 <div className={`text-2xl font-bold ${getScoreTextColor(localVehicle.personalFitScore)}`}>
-                  {localVehicle.personalFitScore ?? 'N/A'}
+                  {localVehicle.personalFitScore !== null ? `${localVehicle.personalFitScore}/10` : 'N/A'}
                 </div>
                 <div className="text-xs font-medium">Personal Fit</div>
               </div>

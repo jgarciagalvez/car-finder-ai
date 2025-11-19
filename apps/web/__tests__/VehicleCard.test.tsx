@@ -100,9 +100,9 @@ const createMockVehicle = (overrides: Partial<Vehicle> = {}): Vehicle => ({
     memberSince: '2020-01'
   },
   photos: ['https://example.com/photo1.jpg', 'https://example.com/photo2.jpg'],
-  personalFitScore: 85,
+  personalFitScore: 8.5,
   marketValueScore: '-5%',
-  aiPriorityRating: 90,
+  aiPriorityRating: 9,
   aiPrioritySummary: 'Excellent condition with low mileage',
   aiMechanicReport: 'No major issues found',
   virtualMechanicSummary: null,
@@ -153,8 +153,8 @@ describe('VehicleCard', () => {
     it('should display all AI scores when present', () => {
       const vehicle = createMockVehicle();
       render(<VehicleCard vehicle={vehicle} />);
-      expect(screen.getByText('90')).toBeInTheDocument(); // aiPriorityRating
-      expect(screen.getByText('85')).toBeInTheDocument(); // personalFitScore
+      expect(screen.getByText('9')).toBeInTheDocument(); // aiPriorityRating (shows just number, no /10 suffix)
+      expect(screen.getByText('8.5/10')).toBeInTheDocument(); // personalFitScore (now shows /10 suffix)
       expect(screen.getByText('-5%')).toBeInTheDocument(); // marketValueScore
     });
 
@@ -474,39 +474,41 @@ describe('VehicleCard', () => {
 
   describe('Action Buttons', () => {
     it('should show action buttons for not_interested status', () => {
-      const vehicle = createMockVehicle({ status: 'not_interested' });
+      const vehicle = createMockVehicle({ status: 'not_interested', description: '' }); // Need missing description to show Translate button
       render(<VehicleCard vehicle={vehicle} />);
-      expect(screen.getByText('Force Translate')).toBeInTheDocument();
-      expect(screen.getByText('Force Analyze')).toBeInTheDocument();
+      expect(screen.getByText('Translate')).toBeInTheDocument();
+      expect(screen.getByText('Quick Analysis')).toBeInTheDocument();
     });
 
     it('should show action buttons when description is missing', () => {
       const vehicle = createMockVehicle({ description: '' });
       render(<VehicleCard vehicle={vehicle} />);
-      expect(screen.getByText('Force Translate')).toBeInTheDocument();
-      expect(screen.getByText('Force Analyze')).toBeInTheDocument();
+      expect(screen.getByText('Translate')).toBeInTheDocument();
+      expect(screen.getByText('Quick Analysis')).toBeInTheDocument();
     });
 
     it('should show action buttons when aiPriorityRating is null', () => {
-      const vehicle = createMockVehicle({ aiPriorityRating: null });
+      const vehicle = createMockVehicle({ aiPriorityRating: null, virtualMechanicSummary: null });
       render(<VehicleCard vehicle={vehicle} />);
-      expect(screen.getByText('Force Translate')).toBeInTheDocument();
-      expect(screen.getByText('Force Analyze')).toBeInTheDocument();
+      // Quick Analysis should show when virtualMechanicSummary is null
+      expect(screen.getByText('Quick Analysis')).toBeInTheDocument();
     });
 
     it('should not show action buttons for complete vehicles with good status', () => {
-      const vehicle = createMockVehicle();
+      const vehicle = createMockVehicle({ virtualMechanicSummary: 'Summary exists' });
       render(<VehicleCard vehicle={vehicle} />);
-      expect(screen.queryByText('Force Translate')).not.toBeInTheDocument();
-      expect(screen.queryByText('Force Analyze')).not.toBeInTheDocument();
+      // When description exists, Translate button is hidden
+      expect(screen.queryByText('Translate')).not.toBeInTheDocument();
+      // When virtualMechanicSummary exists, Quick Analysis is hidden
+      expect(screen.queryByText('Quick Analysis')).not.toBeInTheDocument();
     });
 
     it('should call forceTranslateVehicle on Force Translate button click', async () => {
-      const vehicle = createMockVehicle({ status: 'not_interested' });
+      const vehicle = createMockVehicle({ status: 'not_interested', description: '' });
       mockForceTranslateVehicle.mockResolvedValue(undefined);
       render(<VehicleCard vehicle={vehicle} />);
 
-      const translateButton = screen.getByText('Force Translate');
+      const translateButton = screen.getByText('Translate');
       fireEvent.click(translateButton);
 
       await waitFor(() => {
@@ -515,20 +517,20 @@ describe('VehicleCard', () => {
     });
 
     it('should call forceAnalyzeVehicle on Force Analyze button click', async () => {
-      const vehicle = createMockVehicle({ status: 'not_interested' });
+      const vehicle = createMockVehicle({ status: 'not_interested', virtualMechanicSummary: null });
       mockForceAnalyzeVehicle.mockResolvedValue(undefined);
       render(<VehicleCard vehicle={vehicle} />);
 
-      const analyzeButton = screen.getByText('Force Analyze');
+      const analyzeButton = screen.getByText('Quick Analysis');
       fireEvent.click(analyzeButton);
 
       await waitFor(() => {
-        expect(mockForceAnalyzeVehicle).toHaveBeenCalledWith('1');
+        expect(mockForceAnalyzeVehicle).toHaveBeenCalledWith('1', false); // includeFullReport=false for quick analysis
       });
     });
 
     it('should show loading state during translation', async () => {
-      const vehicle = createMockVehicle({ status: 'not_interested' });
+      const vehicle = createMockVehicle({ status: 'not_interested', description: '' });
 
       // Override mock to show translating state
       mockUseVehicles.useVehicles = jest.fn(() => ({
@@ -581,10 +583,10 @@ describe('VehicleCard', () => {
 
     it('should not call API if user cancels confirmation', async () => {
       global.confirm = jest.fn(() => false);
-      const vehicle = createMockVehicle({ status: 'not_interested' });
+      const vehicle = createMockVehicle({ status: 'not_interested', description: '' });
       render(<VehicleCard vehicle={vehicle} />);
 
-      const translateButton = screen.getByText('Force Translate');
+      const translateButton = screen.getByText('Translate');
       fireEvent.click(translateButton);
 
       await waitFor(() => {

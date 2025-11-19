@@ -324,7 +324,46 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
+      {/* Mobile Sticky Header - MVP solution */}
+      <div className="block lg:hidden sticky top-0 bg-white z-10 shadow-md p-4">
+        <div className="flex items-center gap-3">
+          {/* Status Dropdown */}
+          <select
+            aria-label="status-mobile"
+            value={status}
+            onChange={(e) => handleStatusChange(e.target.value)}
+            disabled={isSaving}
+            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+          >
+            <option value="new">New</option>
+            <option value="processed">Processed</option>
+            <option value="skipped">Skipped</option>
+            <option value="to_contact">To Contact</option>
+            <option value="contacted">Contacted</option>
+            <option value="to_visit">To Visit</option>
+            <option value="visited">Visited</option>
+            <option value="not_interested">Not Interested</option>
+            <option value="deleted">Deleted</option>
+          </select>
+          {/* Quick action buttons */}
+          {!localVehicle.description && (
+            <button
+              onClick={handleTranslate}
+              disabled={isTranslating}
+              className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-300 text-sm"
+              title="Translate"
+            >
+              {isTranslating ? '...' : 'Translate'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Desktop Two-Column Layout */}
+      <div className="flex flex-col lg:flex-row gap-6">
+      {/* Main Content (Left) */}
+      <div className="flex-1 space-y-6">
       {/* Hero Section - Photo Gallery */}
       <section className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="relative">
@@ -333,7 +372,7 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
               <img
                 src={photos[currentPhotoIndex]}
                 alt={`${vehicle.title} - Photo ${currentPhotoIndex + 1}`}
-                className="w-full h-96 object-cover"
+                className="w-full h-96 aspect-square object-cover"
               />
               {photos.length > 1 && (
                 <>
@@ -358,7 +397,7 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
               )}
             </>
           ) : (
-            <div className="w-full h-96 bg-gray-200 flex items-center justify-center">
+            <div className="w-full h-96 aspect-square bg-gray-200 flex items-center justify-center">
               <p className="text-gray-500">No photos available</p>
             </div>
           )}
@@ -399,28 +438,6 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
         <section className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">AI Analysis</h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            {vehicle.personalFitScore !== null && (
-              <div className="bg-blue-50 rounded-lg p-4">
-                <div className="text-sm text-gray-600 mb-1">Personal Fit Score</div>
-                <div className="text-3xl font-bold text-blue-600">{vehicle.personalFitScore}/100</div>
-              </div>
-            )}
-
-            {vehicle.marketValueScore !== null && (
-              <div className="bg-green-50 rounded-lg p-4">
-                <div className="text-sm text-gray-600 mb-1">Market Value</div>
-                <div className="text-3xl font-bold text-green-600">{vehicle.marketValueScore}</div>
-              </div>
-            )}
-
-            {vehicle.aiPriorityRating !== null && (
-              <div className="bg-purple-50 rounded-lg p-4">
-                <div className="text-sm text-gray-600 mb-1">Priority Rating</div>
-                <div className="text-3xl font-bold text-purple-600">{vehicle.aiPriorityRating}/10</div>
-              </div>
-            )}
-          </div>
 
           {vehicle.aiPrioritySummary && (
             <div className="mb-6">
@@ -691,144 +708,6 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
         </section>
       )}
 
-      {/* Workflow Section */}
-      <section className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">My Workflow</h2>
-
-        <div className="space-y-4">
-          <div>
-            <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">
-              Status
-            </label>
-            <select
-              id="status"
-              value={status}
-              onChange={(e) => handleStatusChange(e.target.value)}
-              disabled={isSaving}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-            >
-              <option value="new">New</option>
-              <option value="processed">Processed</option>
-              <option value="skipped">Skipped</option>
-              <option value="to_contact">To Contact</option>
-              <option value="contacted">Contacted</option>
-              <option value="to_visit">To Visit</option>
-              <option value="visited">Visited</option>
-              <option value="not_interested">Not Interested</option>
-              <option value="deleted">Deleted</option>
-            </select>
-          </div>
-
-          {/* Action Buttons - matching VehicleCard */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Actions
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {/* Translate - hide when translation exists */}
-              {!localVehicle.description && (
-                <button
-                  onClick={handleTranslate}
-                  disabled={isTranslating}
-                  className="flex-1 min-w-[140px] px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                  title="Translate vehicle description"
-                >
-                  {isTranslating ? (
-                    <>
-                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                      <span>Translating...</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-                      </svg>
-                      <span>Translate</span>
-                    </>
-                  )}
-                </button>
-              )}
-
-              {/* Quick Analysis - hide when summary exists */}
-              {!localVehicle.virtualMechanicSummary && (
-                <button
-                  onClick={handleQuickAnalysis}
-                  disabled={isAnalyzing || !localVehicle.description}
-                  className="flex-1 min-w-[140px] px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                  title="Generate AI summary analysis (concise key insights)"
-                >
-                  {isAnalyzing ? (
-                    <>
-                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                      <span>Analyzing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                      <span>Quick Analysis</span>
-                    </>
-                  )}
-                </button>
-              )}
-
-              {/* Full Analysis - hide when full report exists */}
-              {!localVehicle.aiMechanicReport && (
-                <button
-                  onClick={handleFullAnalysis}
-                  disabled={isAnalyzing || !localVehicle.description}
-                  className="flex-1 min-w-[140px] px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-orange-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                  title="Generate full detailed mechanic report (comprehensive analysis)"
-                >
-                  {isAnalyzing ? (
-                    <>
-                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                      <span>Analyzing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      <span>Full Analysis</span>
-                    </>
-                  )}
-                </button>
-              )}
-            </div>
-            {translateError && (
-              <p className="mt-2 text-sm text-red-600">{translateError}</p>
-            )}
-            {translateSuccess && (
-              <p className="mt-2 text-sm text-green-600">Translation completed successfully!</p>
-            )}
-            {analyzeError && (
-              <p className="mt-2 text-sm text-red-600">{analyzeError}</p>
-            )}
-            {analyzeSuccess && (
-              <p className="mt-2 text-sm text-green-600">Analysis completed successfully!</p>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-2">
-              Personal Notes
-            </label>
-            <textarea
-              id="notes"
-              value={personalNotes}
-              onChange={(e) => setPersonalNotes(e.target.value)}
-              onBlur={handleNotesBlur}
-              disabled={isSaving}
-              placeholder="Add your notes about this vehicle..."
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 resize-y"
-              rows={4}
-            />
-          </div>
-        </div>
-      </section>
-
       {/* Source Data Section */}
       <section className="bg-white rounded-lg shadow-md p-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-4">Source Data</h2>
@@ -900,6 +779,330 @@ export function VehicleDetail({ vehicle, onVehicleUpdate }: VehicleDetailProps) 
           </div>
         </div>
       </section>
+
+      {/* Mobile-Only: Scores and Workflow (visible below lg) */}
+      <div className="block lg:hidden space-y-6">
+        {/* AI Scores Section - Mobile */}
+        {(vehicle.personalFitScore !== null || vehicle.aiPriorityRating !== null || vehicle.marketValueScore !== null) && (
+          <section className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">AI Scores</h2>
+            <div className="space-y-3">
+              {vehicle.personalFitScore !== null && (
+                <div className="bg-blue-50 rounded-lg p-3 flex justify-between items-center">
+                  <div className="text-sm text-gray-600">Personal Fit Score</div>
+                  <div className="text-xl font-bold text-blue-600">{vehicle.personalFitScore}/10</div>
+                </div>
+              )}
+
+              {vehicle.marketValueScore !== null && (
+                <div className="bg-green-50 rounded-lg p-3 flex justify-between items-center">
+                  <div className="text-sm text-gray-600">Market Value</div>
+                  <div className="text-xl font-bold text-green-600">{vehicle.marketValueScore}</div>
+                </div>
+              )}
+
+              {vehicle.aiPriorityRating !== null && (
+                <div className="bg-purple-50 rounded-lg p-3 flex justify-between items-center">
+                  <div className="text-sm text-gray-600">Priority Rating</div>
+                  <div className="text-xl font-bold text-purple-600">{vehicle.aiPriorityRating}/10</div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* My Workflow Section - Mobile */}
+        <section className="bg-white rounded-lg shadow-md p-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">My Workflow</h2>
+
+          <div className="space-y-4">
+            {/* Note: Status dropdown is in sticky header on mobile, so we can skip it here or show action buttons */}
+
+            {/* Action Buttons */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Actions
+              </label>
+              <div className="flex flex-col gap-2">
+                {/* Translate - hide when translation exists */}
+                {!localVehicle.description && (
+                  <button
+                    onClick={handleTranslate}
+                    disabled={isTranslating}
+                    className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                    title="Translate vehicle description"
+                  >
+                    {isTranslating ? (
+                      <>
+                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                        <span>Translating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                        </svg>
+                        <span>Translate</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {/* Quick Analysis - hide when summary exists */}
+                {!localVehicle.virtualMechanicSummary && (
+                  <button
+                    onClick={handleQuickAnalysis}
+                    disabled={isAnalyzing || !localVehicle.description}
+                    className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                    title="Generate AI summary analysis (concise key insights)"
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                        <span>Analyzing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <span>Quick Analysis</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {/* Full Analysis - hide when full report exists */}
+                {!localVehicle.aiMechanicReport && (
+                  <button
+                    onClick={handleFullAnalysis}
+                    disabled={isAnalyzing || !localVehicle.description}
+                    className="w-full px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-orange-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                    title="Generate full detailed mechanic report (comprehensive analysis)"
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                        <span>Analyzing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span>Full Analysis</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+              {translateError && (
+                <p className="mt-2 text-sm text-red-600">{translateError}</p>
+              )}
+              {translateSuccess && (
+                <p className="mt-2 text-sm text-green-600">Translation completed successfully!</p>
+              )}
+              {analyzeError && (
+                <p className="mt-2 text-sm text-red-600">{analyzeError}</p>
+              )}
+              {analyzeSuccess && (
+                <p className="mt-2 text-sm text-green-600">Analysis completed successfully!</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="notes-mobile" className="block text-sm font-medium text-gray-700 mb-2">
+                Personal Notes
+              </label>
+              <textarea
+                id="notes-mobile"
+                value={personalNotes}
+                onChange={(e) => setPersonalNotes(e.target.value)}
+                onBlur={handleNotesBlur}
+                disabled={isSaving}
+                placeholder="Add your notes about this vehicle..."
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 resize-y"
+                rows={4}
+              />
+            </div>
+          </div>
+        </section>
+      </div>
+
+      </div>
+      {/* End Main Content */}
+
+      {/* Sidebar (Right) - Desktop Sticky */}
+      <aside className="hidden lg:block lg:sticky lg:top-0 lg:w-96 lg:max-h-screen lg:overflow-y-auto space-y-6 lg:pl-6 lg:border-l lg:border-gray-200">
+        {/* AI Scores Section */}
+        {(vehicle.personalFitScore !== null || vehicle.aiPriorityRating !== null || vehicle.marketValueScore !== null) && (
+          <section className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">AI Scores</h2>
+            <div className="space-y-3">
+              {vehicle.personalFitScore !== null && (
+                <div className="bg-blue-50 rounded-lg p-3 flex justify-between items-center">
+                  <div className="text-sm text-gray-600">Personal Fit Score</div>
+                  <div className="text-xl font-bold text-blue-600">{vehicle.personalFitScore}/10</div>
+                </div>
+              )}
+
+              {vehicle.marketValueScore !== null && (
+                <div className="bg-green-50 rounded-lg p-3 flex justify-between items-center">
+                  <div className="text-sm text-gray-600">Market Value</div>
+                  <div className="text-xl font-bold text-green-600">{vehicle.marketValueScore}</div>
+                </div>
+              )}
+
+              {vehicle.aiPriorityRating !== null && (
+                <div className="bg-purple-50 rounded-lg p-3 flex justify-between items-center">
+                  <div className="text-sm text-gray-600">Priority Rating</div>
+                  <div className="text-xl font-bold text-purple-600">{vehicle.aiPriorityRating}/10</div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* My Workflow Section */}
+        <section className="bg-white rounded-lg shadow-md p-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">My Workflow</h2>
+
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">
+                Status
+              </label>
+              <select
+                id="status"
+                value={status}
+                onChange={(e) => handleStatusChange(e.target.value)}
+                disabled={isSaving}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              >
+                <option value="new">New</option>
+                <option value="processed">Processed</option>
+                <option value="skipped">Skipped</option>
+                <option value="to_contact">To Contact</option>
+                <option value="contacted">Contacted</option>
+                <option value="to_visit">To Visit</option>
+                <option value="visited">Visited</option>
+                <option value="not_interested">Not Interested</option>
+                <option value="deleted">Deleted</option>
+              </select>
+            </div>
+
+            {/* Action Buttons */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Actions
+              </label>
+              <div className="flex flex-col gap-2">
+                {/* Translate - hide when translation exists */}
+                {!localVehicle.description && (
+                  <button
+                    onClick={handleTranslate}
+                    disabled={isTranslating}
+                    className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                    title="Translate vehicle description"
+                  >
+                    {isTranslating ? (
+                      <>
+                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                        <span>Translating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                        </svg>
+                        <span>Translate</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {/* Quick Analysis - hide when summary exists */}
+                {!localVehicle.virtualMechanicSummary && (
+                  <button
+                    onClick={handleQuickAnalysis}
+                    disabled={isAnalyzing || !localVehicle.description}
+                    className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                    title="Generate AI summary analysis (concise key insights)"
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                        <span>Analyzing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <span>Quick Analysis</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {/* Full Analysis - hide when full report exists */}
+                {!localVehicle.aiMechanicReport && (
+                  <button
+                    onClick={handleFullAnalysis}
+                    disabled={isAnalyzing || !localVehicle.description}
+                    className="w-full px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-orange-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                    title="Generate full detailed mechanic report (comprehensive analysis)"
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                        <span>Analyzing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span>Full Analysis</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+              {translateError && (
+                <p className="mt-2 text-sm text-red-600">{translateError}</p>
+              )}
+              {translateSuccess && (
+                <p className="mt-2 text-sm text-green-600">Translation completed successfully!</p>
+              )}
+              {analyzeError && (
+                <p className="mt-2 text-sm text-red-600">{analyzeError}</p>
+              )}
+              {analyzeSuccess && (
+                <p className="mt-2 text-sm text-green-600">Analysis completed successfully!</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-2">
+                Personal Notes
+              </label>
+              <textarea
+                id="notes"
+                value={personalNotes}
+                onChange={(e) => setPersonalNotes(e.target.value)}
+                onBlur={handleNotesBlur}
+                disabled={isSaving}
+                placeholder="Add your notes about this vehicle..."
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 resize-y"
+                rows={4}
+              />
+            </div>
+          </div>
+        </section>
+      </aside>
+      </div>
+      {/* End Desktop Two-Column Layout */}
     </div>
   );
 }

@@ -1,8 +1,8 @@
 # Technical Debt Registry
 
 **Last Updated:** 2025-01-19 (Verified against actual codebase)
-**Total Active Items:** 14
-**Total Estimated Effort:** 28-46 hours
+**Total Active Items:** 15
+**Total Estimated Effort:** 33-54 hours
 
 ---
 
@@ -156,6 +156,35 @@ This registry tracks all technical debt, deferred improvements, and post-MVP enh
 - **Files Affected**:
   - `apps/web/src/components/VehicleCard.tsx` (Quick/Full Analysis buttons)
   - `apps/web/src/context/VehicleContext.tsx` (operation state management)
+
+#### TD-024: Manual Score Edits Overwritten by AI Re-Analysis
+- **Origin**: Story 4.5 (Epic 4 - Manual Overrides & Priority Flags)
+- **Category**: Data Integrity / MVP Trade-off
+- **Impact**: MEDIUM - User edits lost when re-running AI analysis
+- **Effort**: 5-8 hours (to implement proper solution)
+- **Description**: Priority and market value scores can be manually edited, but re-running AI analysis overwrites these manual edits
+  - **Current Behavior (MVP)**: Direct edit of `aiPriorityRating` and `marketValueScore` fields
+  - **Risk**: Re-running AI analysis (`pnpm analyze`) will overwrite manual edits without warning
+  - **Trade-off**: Chosen for MVP simplicity - get app usable quickly to find vehicle
+  - **User Acceptance**: User acknowledged risk, prefers simple implementation for now
+- **Verified Status**: ✅ INTENTIONAL DESIGN TRADE-OFF - Documented in Story 4.5
+- **Proposed Solution** (Future Enhancement):
+  - Add separate fields: `manualPriorityScore: number | null`, `manualMarketValue: string | null`
+  - Display logic: Show manual override if set, otherwise show AI value
+  - Visual indicator: Badge showing "Manual" vs "AI"
+  - AI re-analysis never overwrites manual fields
+  - User can revert to AI values by clearing manual override
+- **Alternative Solutions**:
+  - Add `isLockedFromReanalysis: boolean` flag (prevent AI updates)
+  - Add audit trail tracking which values were manually edited
+  - Confirmation prompt before overwriting manually-edited scores
+- **Proposed Story**: Post-MVP enhancement (Epic 5 or future iteration)
+- **Status**: Accepted Risk - Document in user guide
+- **Priority Note**: LOW for MVP (user acknowledged), MEDIUM for production (data integrity concern)
+- **Related Future Enhancements**:
+  - History/audit log of score changes
+  - Bulk operations respect manual edits
+  - Notes field explaining manual override reasoning
 
 #### TD-006: Nominatim API Production Scalability
 - **Origin**: Story 3.2 (QA Review - Security Review / Performance)

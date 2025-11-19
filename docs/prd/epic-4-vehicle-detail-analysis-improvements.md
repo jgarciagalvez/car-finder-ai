@@ -1,6 +1,6 @@
 # Epic 4: Vehicle Detail Page & Analysis Improvements
 
-**Epic Goal:** Optimize AI analysis processing time through parallel execution, redesign the vehicle detail page for better usability with improved image viewing and layout, enhance the virtual mechanic report for clarity, and enable manual feature management for data completeness.
+**Epic Goal:** Optimize AI analysis processing through parallel execution, enhance virtual mechanic reports with concise summaries, redesign the vehicle detail page with improved layout (sidebar, square images, scores), add full-size image viewing, and enable manual feature management for data completeness.
 
 ---
 
@@ -114,7 +114,125 @@
 
 ---
 
-### **Story 4.3: Features Management - Complete Feature System**
+### **Story 4.3: Detail Page Layout Redesign**
+
+**As a** user, **I want** a redesigned vehicle detail page with improved layout and visual hierarchy, **so that** I can efficiently view vehicle information with images on the left and scores/workflow controls in an accessible sidebar.
+
+**Context:**
+- Current layout needs reorganization for better information hierarchy
+- Images currently use fixed aspect ratio causing cropping issues
+- Scores and workflow controls scroll out of view
+- Need cohesive layout that works together as a system
+
+**Acceptance Criteria:**
+
+1. **Square Image Thumbnails (Detail Page Only):**
+   - Image thumbnails displayed as squares (maintain same height as current)
+   - Images fill square area (may crop slightly, but predictably)
+   - Maintain image carousel navigation (previous/next arrows)
+   - Responsive sizing for different screen sizes
+   - Dashboard cards keep current carousel/image display (no changes)
+
+2. **Desktop Sticky Sidebar:**
+   - Sticky sidebar positioned on right side of detail page
+   - Sidebar remains visible while user scrolls through vehicle details
+   - Sidebar content includes:
+     - **Scores section** (AI Priority Rating, Personal Fit Score, Market Value)
+     - **Workflow section** (status dropdown, action buttons, personal notes)
+   - Sidebar has fixed width, appropriate for content
+   - Sidebar doesn't overlap main content area
+   - Images positioned on left, sidebar on right
+
+3. **Scores in Sidebar:**
+   - Scores displayed at top of sidebar, vertically stacked or in grid layout
+   - Personal Fit Score scale changed from "N/100" to "N/10"
+   - Database value remains 0-100 internally, display converts to 0-10
+   - Example: Database value 85 displays as "8.5/10" or "9/10" (decide on decimal)
+   - Color-coded badges remain unchanged (good/medium/poor indicators)
+   - Scale change applies to both dashboard and detail page
+   - Maintain clear labels for each score type
+
+4. **Workflow Controls in Sidebar:**
+   - "My Workflow" section positioned below scores in sidebar
+   - Includes: status dropdown, action buttons (translate/analyze), personal notes
+   - Personal notes maintain existing autosave behavior (saves onBlur)
+   - No changes needed to save functionality, only repositioning
+
+5. **Mobile Responsive Layout:**
+   - On mobile viewports, use simple sticky header approach (temporary MVP solution)
+   - Sticky header includes most critical controls (status dropdown, key actions)
+   - Header doesn't block excessive screen space
+   - Scores and full workflow section accessible by scrolling
+   - **Note:** This is a quick solution for MVP, proper mobile layout deferred to future enhancement
+
+6. **Responsive Breakpoints:**
+   - Clear breakpoint between desktop (sticky sidebar) and mobile (sticky header) layouts
+   - Typically: desktop >= 768px or 1024px, mobile < breakpoint
+   - Smooth transition between layouts when resizing
+   - On smaller screens (below breakpoint), sidebar content stacks vertically below images
+
+7. **Visual Design:**
+   - Sidebar visually distinct from main content (border, background color, or spacing)
+   - Sidebar styling consistent with overall app design
+   - Adequate padding and spacing for readability
+   - Sticky positioning doesn't cause layout shift or jank
+   - Ensure readability and visual hierarchy for scores
+
+**Technical Notes:**
+- Files to modify: `apps/web/src/app/vehicle/[id]/page.tsx`, `apps/web/src/components/VehicleDetail.tsx`, `apps/web/src/components/VehicleCard.tsx`
+- Use CSS `position: sticky` for sidebar
+- Consider using flexbox or grid layout for main content + sidebar structure
+- Test scrolling performance with sticky elements
+- Ensure sidebar doesn't cover footer or other important content
+- VehicleDetail component already has autosave via `handleNotesBlur` (line 62-75) - preserve this behavior
+- Score conversion calculation: `(value / 100) * 10` - decide on rounding approach
+- Test with various score values and screen sizes
+
+---
+
+### **Story 4.4: Image Modal Viewer**
+
+**As a** user, **I want** to view vehicle images in full size without cropping, **so that** I can see complete images and examine vehicle condition clearly.
+
+**Context:**
+- Building on Story 4.3's square thumbnails
+- Users need ability to view full, uncropped images
+- Modal/lightbox provides better viewing experience than inline carousel
+
+**Acceptance Criteria:**
+
+1. **Modal/Lightbox Viewer:**
+   - Clicking any thumbnail opens full-size image in modal overlay
+   - Modal displays complete, uncropped image
+   - Previous/next navigation buttons in modal (cycle through all vehicle images)
+   - Keyboard navigation support (arrow keys, escape to close)
+   - Click outside image or X button to close modal
+   - Image counter displayed (e.g., "3 / 8")
+
+2. **Image Loading:**
+   - Modal images lazy load when opened (not all at once)
+   - Loading indicator while image loads
+   - Graceful handling of broken/missing images
+   - High-resolution images if available, fallback to standard resolution
+
+3. **Mobile Experience:**
+   - Modal viewer works on mobile (touch swipe for navigation)
+   - Pinch-to-zoom support in modal (optional enhancement)
+   - Responsive layout for modal on smaller screens
+
+4. **Detail Page Only:**
+   - Changes apply only to vehicle detail page
+   - Dashboard cards keep current image display (no modal functionality)
+
+**Technical Notes:**
+- Files to modify: `apps/web/src/app/vehicle/[id]/page.tsx`
+- Consider using existing lightbox library (e.g., react-image-lightbox, yet-another-react-lightbox)
+- Ensure modal has proper z-index layering above sidebar
+- Test with various image sizes and aspect ratios
+
+---
+
+### **Story 4.5: Features Management - Complete Feature System**
 
 **As a** user, **I want** to manually add or edit vehicle features on the detail page, **so that** I can capture important features mentioned in descriptions but missing from scraped data.
 
@@ -125,6 +243,7 @@
 - Features should sync between dashboard and detail page via VehicleContext
 
 **Acceptance Criteria:**
+
 1. **Expand/Collapse Functionality:**
    - Dashboard cards show first 5 features by default
    - Clickable "(+N more)" button expands to show all features
@@ -176,165 +295,26 @@
 
 ---
 
-### **Story 4.4: Images - Square Thumbnails + Modal Viewer**
-
-**As a** user, **I want** to view vehicle images in full size without cropping, **so that** I can see complete images and examine vehicle condition clearly.
-
-**Context:**
-- Current implementation: Fixed aspect ratio causes images to be cut off
-- Current location: `apps/web/src/components/VehicleCard.tsx` lines 188-241
-- User need: See full images without cropping, ability to view larger
-
-**Acceptance Criteria:**
-1. **Square Thumbnails (Detail Page Only):**
-   - Image thumbnails displayed as squares (maintain same height as current)
-   - Images fill square area (may crop slightly, but predictably)
-   - Maintain image carousel navigation (previous/next arrows)
-   - Responsive sizing for different screen sizes
-
-2. **Modal/Lightbox Viewer:**
-   - Clicking any thumbnail opens full-size image in modal overlay
-   - Modal displays complete, uncropped image
-   - Previous/next navigation buttons in modal (cycle through all vehicle images)
-   - Keyboard navigation support (arrow keys, escape to close)
-   - Click outside image or X button to close modal
-   - Image counter displayed (e.g., "3 / 8")
-
-3. **Detail Page Only:**
-   - Changes apply only to vehicle detail page
-   - Dashboard cards keep current carousel/image display (no changes)
-
-4. **Image Loading:**
-   - Modal images lazy load when opened (not all at once)
-   - Loading indicator while image loads
-   - Graceful handling of broken/missing images
-   - High-resolution images if available, fallback to standard resolution
-
-5. **Mobile Experience:**
-   - Modal viewer works on mobile (touch swipe for navigation)
-   - Pinch-to-zoom support in modal (optional enhancement)
-   - Responsive layout for thumbnails on smaller screens
-
-**Technical Notes:**
-- Files to modify: `apps/web/src/app/vehicle/[id]/page.tsx`
-- Consider using existing lightbox library (e.g., react-image-lightbox, yet-another-react-lightbox)
-- Ensure modal has proper z-index layering
-- Test with various image sizes and aspect ratios
-
----
-
-### **Story 4.5: Scores - Dedicated Section + Layout**
-
-**As a** user, **I want** vehicle scores displayed clearly and consistently, **so that** I can quickly assess vehicle quality ratings.
-
-**Context:**
-- Current scores: AI Priority Rating, Personal Fit Score, Market Value
-- Current location: `apps/web/src/components/VehicleCard.tsx` lines 302-328
-- User need: Better positioning, clearer Personal Fit Score scale
-
-**Acceptance Criteria:**
-1. **Scores Repositioning (Detail Page):**
-   - Scores section moved to right side of images section
-   - Currently empty space to the right of images is used
-   - Scores displayed vertically stacked or in grid layout
-   - Responsive: on smaller screens, scores move below images
-
-2. **Personal Fit Score Scale Change:**
-   - Change display from "N/100" to "N/10" scale
-   - Database value may remain 0-100 internally, display converts to 0-10
-   - Example: Database value 85 displays as "8.5/10" or "9/10" (decide on decimal display)
-   - Color-coded badges remain unchanged (good/medium/poor indicators)
-   - Scale change applies to both dashboard and detail page
-
-3. **Visual Consistency:**
-   - Keep existing color-coded badge styling
-   - Maintain clear labels for each score type:
-     - AI Priority Rating
-     - Personal Fit Score
-     - Market Value
-   - Resize badges if needed to fit new layout space
-   - Ensure readability and visual hierarchy
-
-4. **Dashboard Cards:**
-   - Personal Fit Score scale change applies to dashboard cards as well
-   - Dashboard layout remains otherwise unchanged
-   - Consistent score display format across all views
-
-**Technical Notes:**
-- Files to modify: `apps/web/src/components/VehicleCard.tsx`, `apps/web/src/app/vehicle/[id]/page.tsx`
-- Decide on rounding: 8.5/10 vs 9/10 (round to nearest integer or show one decimal)
-- Ensure conversion calculation is consistent: `(value / 100) * 10`
-- Test with various score values to ensure proper display
-
----
-
-### **Story 4.6: Layout - Sticky Workflow Sidebar**
-
-**As a** user, **I want** workflow controls to remain accessible while scrolling through vehicle details, **so that** I can quickly update status or take actions without scrolling back to the top.
-
-**Context:**
-- "My Workflow" section currently scrolls out of view on detail page
-- Includes: status dropdown, action buttons (translate/analyze), personal notes
-- Current location: Lines 424-490 in VehicleCard.tsx (reference for content)
-
-**Acceptance Criteria:**
-1. **Desktop Sticky Sidebar:**
-   - "My Workflow" section displayed as sticky sidebar on desktop viewports
-   - Sidebar remains visible while user scrolls through vehicle details
-   - Sidebar positioned on right side of page (or left, based on design preference)
-   - Sidebar content includes:
-     - Status dropdown (from Story 3.5)
-     - Action buttons (translate, analyze, etc.) if applicable
-     - Personal notes with existing onBlur save behavior
-   - Sidebar has fixed width, appropriate for content
-   - Sidebar doesn't overlap main content area
-
-2. **Mobile Sticky Header:**
-   - On mobile viewports, use simple sticky header approach (temporary MVP solution)
-   - Sticky header includes most critical controls (status dropdown, key actions)
-   - Header doesn't block excessive screen space
-   - Full workflow section accessible by scrolling (collapse/expand pattern)
-   - **Note:** This is a quick solution for MVP, proper mobile layout deferred to future enhancement
-
-3. **Responsive Breakpoints:**
-   - Clear breakpoint between desktop (sticky sidebar) and mobile (sticky header) layouts
-   - Typically: desktop >= 768px or 1024px, mobile < breakpoint
-   - Smooth transition between layouts when resizing
-
-4. **Existing Autosave Preserved:**
-   - Personal notes in sidebar maintain existing autosave behavior (saves onBlur - when field loses focus)
-   - No changes needed to save functionality, only repositioning of the workflow section
-
-5. **Visual Design:**
-   - Sidebar visually distinct from main content (border, background color, or spacing)
-   - Sidebar styling consistent with overall app design
-   - Adequate padding and spacing for readability
-   - Sticky positioning doesn't cause layout shift or jank
-
-**Technical Notes:**
-- Files to modify: `apps/web/src/app/vehicle/[id]/page.tsx`, `apps/web/src/components/VehicleDetail.tsx`
-- Use CSS `position: sticky` for sidebar
-- Consider using flexbox or grid layout for main content + sidebar structure
-- Test scrolling performance with sticky elements
-- Ensure sidebar doesn't cover footer or other important content
-- VehicleDetail component already has autosave via `handleNotesBlur` (line 62-75) - preserve this behavior
-
----
-
 ## Epic Summary
 
-**Total Stories:** 6
+**Total Stories:** 5
 
 **Key Outcomes:**
 - 3-4x faster AI analysis processing (4 hours → 1-1.5 hours)
 - Clearer, more usable virtual mechanic reports (concise summary + detailed report)
+- Redesigned detail page layout (square images, sticky sidebar with scores and workflow)
+- Enhanced image viewing with full-size modal viewer
 - Complete feature management system (manual add/edit on detail page)
-- Improved image viewing experience (square thumbnails + modal viewer)
-- Better score visibility (repositioned, clearer scale)
-- Enhanced detail page workflow (sticky sidebar with existing autosave)
+
+**Story Sequence & Rationale:**
+1. **4.1 - Parallel Analysis Processing:** Performance improvement, immediate value
+2. **4.2 - Virtual Mechanic Report Redesign:** Content improvement, streamlines analysis
+3. **4.3 - Detail Page Layout Redesign:** Foundation for improved UI (images + sidebar + scores)
+4. **4.4 - Image Modal Viewer:** Enhances 4.3's square thumbnails with full-size viewing
+5. **4.5 - Features Management:** Lower priority enhancement, can be deferred if needed
 
 **Database Changes Required:**
-- New field: `virtualMechanicSummary: string | null` (concise summary)
+- New field: `virtualMechanicSummary: string | null` (concise summary for Story 4.2)
 - No migration required for features (existing array field)
 
 **Processing Improvements:**
@@ -342,9 +322,9 @@
 - Concise summary generation speeds up individual vehicle analysis
 
 **Dependencies:**
-- Story 4.1 (Parallel processing) should be prioritized early for immediate value
-- Story 4.2 (Virtual mechanic redesign) should be completed early to streamline analysis
-- Other stories are relatively independent
+- Story 4.4 builds directly on Story 4.3's square thumbnail implementation
+- Stories 4.1, 4.2, and 4.5 are independent and can be worked on separately
+- Story 4.3 is a cohesive unit (layout + sidebar + scores) - do not decompose further
 
 **Existing Functionality Preserved:**
 - Personal notes autosave (onBlur) already implemented in VehicleDetail component (line 62-75)
